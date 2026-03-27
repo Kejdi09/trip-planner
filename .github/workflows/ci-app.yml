@@ -1,4 +1,4 @@
-name: CI - Web
+name: CI - App
 
 on:
   push:
@@ -6,13 +6,13 @@ on:
       - main
       - dev
     paths:
-      - 'web/**'
+      - 'app/**'
   pull_request:
     branches:
       - main
       - dev
     paths:
-      - 'web/**'
+      - 'app/**'
 
 jobs:
   build:
@@ -29,20 +29,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          
 
       - name: Install dependencies
-        working-directory: web
+        working-directory: app
         run: npm install
 
       - name: Lint
-        working-directory: web
+        working-directory: app
         run: npm run lint
 
       - name: Test
-        working-directory: web
+        working-directory: app
         run: npm test
 
       - name: Build
-        working-directory: web
-        run: npm run build
+        working-directory: app
+        run: npx expo export -p web
