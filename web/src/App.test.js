@@ -1,3 +1,4 @@
+import '@testing-library/jest-dom';  // ← add this line at the top
 import { render, screen } from '@testing-library/react';
 import App from './App';
 
