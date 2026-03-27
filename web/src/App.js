@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3001';
+
 function App() {
   const [a, setA] = useState('');
   const [b, setB] = useState('');
@@ -14,7 +16,7 @@ function App() {
 
     try {
       const response = await fetch(
-        `http://localhost:3001/sum?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`
+        `${API_BASE_URL}/sum?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`
       );
       const data = await response.json();
 
@@ -24,7 +26,11 @@ function App() {
 
       setResult(data.sum);
     } catch (err) {
-      setError(err.message || 'Something went wrong');
+      if (err.message === 'Failed to fetch') {
+        setError(`Cannot reach backend API at ${API_BASE_URL}. Start backend server and try again.`);
+      } else {
+        setError(err.message || 'Something went wrong');
+      }
     } finally {
       setLoading(false);
     }
@@ -34,6 +40,7 @@ function App() {
     <div style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
       <h1>Trip Planner</h1>
       <p>Quick backend test: add two numbers using the API.</p>
+      <p>API URL: {API_BASE_URL}</p>
 
       <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
         <input
