@@ -1,40 +1,76 @@
-# trip-planner
+# TripSync
 
-A full MERN stack monorepo for planning and managing trips.
+TripSync is a social trip planning app.
 
-## Structure
+This monorepo contains:
 
-```
-trip-planner/
-├── backend/    # Node.js + Express REST API
-├── web/        # React web application
-└── mobile/     # Expo + React Native mobile application
-```
+- an Expo app for web and mobile
+- a Node/Express backend (deployed on Render, currently minimal)
+- Supabase migrations for database changes
 
-## Getting Started
+## Project Structure
 
-Each sub-project is independent. Navigate to the desired folder and follow the instructions in its own README or run `npm install` followed by `npm start`.
-
-## MongoDB Atlas Setup (Team Safe)
-
-Use environment variables for Atlas credentials. Do not commit real secrets.
-
-1. In Atlas, create a database user and allow network access for your dev IP (or temporary `0.0.0.0/0` for testing).
-2. Copy your Atlas URI from `Connect -> Drivers`.
-3. In `backend/`, create `.env` by copying `.env.example`.
-4. Set `MONGODB_URI` in `backend/.env` with your real URI.
-5. Keep `.env` local only (already gitignored). Commit only `.env.example`.
-
-Example local file:
-
-```env
-PORT=3001
-MONGODB_URI=mongodb+srv://username:password@cluster-url/tripplanner?retryWrites=true&w=majority&appName=TripPlanner
-MONGODB_DB_NAME=tripplanner
+```text
+tripsync/
+├── app/                  # Expo (React Native + Expo Router)
+├── backend/              # Node/Express API (Render)
+└── supabase/
+	└── migrations/       # SQL migration files
 ```
 
-For production/staging, put `MONGODB_URI` in your hosting provider secrets (not in git).
+Note: if `supabase/migrations/` is missing in your local checkout, sync with `dev` and create it before adding migrations.
 
-## Contributing
+## Tech Stack
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for branch workflow, PR rules, and developer guidelines.
+- Frontend/Mobile: Expo (React Native) + Expo Router
+- Database/Auth/Storage: Supabase
+- Mobile testing: Expo Go
+- Web staging: Vercel (`dev` branch)
+- Backend hosting: Render (`dev` and `main`)
+- CI: GitHub Actions (lint, test, build)
+
+## Local Setup
+
+### Prerequisites
+
+- Node.js 20+
+- npm
+
+### 1) App
+
+```bash
+cd app
+npm install
+npx expo start
+```
+
+- Scan the QR code with Expo Go for mobile testing
+- Press `w` to run on web
+
+### 2) Backend
+
+```bash
+cd backend
+npm install
+npm start
+```
+
+## Environment Variables
+
+Do not commit `.env`.
+
+Get these values from DevOps privately:
+
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+- `EXPO_PUBLIC_API_URL`
+
+## CI and Branches
+
+- `main` is production and requires PR approval
+- `dev` is staging and CI must pass
+- `feature/*` branches must be created from `dev` and merged back to `dev` via PR
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the exact PR and commit rules.
+See [DEVELOPMENT.md](./DEVELOPMENT.md) for daily workflow.
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for system design and responsibilities.
