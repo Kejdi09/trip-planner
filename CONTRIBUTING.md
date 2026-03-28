@@ -1,38 +1,56 @@
-# Contributing to trip-planner
+# Contributing to TripSync
 
-## Branch Workflow
+## Branch Strategy
 
-| Branch | Purpose |
-|--------|---------|
-| `main` | Production releases |
-| `dev` | Integration / staging |
-| `feature/*` | Individual feature development |
+- `main` -> production, PR approval required
+- `dev` -> staging, CI must pass
+- `feature/*` -> always branch from `dev`, PR back into `dev`
 
-### Flow
+Required flow:
 
-```
-feature/* → dev → main
+```text
+feature/* -> dev -> main
 ```
 
-1. Create a `feature/<name>` branch off `dev`.
-2. Open a pull request from `feature/<name>` → `dev` when the work is ready.
-3. After QA on `dev`, open a pull request from `dev` → `main` for a production release.
+Rules:
+
+1. Never push directly to `dev` or `main`.
+2. Never force-push `dev` or `main`.
+3. Keep feature branches focused to one change set.
 
 ## Pull Request Rules
 
-- **1 approval** is required before merging any pull request.
-- All CI checks must pass before merging.
-- Pull request titles should be descriptive (e.g. `feat: add trip details page`).
-- Keep pull requests small and focused — one feature or fix per PR.
+1. Open PR from `feature/*` into `dev`.
+2. Ensure CI is green (lint, test, build).
+3. At least one reviewer approval is required.
+4. Resolve all review comments before merge.
+5. Use small PRs with clear scope.
 
-## Developer Guidelines
+## Commit Message Format
 
-1. **Code style** – Each sub-project (`backend`, `web`, `mobile`) has its own ESLint configuration. Run `npm run lint` inside the sub-project before pushing.
-2. **Tests** – Add or update tests for every change. Run `npm test` inside the sub-project. CI will fail if tests are not green.
-3. **Environment variables** – Never commit `.env` files. Use `.env.example` files to document required variables.
-4. **Commits** – Use [Conventional Commits](https://www.conventionalcommits.org/) format:
-   - `feat:` new feature
-   - `fix:` bug fix
-   - `chore:` tooling / config
-   - `docs:` documentation only
-5. **Dependencies** – Discuss adding new dependencies in the PR description. Avoid unnecessary packages.
+Use Conventional Commits:
+
+- `feat: add trip invite flow`
+- `fix: prevent duplicate activity creation`
+- `chore: update expo dependencies`
+- `docs: update setup instructions`
+- `refactor: simplify trip list state handling`
+- `test: add unit test for trip card`
+
+## Environment and Secrets
+
+- Never commit `.env`.
+- Never post secrets in PRs/issues/chat.
+- Get env values from DevOps privately.
+
+Required app env vars:
+
+- `EXPO_PUBLIC_SUPABASE_URL`
+- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+- `EXPO_PUBLIC_API_URL`
+
+## CI
+
+- CI runs via GitHub Actions.
+- CI validates lint, tests, and build.
+- `dev` must stay green.
