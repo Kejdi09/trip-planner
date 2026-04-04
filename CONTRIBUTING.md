@@ -1,56 +1,50 @@
-# Contributing to TripSync
+# Contributing
 
-## Branch Strategy
+Follow one branch path: `feature/* -> dev -> main`.
 
-- `main` -> production, PR approval required
-- `dev` -> staging, CI must pass
-- `feature/*` -> always branch from `dev`, PR back into `dev`
+Create every feature branch from `dev`, then open a PR back to `dev`.
 
-Required flow:
-
-```text
-feature/* -> dev -> main
+```bash
+git checkout dev
+git pull origin dev
+git checkout -b feature/<short-name>
 ```
 
-Rules:
+Do not push directly to `dev` or `main`. Do not force-push shared branches.
 
-1. Never push directly to `dev` or `main`.
-2. Never force-push `dev` or `main`.
-3. Keep feature branches focused to one change set.
+## Pull Requests
 
-## Pull Request Rules
+Open focused PRs. Keep each PR to one change set.
 
-1. Open PR from `feature/*` into `dev`.
-2. Ensure CI is green (lint, test, build).
-3. At least one reviewer approval is required.
-4. Resolve all review comments before merge.
-5. Use small PRs with clear scope.
+Before opening a PR, run lint and tests in both app and backend:
 
-## Commit Message Format
+```bash
+cd app
+npm run lint
+npm test -- --watch=false
 
-Use Conventional Commits:
+cd ../backend
+npm run lint
+npm test
+```
 
-- `feat: add trip invite flow`
-- `fix: prevent duplicate activity creation`
-- `chore: update expo dependencies`
-- `docs: update setup instructions`
-- `refactor: simplify trip list state handling`
-- `test: add unit test for trip card`
+Open the PR from your feature branch into `dev`, wait for CI to pass, resolve every review comment, then merge after approval.
 
-## Environment and Secrets
+## Commit Messages
 
-- Never commit `.env`.
-- Never post secrets in PRs/issues/chat.
-- Get env values from DevOps privately.
+Use Conventional Commits. Write short, specific messages.
 
-Required app env vars:
+```text
+feat: add trip invite flow
+fix: prevent duplicate activity creation
+chore: update expo dependencies
+docs: rewrite onboarding docs
+refactor: simplify trip list state handling
+test: add unit test for trip card
+```
 
-- `EXPO_PUBLIC_SUPABASE_URL`
-- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-- `EXPO_PUBLIC_API_URL`
+## Secrets and Configuration
 
-## CI
+Never commit `.env` files. Never paste keys in issues, PRs, or chat.
 
-- CI runs via GitHub Actions.
-- CI validates lint, tests, and build.
-- `dev` must stay green.
+When you add or rename an environment variable, update both `app/.env.example` and `README.md` in the same PR.

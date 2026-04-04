@@ -1,20 +1,4 @@
-const express = require('express');
+const { app } = require('./app')
 
-const app = express();
-const PORT = process.env.PORT || 3001;
-
-app.use(express.json());
-
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
-});
-
-// TODO: add trip routes here
-
-if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`Backend server running on port ${PORT}`);
-  });
-}
-
-module.exports = app;
+const PORT = process.env.PORT || 3000
+app.listen(PORT, () => console.log(`Backend running on port ${PORT}`))

@@ -1,70 +1,44 @@
 # Architecture
 
-TripSync is organized as a monorepo with clear responsibilities between app, backend, and database layer.
+TripSync runs as three layers: Expo client, Express backend, and Supabase.
 
-## Folder Structure
+## Repository Boundaries
 
 ```text
-tripsync/
-├── app/                  # Expo app (React Native + Expo Router)
-├── backend/              # Node/Express API (Render)
+trip-planner/
+├── app/                  Expo client for Android, iOS, and web
+├── backend/              Server-side API and integrations
 └── supabase/
-    └── migrations/       # SQL schema changes
+    └── migrations/       SQL schema change history
 ```
 
-## Responsibilities
+## Layer Responsibilities
 
 ### app/
 
-- Main product code for web and mobile from one codebase.
-- Connects directly to Supabase for database, auth, and storage.
-- Uses Expo Router for navigation/routing.
+The app owns UI, navigation, client state, and standard user-facing data operations. It talks to Supabase for auth, CRUD, and storage.
 
 ### backend/
 
-- Server-side logic layer deployed on Render.
-- Use for logic that should not live in the client:
-  - sensitive operations
-  - integration with external services requiring private keys
-  - controlled server-side workflows
-- If backend is not needed for a feature, prefer direct Supabase usage from app.
+The backend owns server-only logic. Put privileged operations here, especially anything that needs private keys, strict validation, or orchestration across services.
 
 ### supabase/migrations/
 
-- Source of truth for schema changes.
-- Every new table/column/index/policy change should be represented as a migration file.
-- Migration files must be coordinated with DevOps.
+This directory is the source of truth for schema changes. Every table, column, index, and RLS policy change needs a migration file committed with the related feature.
 
-## How Components Connect
+## Runtime Data Flow
 
-1. App authenticates users via Supabase Auth.
-2. App reads/writes trip data in Supabase.
-3. App uses Supabase Storage for files/assets when needed.
-4. App calls backend endpoints only for server-side logic.
-5. Backend can interact with Supabase when privileged processing is required.
+1. The app authenticates users with Supabase Auth.
+2. The app reads and writes primary product data through Supabase.
+3. The app calls backend endpoints when logic must run server-side.
+4. The backend can use elevated Supabase access for controlled operations.
 
-## Supabase vs Backend Decision Rule
+## Decision Rule: Supabase Direct vs Backend Endpoint
 
-Use Supabase directly when:
+Use direct Supabase access for standard CRUD under row-level security.
 
-- standard CRUD is enough
-- auth/session-based access is enough
-- storage operations are straightforward
+Use backend endpoints when the action needs a secret key, cross-service orchestration, or stronger server-side enforcement than client code can guarantee.
 
-Use backend when:
+## Security Boundaries
 
-- operation requires secrets not safe for client
-- operation should be validated/enforced server-side
-- operation coordinates multiple systems and needs orchestration
-
-## Deployment Mapping
-
-- `dev` branch -> staging environment
-  - web staging on Vercel
-  - backend staging on Render
-- `main` branch -> production environment
-  - backend production on Render
-
-## CI
-
-GitHub Actions run lint, test, and build checks to protect `dev` and `main` quality.
+Do not keep service-role operations in the client runtime. Move privileged flows to the backend and store sensitive keys in deployment environment settings.
