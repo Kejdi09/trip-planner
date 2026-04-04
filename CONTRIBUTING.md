@@ -1,56 +1,44 @@
-# Contributing to TripSync
+# Contributing
 
-## Branch Strategy
+TripSync uses a protected branch workflow. All feature work starts from `dev`, merges back into `dev`, then ships through `main`.
 
-- `main` -> production, PR approval required
-- `dev` -> staging, CI must pass
-- `feature/*` -> always branch from `dev`, PR back into `dev`
-
-Required flow:
-
-```text
-feature/* -> dev -> main
+```bash
+git checkout dev
+git pull origin dev
+git checkout -b feature/<short-scope>
 ```
 
-Rules:
+Direct pushes to `main` are not allowed. Keep branch scope tight and avoid mixed feature/fix commits in the same PR.
 
-1. Never push directly to `dev` or `main`.
-2. Never force-push `dev` or `main`.
-3. Keep feature branches focused to one change set.
+## Pull Request Standard
 
-## Pull Request Rules
+Open PRs into `dev` only. Keep each PR limited to one coherent change and include code, tests, and docs in the same branch when needed.
 
-1. Open PR from `feature/*` into `dev`.
-2. Ensure CI is green (lint, test, build).
-3. At least one reviewer approval is required.
-4. Resolve all review comments before merge.
-5. Use small PRs with clear scope.
+Run checks locally before opening the PR:
 
-## Commit Message Format
+```bash
+cd app
+npm run lint
+npm test -- --watch=false
+cd ../backend
+npm run lint
+npm test
+```
 
-Use Conventional Commits:
+Resolve every review comment, re-run checks after rebases, and merge only when CI is green.
 
-- `feat: add trip invite flow`
-- `fix: prevent duplicate activity creation`
-- `chore: update expo dependencies`
-- `docs: update setup instructions`
-- `refactor: simplify trip list state handling`
-- `test: add unit test for trip card`
+## Commit Convention
 
-## Environment and Secrets
+Use Conventional Commits with specific scopes and verbs.
 
-- Never commit `.env`.
-- Never post secrets in PRs/issues/chat.
-- Get env values from DevOps privately.
+```text
+feat: add trip invitation endpoint
+fix: handle missing itinerary date in mobile form
+refactor: move supabase calls to service layer
+test: add backend health route test
+docs: update environment setup section
+```
 
-Required app env vars:
+## Secrets and Configuration Rules
 
-- `EXPO_PUBLIC_SUPABASE_URL`
-- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-- `EXPO_PUBLIC_API_URL`
-
-## CI
-
-- CI runs via GitHub Actions.
-- CI validates lint, tests, and build.
-- `dev` must stay green.
+Never commit `.env` files or paste secrets in PR comments. When a variable changes, update `app/.env.example`, `backend/.env.example`, and `README.md` in the same PR so onboarding stays correct.

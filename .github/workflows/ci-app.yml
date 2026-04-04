@@ -32,11 +32,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: app
-        run: npm install
-
-      - name: Install ESLint
-        working-directory: app
-        run: npm install eslint --save-dev
+        run: npm ci --legacy-peer-deps
 
       - name: Lint
         working-directory: app

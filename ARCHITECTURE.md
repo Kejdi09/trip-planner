@@ -1,70 +1,28 @@
 # Architecture
 
-TripSync is organized as a monorepo with clear responsibilities between app, backend, and database layer.
+TripSync is split into three runtime layers: client (`app/`), API (`backend/`), and data platform (`supabase/`).
 
-## Folder Structure
+## System Boundaries
 
-```text
-tripsync/
-├── app/                  # Expo app (React Native + Expo Router)
-├── backend/              # Node/Express API (Render)
-└── supabase/
-    └── migrations/       # SQL schema changes
-```
+`app/` is the React Native + Expo Router client. It owns UI, navigation, and user-scoped data access.
 
-## Responsibilities
+`backend/` is the Node.js + Express service. It owns privileged operations that require service-role credentials, cross-service orchestration, or server-side validation.
 
-### app/
+`supabase/` stores migration SQL for schema and policy changes. The migration history under `supabase/migrations/` is the authoritative schema record.
 
-- Main product code for web and mobile from one codebase.
-- Connects directly to Supabase for database, auth, and storage.
-- Uses Expo Router for navigation/routing.
+## Runtime Flow
 
-### backend/
+1. The client authenticates through Supabase Auth.
+2. User-scoped reads and writes run through Supabase with RLS.
+3. The client calls backend endpoints for privileged operations.
+4. The backend executes admin-level Supabase calls using server-side credentials.
 
-- Server-side logic layer deployed on Render.
-- Use for logic that should not live in the client:
-  - sensitive operations
-  - integration with external services requiring private keys
-  - controlled server-side workflows
-- If backend is not needed for a feature, prefer direct Supabase usage from app.
+## Where Logic Should Live
 
-### supabase/migrations/
+Keep presentation and user interaction in `app/src/app` and `app/src/components`. Keep external service orchestration and privileged data mutations in `backend/src`.
 
-- Source of truth for schema changes.
-- Every new table/column/index/policy change should be represented as a migration file.
-- Migration files must be coordinated with DevOps.
+When a change needs a service key, it belongs in backend code. When a change fits RLS-protected CRUD with anon auth, it can stay in client code.
 
-## How Components Connect
+## Security Boundary
 
-1. App authenticates users via Supabase Auth.
-2. App reads/writes trip data in Supabase.
-3. App uses Supabase Storage for files/assets when needed.
-4. App calls backend endpoints only for server-side logic.
-5. Backend can interact with Supabase when privileged processing is required.
-
-## Supabase vs Backend Decision Rule
-
-Use Supabase directly when:
-
-- standard CRUD is enough
-- auth/session-based access is enough
-- storage operations are straightforward
-
-Use backend when:
-
-- operation requires secrets not safe for client
-- operation should be validated/enforced server-side
-- operation coordinates multiple systems and needs orchestration
-
-## Deployment Mapping
-
-- `dev` branch -> staging environment
-  - web staging on Vercel
-  - backend staging on Render
-- `main` branch -> production environment
-  - backend production on Render
-
-## CI
-
-GitHub Actions run lint, test, and build checks to protect `dev` and `main` quality.
+Service-role keys belong in backend environment variables only. Do not ship them in mobile or web runtime configuration. If a client flow currently depends on a service-role key, move that operation behind a backend endpoint before release.
