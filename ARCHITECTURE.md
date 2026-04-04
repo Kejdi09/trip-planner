@@ -1,44 +1,28 @@
 # Architecture
 
-TripSync runs as three layers: Expo client, Express backend, and Supabase.
+TripSync is split into three runtime layers: client (`app/`), API (`backend/`), and data platform (`supabase/`).
 
-## Repository Boundaries
+## System Boundaries
 
-```text
-trip-planner/
-├── app/                  Expo client for Android, iOS, and web
-├── backend/              Server-side API and integrations
-└── supabase/
-    └── migrations/       SQL schema change history
-```
+`app/` is the React Native + Expo Router client. It owns UI, navigation, and user-scoped data access.
 
-## Layer Responsibilities
+`backend/` is the Node.js + Express service. It owns privileged operations that require service-role credentials, cross-service orchestration, or server-side validation.
 
-### app/
+`supabase/` stores migration SQL for schema and policy changes. The migration history under `supabase/migrations/` is the authoritative schema record.
 
-The app owns UI, navigation, client state, and standard user-facing data operations. It talks to Supabase for auth, CRUD, and storage.
+## Runtime Flow
 
-### backend/
+1. The client authenticates through Supabase Auth.
+2. User-scoped reads and writes run through Supabase with RLS.
+3. The client calls backend endpoints for privileged operations.
+4. The backend executes admin-level Supabase calls using server-side credentials.
 
-The backend owns server-only logic. Put privileged operations here, especially anything that needs private keys, strict validation, or orchestration across services.
+## Where Logic Should Live
 
-### supabase/migrations/
+Keep presentation and user interaction in `app/src/app` and `app/src/components`. Keep external service orchestration and privileged data mutations in `backend/src`.
 
-This directory is the source of truth for schema changes. Every table, column, index, and RLS policy change needs a migration file committed with the related feature.
+When a change needs a service key, it belongs in backend code. When a change fits RLS-protected CRUD with anon auth, it can stay in client code.
 
-## Runtime Data Flow
+## Security Boundary
 
-1. The app authenticates users with Supabase Auth.
-2. The app reads and writes primary product data through Supabase.
-3. The app calls backend endpoints when logic must run server-side.
-4. The backend can use elevated Supabase access for controlled operations.
-
-## Decision Rule: Supabase Direct vs Backend Endpoint
-
-Use direct Supabase access for standard CRUD under row-level security.
-
-Use backend endpoints when the action needs a secret key, cross-service orchestration, or stronger server-side enforcement than client code can guarantee.
-
-## Security Boundaries
-
-Do not keep service-role operations in the client runtime. Move privileged flows to the backend and store sensitive keys in deployment environment settings.
+Service-role keys belong in backend environment variables only. Do not ship them in mobile or web runtime configuration. If a client flow currently depends on a service-role key, move that operation behind a backend endpoint before release.

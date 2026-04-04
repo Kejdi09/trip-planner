@@ -1,50 +1,44 @@
 # Contributing
 
-Follow one branch path: `feature/* -> dev -> main`.
-
-Create every feature branch from `dev`, then open a PR back to `dev`.
+TripSync uses a protected branch workflow. All feature work starts from `dev`, merges back into `dev`, then ships through `main`.
 
 ```bash
 git checkout dev
 git pull origin dev
-git checkout -b feature/<short-name>
+git checkout -b feature/<short-scope>
 ```
 
-Do not push directly to `dev` or `main`. Do not force-push shared branches.
+Direct pushes to `main` are not allowed. Keep branch scope tight and avoid mixed feature/fix commits in the same PR.
 
-## Pull Requests
+## Pull Request Standard
 
-Open focused PRs. Keep each PR to one change set.
+Open PRs into `dev` only. Keep each PR limited to one coherent change and include code, tests, and docs in the same branch when needed.
 
-Before opening a PR, run lint and tests in both app and backend:
+Run checks locally before opening the PR:
 
 ```bash
 cd app
 npm run lint
 npm test -- --watch=false
-
 cd ../backend
 npm run lint
 npm test
 ```
 
-Open the PR from your feature branch into `dev`, wait for CI to pass, resolve every review comment, then merge after approval.
+Resolve every review comment, re-run checks after rebases, and merge only when CI is green.
 
-## Commit Messages
+## Commit Convention
 
-Use Conventional Commits. Write short, specific messages.
+Use Conventional Commits with specific scopes and verbs.
 
 ```text
-feat: add trip invite flow
-fix: prevent duplicate activity creation
-chore: update expo dependencies
-docs: rewrite onboarding docs
-refactor: simplify trip list state handling
-test: add unit test for trip card
+feat: add trip invitation endpoint
+fix: handle missing itinerary date in mobile form
+refactor: move supabase calls to service layer
+test: add backend health route test
+docs: update environment setup section
 ```
 
-## Secrets and Configuration
+## Secrets and Configuration Rules
 
-Never commit `.env` files. Never paste keys in issues, PRs, or chat.
-
-When you add or rename an environment variable, update both `app/.env.example` and `README.md` in the same PR.
+Never commit `.env` files or paste secrets in PR comments. When a variable changes, update `app/.env.example`, `backend/.env.example`, and `README.md` in the same PR so onboarding stays correct.

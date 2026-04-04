@@ -1,96 +1,117 @@
 # TripSync
 
-TripSync is a monorepo for a cross-platform trip planning product. The Expo app ships Android, iOS, and web from one codebase. The backend handles server-side endpoints. Supabase handles auth, database, and storage.
+TripSync is a cross-platform trip planning application. The mobile and web clients run from one Expo codebase, and an Express backend handles privileged server-side operations. Supabase provides authentication, Postgres storage, and file storage.
+
+## Tech Stack
+
+The app uses React Native, Expo Router, and TypeScript under `app/`. The data platform is Supabase. The API service under `backend/` runs on Node.js and Express.
 
 ## Prerequisites
 
-Use Node.js 20 or newer and npm.
+Use Node.js 20.x and npm.
 
-## Local Setup
-
-Clone the repo, install dependencies, create your app env file, then run app and backend.
+Install and verify the required CLIs:
 
 ```bash
-git clone <repository-url>
-cd trip-planner
+npm install -g expo-cli eas-cli supabase
+npx expo --version
+eas --version
+supabase --version
+node --version
+npm --version
+```
 
+## Clone and Local Setup
+
+Clone the repository and install dependencies for both workspaces.
+
+```bash
+git clone https://github.com/Kejdi09/trip-planner.git
+cd trip-planner
 cd app
 npm install
-
-cp .env.example .env
-# Windows PowerShell: Copy-Item .env.example .env
-
 cd ../backend
 npm install
+```
+
+Create environment files from templates.
+
+PowerShell:
+
+```powershell
+Copy-Item app/.env.example app/.env
+Copy-Item backend/.env.example backend/.env
+```
+
+macOS/Linux:
+
+```bash
+cp app/.env.example app/.env
+cp backend/.env.example backend/.env
 ```
 
 ## Environment Variables
 
-TripSync reads app env values from `app/.env`. Start from `app/.env.example`.
+The app reads `EXPO_PUBLIC_*` variables from `app/.env`. The backend reads server variables from `backend/.env`.
 
-| Variable | What it does | Where to get it |
-| --- | --- | --- |
-| `EXPO_PUBLIC_SUPABASE_URL` | Supabase project URL used by the app clients. | Supabase Dashboard -> Project Settings -> API -> Project URL |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Public anonymous key for client-side Supabase access. | Supabase Dashboard -> Project Settings -> API -> Project API keys -> anon |
-| `EXPO_PUBLIC_SUPABASE_SERVICE_KEY` | Service role key used by the `supabaseAdmin` client in `app/lib/supabase.ts`. This key has elevated privileges. Do not expose it in public builds. Move privileged operations to backend endpoints. | Supabase Dashboard -> Project Settings -> API -> Project API keys -> service_role |
-| `EXPO_PUBLIC_API_URL` | Base URL for backend API calls. | Local: `http://localhost:3000`. Hosted: your backend service URL (for example Render). |
+| File | Variable | Purpose | Where to get it |
+| --- | --- | --- | --- |
+| `app/.env` | `EXPO_PUBLIC_SUPABASE_URL` | Supabase project URL used by the app client. | Supabase Dashboard -> Project Settings -> API -> Project URL |
+| `app/.env` | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Public anon key used by the app for client-side auth and RLS-scoped queries. | Supabase Dashboard -> Project Settings -> API -> Project API keys -> anon |
+| `app/.env` | `EXPO_PUBLIC_API_URL` | Backend base URL used by the app when calling server endpoints. | Local: `http://localhost:3000`; hosted: your backend deployment URL |
+| `app/.env` | `EXPO_PUBLIC_SUPABASE_SERVICE_KEY` | Service role key currently referenced by `app/lib/supabase.ts`. This key is privileged and should be moved to backend-only usage. | Supabase Dashboard -> Project Settings -> API -> Project API keys -> service_role |
+| `backend/.env` | `SUPABASE_URL` | Supabase project URL used by backend admin client. | Same value as `EXPO_PUBLIC_SUPABASE_URL` |
+| `backend/.env` | `SUPABASE_SERVICE_KEY` | Service role key used by backend admin client in `backend/src/app.js`. | Supabase Dashboard -> Project Settings -> API -> Project API keys -> service_role |
+| `backend/.env` | `PORT` | Backend listen port. | Local default is `3000`; set explicitly in `backend/.env` |
 
-## Run Locally
+## Run the App
 
-Start backend first:
+Run the frontend from `app/` with Expo CLI:
+
+```bash
+cd app
+npx expo start
+```
+
+Use the Expo terminal targets for Android, iOS, and web.
+
+## Run the Backend
+
+Run the backend from `backend/`:
 
 ```bash
 cd backend
-npm start
+npm run dev
 ```
 
-The backend health endpoint responds at `http://localhost:3000/health`.
-
-Start app in a second terminal:
+Health check endpoint:
 
 ```bash
-cd app
-npm start
+curl http://localhost:3000/health
 ```
 
-Use Expo Go to open mobile builds from the QR code. Press `w` in the Expo terminal to open web. Use `npm run android` or `npm run ios` for native run targets.
+## Folder Structure
 
-## Quality Checks
+`app/` contains the React Native + Expo Router client, including screens in `app/src/app`, UI components in `app/src/components`, and Supabase client setup in `app/lib`.
 
-Run checks before you open a PR.
+`backend/` contains the Express API. `backend/src/app.js` configures middleware and clients, while `backend/src/index.js` starts the HTTP server.
+
+`supabase/migrations/` stores SQL migrations. Treat this directory as the schema source of truth.
+
+## Git Workflow
+
+Create feature branches from `dev` and open PRs back into `dev`. Never push directly to `main`. Keep branch names consistent with `feature/<short-scope>`, `fix/<short-scope>`, or `chore/<short-scope>`.
 
 ```bash
-cd app
-npm run lint
-npm test -- --watch=false
-
-cd ../backend
-npm run lint
-npm test
+git checkout dev
+git pull origin dev
+git checkout -b feature/<short-scope>
 ```
 
-## Repository Layout
+Every PR must pass CI and review before merge.
 
-```text
-trip-planner/
-├── app/                  Expo app (React Native + Expo Router)
-│   ├── src/              App screens, components, hooks, constants
-│   ├── lib/              Supabase clients and external integrations
-│   └── .env.example      App environment template
-├── backend/              Node.js/Express API
-│   └── src/              API source files
-└── supabase/
-    └── migrations/       SQL schema migrations
-```
+## Supabase Usage Rules for Developers
 
-## Deployment Notes
+Use the anon key from the app for user-scoped reads and writes governed by RLS. Use the service role key only on the backend for privileged operations. Do not commit service-role credentials, do not move service-role usage into mobile/web runtime code, and do not make schema changes directly in the dashboard without committing a SQL migration file under `supabase/migrations`.
 
-Use this branch flow: `feature/* -> dev -> main`.
-
-`dev` is the staging line. Keep it green. `main` is production.
-
-App web previews deploy from `dev` when Vercel is connected. Backend deploys from branch targets on Render. Keep deployment secrets in platform env settings, not in repo files.
-
-When you change database schema, add a SQL migration file under `supabase/migrations` in the same PR.
-
-For contribution rules, read [CONTRIBUTING.md](./CONTRIBUTING.md). For system boundaries, read [ARCHITECTURE.md](./ARCHITECTURE.md).
+For contribution process details, use [CONTRIBUTING.md](./CONTRIBUTING.md). For architecture boundaries, use [ARCHITECTURE.md](./ARCHITECTURE.md).
