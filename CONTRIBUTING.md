@@ -1,56 +1,36 @@
-# Contributing to TripSync
+# Contributing
 
-## Branch Strategy
+This file describes only how developers should work in this repo.
 
-- `main` -> production, PR approval required
-- `dev` -> staging, CI must pass
-- `feature/*` -> always branch from `dev`, PR back into `dev`
+Keep work simple, focused, and easy to review.
 
-Required flow:
+## Branching
 
-```text
-feature/* -> dev -> main
+Start from `dev`, then create your branch:
+
+```bash
+git checkout dev
+git pull origin dev
+git checkout -b feature/<short-scope>
 ```
 
-Rules:
+Open PRs into `dev`. Do not push directly to `main`.
 
-1. Never push directly to `dev` or `main`.
-2. Never force-push `dev` or `main`.
-3. Keep feature branches focused to one change set.
+## PR Rules
 
-## Pull Request Rules
+Keep each PR focused on one clear change.
+Prefer small PRs over large mixed changes.
+Run lint and tests before opening the PR.
+Merge only when CI is green and review comments are resolved.
 
-1. Open PR from `feature/*` into `dev`.
-2. Ensure CI is green (lint, test, build).
-3. At least one reviewer approval is required.
-4. Resolve all review comments before merge.
-5. Use small PRs with clear scope.
+Include related docs updates in the same PR when behavior or setup changes.
 
-## Commit Message Format
+## Commits
 
-Use Conventional Commits:
+Use concise Conventional Commit messages (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`).
+Keep commit messages specific to what changed.
 
-- `feat: add trip invite flow`
-- `fix: prevent duplicate activity creation`
-- `chore: update expo dependencies`
-- `docs: update setup instructions`
-- `refactor: simplify trip list state handling`
-- `test: add unit test for trip card`
+## Secrets
 
-## Environment and Secrets
-
-- Never commit `.env`.
-- Never post secrets in PRs/issues/chat.
-- Get env values from DevOps privately.
-
-Required app env vars:
-
-- `EXPO_PUBLIC_SUPABASE_URL`
-- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-- `EXPO_PUBLIC_API_URL`
-
-## CI
-
-- CI runs via GitHub Actions.
-- CI validates lint, tests, and build.
-- `dev` must stay green.
+Never commit `.env` files or secrets.
+Never paste credentials in issues, PRs, or comments.

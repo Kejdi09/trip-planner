@@ -1,76 +1,17 @@
 # TripSync
 
-TripSync is a social trip planning app.
+TripSync is a trip planning project with a frontend in `app/` and a backend in `backend/`.
 
-This monorepo contains:
+The app helps users organize trips, itineraries, and related planning details across platforms.
 
-- an Expo app for web and mobile
-- a Node/Express backend (deployed on Render, currently minimal)
-- Supabase migrations for database changes
+## Repository Layout
 
-## Project Structure
+- `app/`: Expo + React Native client
+- `backend/`: Node + Express API
+- `supabase/migrations/`: database migration files
 
-```text
-tripsync/
-├── app/                  # Expo (React Native + Expo Router)
-├── backend/              # Node/Express API (Render)
-└── supabase/
-	└── migrations/       # SQL migration files
-```
+## Purpose Of This README
 
-Note: if `supabase/migrations/` is missing in your local checkout, sync with `dev` and create it before adding migrations.
+This README is intentionally brief and only describes the project at a high level.
 
-## Tech Stack
-
-- Frontend/Mobile: Expo (React Native) + Expo Router
-- Database/Auth/Storage: Supabase
-- Mobile testing: Expo Go
-- Web staging: Vercel (`dev` branch)
-- Backend hosting: Render (`dev` and `main`)
-- CI: GitHub Actions (lint, test, build)
-
-## Local Setup
-
-### Prerequisites
-
-- Node.js 20+
-- npm
-
-### 1) App
-
-```bash
-cd app
-npm install
-npx expo start
-```
-
-- Scan the QR code with Expo Go for mobile testing
-- Press `w` to run on web
-
-### 2) Backend
-
-```bash
-cd backend
-npm install
-npm start
-```
-
-## Environment Variables
-
-Do not commit `.env`.
-
-Get these values from DevOps privately:
-
-- `EXPO_PUBLIC_SUPABASE_URL`
-- `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-- `EXPO_PUBLIC_API_URL`
-
-## CI and Branches
-
-- `main` is production and requires PR approval
-- `dev` is staging and CI must pass
-- `feature/*` branches must be created from `dev` and merged back to `dev` via PR
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the exact PR and commit rules.
-See [DEVELOPMENT.md](./DEVELOPMENT.md) for daily workflow.
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for system design and responsibilities.
+For team workflow and development rules, see [CONTRIBUTING.md](./CONTRIBUTING.md).
