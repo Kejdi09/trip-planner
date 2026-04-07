@@ -12,7 +12,7 @@ import { styles } from '@/components/discover-screen.styles';
 export function DiscoverScreen() {
   const insets = useSafeAreaInsets();
   const [isFilterOpen, setIsFilterOpen] = React.useState(false);
-  const [selectedFilters, setSelectedFilters] = React.useState<string[]>(['top_rated']);
+  const [selectedFilters, setSelectedFilters] = React.useState<string[]>(['high', 'culture', 'history']);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [savedPlaceIds, setSavedPlaceIds] = React.useState<string[]>([]);
 
@@ -53,27 +53,28 @@ export function DiscoverScreen() {
           onPressFilter={() => setIsFilterOpen((current) => !current)}
         />
 
-        <ScrollView
-          style={styles.scrollArea}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 124 }]}
-          showsVerticalScrollIndicator={false}>
-          <DiscoverPlacesSection
-            places={filteredPlaces}
-            savedPlaceIds={savedPlaceIds}
-            searchQuery={searchQuery}
-            onToggleSavedPlace={toggleSavedPlace}
-          />
-        </ScrollView>
+        <View style={styles.contentArea}>
+          <ScrollView
+            style={styles.scrollArea}
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 124 }]}
+            showsVerticalScrollIndicator={false}
+            scrollEnabled={!isFilterOpen}>
+            <DiscoverPlacesSection
+              places={filteredPlaces}
+              savedPlaceIds={savedPlaceIds}
+              searchQuery={searchQuery}
+              onToggleSavedPlace={toggleSavedPlace}
+            />
+          </ScrollView>
 
-        <FilterPanel
-          isOpen={isFilterOpen}
-          options={FILTER_OPTIONS}
-          selectedFilters={selectedFilters}
-          onToggleFilter={toggleFilter}
-          onClearFilters={() => setSelectedFilters([])}
-          onApplyFilters={() => setIsFilterOpen(false)}
-          onDismiss={() => setIsFilterOpen(false)}
-        />
+          <FilterPanel
+            isOpen={isFilterOpen}
+            options={FILTER_OPTIONS}
+            selectedFilters={selectedFilters}
+            onToggleFilter={toggleFilter}
+            onApplyFilters={() => setIsFilterOpen(false)}
+          />
+        </View>
 
         <DiscoverBottomNav />
       </View>

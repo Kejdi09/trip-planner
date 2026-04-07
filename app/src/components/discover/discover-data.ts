@@ -1,12 +1,14 @@
 import type { FilterOption, Place } from '@/components/discover/types';
 
 export const FILTER_OPTIONS: readonly FilterOption[] = [
-  { id: 'top_rated', label: 'Top rated' },
-  { id: 'friends_visited', label: 'Friends visited' },
-  { id: 'asia', label: 'Asia' },
-  { id: 'europe', label: 'Europe' },
-  { id: 'beach', label: 'Beach' },
-  { id: 'city', label: 'City' },
+  { id: 'high', label: 'High' },
+  { id: 'medium', label: 'Medium' },
+  { id: 'low', label: 'Low' },
+  { id: 'nature', label: 'Nature' },
+  { id: 'adventure', label: 'Adventure' },
+  { id: 'family', label: 'Family' },
+  { id: 'culture', label: 'Culture' },
+  { id: 'history', label: 'History' },
 ];
 
 export const DUMMY_PLACES: readonly Place[] = [
