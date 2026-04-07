@@ -11,7 +11,6 @@ export const DISCOVER_THEME = {
     navIconInactive: '#62707A',
     searchBackground: '#E3E8EC',
     searchIcon: '#4E5A64',
-    handle: '#CDD0D4',
     cardBorder: '#CFCFCF',
     cardShadow: '#000000',
     ratingIconBackground: '#FFF4CC',
@@ -34,8 +33,15 @@ export const styles = StyleSheet.create({
   scrollArea: {
     flex: 1,
   },
-  scrollContent: {
+  topSection: {
+    backgroundColor: colors.background,
     paddingTop: spacing * 3,
+    paddingHorizontal: spacing * 3,
+    paddingBottom: spacing,
+    zIndex: 11,
+  },
+  scrollContent: {
+    paddingTop: spacing * 2,
     paddingHorizontal: spacing * 3,
     paddingBottom: spacing * 16,
   },
@@ -76,13 +82,6 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  handleBar: {
-    width: 170,
-    height: 6,
-    borderRadius: 99,
-    backgroundColor: colors.handle,
-    marginBottom: spacing * 3,
   },
   sectionTitle: {
     color: colors.textPrimary,
