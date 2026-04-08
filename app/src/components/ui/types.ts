@@ -3,6 +3,13 @@ export type FilterOption = {
   label: string;
 };
 
+export type FilterGroup = {
+  id: string;
+  title: string;
+  options: readonly FilterOption[];
+  layout?: 'row' | 'wrap';
+};
+
 export type Place = {
   id: string;
   title: string;
