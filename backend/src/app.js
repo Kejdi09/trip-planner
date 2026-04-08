@@ -17,7 +17,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_KEY
 )
 
-app.get('/health', (req, res) => res.json({ status: 'ok' }))
+app.get('/health', (req, res) => res.json({ status: 'ok', service: 'backend' }))
 
 app.use((err, req, res) => {
   console.error(err)
