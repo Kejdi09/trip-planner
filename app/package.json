@@ -23,7 +23,7 @@
     "@react-navigation/bottom-tabs": "^7.15.5",
     "@react-navigation/elements": "^2.9.10",
     "@react-navigation/native": "^7.1.33",
-    "@supabase/supabase-js": "^2.100.1",
+    "@supabase/supabase-js": "^2.102.1",
     "expo": "^55.0.10-canary-20260327-0789fbc",
     "expo-constants": "55.0.10-canary-20260327-0789fbc",
     "expo-dev-client": "55.0.20-canary-20260327-0789fbc",
@@ -55,7 +55,7 @@
     "eslint": "^9.0.0",
     "eslint-config-expo": "55.0.1-canary-20260327-0789fbc",
     "jest": "^29.7.0",
-    "jest-expo": "^55.0.12-canary-20260327-0789fbc",
+    "jest-expo": "^55.0.14",
     "react-test-renderer": "19.2.0",
     "typescript": "~5.9.2"
   },
