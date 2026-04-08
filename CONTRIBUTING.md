@@ -1,6 +1,12 @@
 # Contributing
 
-TripSync uses a protected branch workflow. All feature work starts from `dev`, merges back into `dev`, then ships through `main`.
+This file describes only how developers should work in this repo.
+
+Keep work simple, focused, and easy to review.
+
+## Branching
+
+Start from `dev`, then create your branch:
 
 ```bash
 git checkout dev
@@ -8,37 +14,23 @@ git pull origin dev
 git checkout -b feature/<short-scope>
 ```
 
-Direct pushes to `main` are not allowed. Keep branch scope tight and avoid mixed feature/fix commits in the same PR.
+Open PRs into `dev`. Do not push directly to `main`.
 
-## Pull Request Standard
+## PR Rules
 
-Open PRs into `dev` only. Keep each PR limited to one coherent change and include code, tests, and docs in the same branch when needed.
+Keep each PR focused on one clear change.
+Prefer small PRs over large mixed changes.
+Run lint and tests before opening the PR.
+Merge only when CI is green and review comments are resolved.
 
-Run checks locally before opening the PR:
+Include related docs updates in the same PR when behavior or setup changes.
 
-```bash
-cd app
-npm run lint
-npm test -- --watch=false
-cd ../backend
-npm run lint
-npm test
-```
+## Commits
 
-Resolve every review comment, re-run checks after rebases, and merge only when CI is green.
+Use concise Conventional Commit messages (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`).
+Keep commit messages specific to what changed.
 
-## Commit Convention
+## Secrets
 
-Use Conventional Commits with specific scopes and verbs.
-
-```text
-feat: add trip invitation endpoint
-fix: handle missing itinerary date in mobile form
-refactor: move supabase calls to service layer
-test: add backend health route test
-docs: update environment setup section
-```
-
-## Secrets and Configuration Rules
-
-Never commit `.env` files or paste secrets in PR comments. When a variable changes, update `app/.env.example`, `backend/.env.example`, and `README.md` in the same PR so onboarding stays correct.
+Never commit `.env` files or secrets.
+Never paste credentials in issues, PRs, or comments.
