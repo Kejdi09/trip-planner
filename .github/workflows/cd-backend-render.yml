@@ -1,0 +1,54 @@
+name: CD - Backend (Render)
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+    paths:
+      - 'backend/**'
+
+jobs:
+  deploy-staging:
+    name: Deploy Backend Staging
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL_STAGING }}
+
+    steps:
+      - name: Validate staging deploy hook secret
+        run: |
+          if [ -z "${DEPLOY_HOOK_URL}" ]; then
+            echo "Missing secret: RENDER_DEPLOY_HOOK_URL_STAGING"
+            exit 1
+          fi
+
+      - name: Trigger Render staging deploy
+        run: |
+          curl --fail --show-error --silent \
+            -X POST "${DEPLOY_HOOK_URL}"
+
+  deploy-production:
+    name: Deploy Backend Production
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL_PRODUCTION }}
+
+    steps:
+      - name: Validate production deploy hook secret
+        run: |
+          if [ -z "${DEPLOY_HOOK_URL}" ]; then
+            echo "Missing secret: RENDER_DEPLOY_HOOK_URL_PRODUCTION"
+            exit 1
+          fi
+
+      - name: Trigger Render production deploy
+        run: |
+          curl --fail --show-error --silent \
+            -X POST "${DEPLOY_HOOK_URL}"
