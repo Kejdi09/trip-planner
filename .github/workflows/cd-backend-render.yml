@@ -9,8 +9,36 @@ on:
       - 'backend/**'
 
 jobs:
+  verify-backend:
+    name: Verify Backend Before Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Lint
+        working-directory: backend
+        run: npm run lint
+
+      - name: Test
+        working-directory: backend
+        run: npm test
+
   deploy-staging:
     name: Deploy Backend Staging
+    needs: verify-backend
     if: github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
     permissions:
@@ -33,6 +61,7 @@ jobs:
 
   deploy-production:
     name: Deploy Backend Production
+    needs: verify-backend
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
