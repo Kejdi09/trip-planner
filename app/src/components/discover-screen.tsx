@@ -2,12 +2,12 @@ import React from 'react';
 import { ScrollView, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { DUMMY_PLACES, FILTER_OPTIONS } from '@/components/discover/discover-data';
-import { DiscoverBottomNav } from '@/components/discover/discover-bottom-nav';
-import { DiscoverHeader } from '@/components/discover/discover-header';
-import { DiscoverPlacesSection } from '@/components/discover/discover-places-section';
-import { FilterPanel } from '@/components/discover/filter-panel';
-import { styles } from '@/components/discover-screen.styles';
+import { DUMMY_PLACES, FILTER_GROUPS } from '@/components/discover/discover-data';
+import { AppBottomNav } from '@/components/ui/app-bottom-nav';
+import { FilterSheet } from '@/components/ui/filter-sheet';
+import { PlaceListSection } from '@/components/ui/place-list-section';
+import { SearchHeader } from '@/components/ui/search-header';
+import { styles } from './discover-screen.styles';
 
 export function DiscoverScreen() {
   const insets = useSafeAreaInsets();
@@ -47,9 +47,11 @@ export function DiscoverScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.screen}>
-        <DiscoverHeader
+        <SearchHeader
+          title="Discover"
           searchQuery={searchQuery}
           onChangeSearchQuery={setSearchQuery}
+          searchPlaceholder="Search destinations..."
           onPressFilter={() => setIsFilterOpen((current) => !current)}
         />
 
@@ -59,7 +61,8 @@ export function DiscoverScreen() {
             contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 124 }]}
             showsVerticalScrollIndicator={false}
             scrollEnabled={!isFilterOpen}>
-            <DiscoverPlacesSection
+            <PlaceListSection
+              title="Popular Places"
               places={filteredPlaces}
               savedPlaceIds={savedPlaceIds}
               searchQuery={searchQuery}
@@ -67,16 +70,16 @@ export function DiscoverScreen() {
             />
           </ScrollView>
 
-          <FilterPanel
+          <FilterSheet
             isOpen={isFilterOpen}
-            options={FILTER_OPTIONS}
+            groups={FILTER_GROUPS}
             selectedFilters={selectedFilters}
             onToggleFilter={toggleFilter}
             onApplyFilters={() => setIsFilterOpen(false)}
           />
         </View>
 
-        <DiscoverBottomNav />
+        <AppBottomNav activeTab="Discover" />
       </View>
     </SafeAreaView>
   );
