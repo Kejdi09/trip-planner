@@ -33,7 +33,7 @@ export function DiscoverPlacesSection({
             />
           ))
         ) : (
-          <Text style={styles.noResultsText}>No places found for "{searchQuery.trim()}".</Text>
+          <Text style={styles.noResultsText}>No places found for &quot;{searchQuery.trim()}&quot;.</Text>
         )}
       </View>
     </>
