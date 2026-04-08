@@ -41,6 +41,9 @@ jobs:
     needs: verify-backend
     if: github.ref == 'refs/heads/dev'
     runs-on: ubuntu-latest
+    concurrency:
+      group: backend-staging-deploy
+      cancel-in-progress: true
     permissions:
       contents: read
     env:
@@ -64,6 +67,9 @@ jobs:
     needs: verify-backend
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    concurrency:
+      group: backend-production-deploy
+      cancel-in-progress: true
     permissions:
       contents: read
     env:
