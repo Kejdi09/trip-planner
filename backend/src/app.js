@@ -18,20 +18,23 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_KEY
 )
 
+const USERNAME_REGEX = /^[a-z0-9_]{3,24}$/
+
 const ENGINEERING_CODE = process.env.ENGINEERING_CODE || '1092'
 const engineeringItems = new Map()
 
 function verifyEngineeringCode(req, res, next) {
   const code = req.headers['x-engineering-code']
-
   if (code !== ENGINEERING_CODE) {
     return res.status(403).json({ error: 'Forbidden' })
   }
-
   next()
 }
 
-app.get('/health', (req, res) => res.json({ status: 'ok', service: 'backend' }))
+app.get('/health', (req, res) => res.json({
+  status: 'ok',
+  env: process.env.APP_ENV || process.env.NODE_ENV || 'development',
+}))
 
 app.get('/engineering/checks', (req, res) => {
   return res.json({
@@ -52,50 +55,66 @@ app.post('/engineering/test-item', verifyEngineeringCode, (req, res) => {
     value: req.body?.value ?? 'engineering-smoke-test',
     createdAt: new Date().toISOString(),
   }
-
   engineeringItems.set(id, item)
   return res.status(201).json(item)
 })
 
 app.get('/engineering/test-item/:id', verifyEngineeringCode, (req, res) => {
   const item = engineeringItems.get(req.params.id)
-
   if (!item) {
     return res.status(404).json({ error: 'Not found' })
   }
-
   return res.json(item)
 })
 
 app.delete('/engineering/test-item/:id', verifyEngineeringCode, (req, res) => {
   const existed = engineeringItems.delete(req.params.id)
-
   if (!existed) {
     return res.status(404).json({ error: 'Not found' })
   }
-
   return res.status(204).send()
 })
 
-app.get('/auth/username-available', async (req, res) => {
-  const { username } = req.query
+app.get('/auth/username-available', async (req, res, next) => {
+  try {
+    const username = String(req.query.username || '').trim().toLowerCase()
 
-  if (!username) {
-    return res.status(400).json({ error: 'Username is required.' })
+    if (!USERNAME_REGEX.test(username)) {
+      return res.status(400).json({
+        error: 'Username must be 3-24 characters and use lowercase letters, numbers, or underscores.',
+      })
+    }
+
+    const perPage = 200
+    let page = 1
+    let hasMore = true
+
+    while (hasMore) {
+      const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage })
+
+      if (error) {
+        const wrappedError = new Error(error.message || 'Failed to query users')
+        wrappedError.status = 502
+        throw wrappedError
+      }
+
+      const users = data?.users || []
+      const match = users.find(user =>
+        String(user.user_metadata?.username || '').trim().toLowerCase() === username
+      )
+
+      if (match) return res.json({ available: false })
+
+      hasMore = users.length === perPage
+      page += 1
+    }
+
+    return res.json({ available: true })
+  } catch (error) {
+    return next(error)
   }
-
-  const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .select('username')
-    .eq('username', username)
-    .maybeSingle()
-
-  if (error) {
-    return res.status(500).json({ error: 'Unable to check username availability.' })
-  }
-
-  return res.json({ available: data === null })
 })
+
 app.get('/auth/email-available', async (req, res, next) => {
   try {
     const email = String(req.query.email || '').trim().toLowerCase()
@@ -120,9 +139,7 @@ app.get('/auth/email-available', async (req, res, next) => {
       const users = data?.users || []
       const match = users.find(user => user.email?.toLowerCase() === email)
 
-      if (match) {
-        return res.json({ available: false })
-      }
+      if (match) return res.json({ available: false })
 
       hasMore = users.length === perPage
       page += 1
@@ -133,7 +150,9 @@ app.get('/auth/email-available', async (req, res, next) => {
     return next(error)
   }
 })
-app.use((err, req, res) => {
+
+app.use((err, req, res, next) => {
+  void next
   console.error(err)
   res.status(err.status || 500).json({ error: err.message || 'Internal server error' })
 })
