@@ -1,7 +1,7 @@
 import React from 'react';
 
-import { DiscoverScreen } from '@/components/discover-screen';
+import { LoginScreen } from '@/components/auth/login-screen';
 
 export default function HomeScreen() {
-  return <DiscoverScreen />;
+  return <LoginScreen />;
 }
