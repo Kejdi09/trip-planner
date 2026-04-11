@@ -1,11 +1,6 @@
 import { API_BASE_URL, APP_ENV } from './app-config';
 
-type UsernameAvailabilityResponse = {
-  available?: boolean;
-  error?: string;
-};
-
-type EmailAvailabilityResponse = {
+type AvailabilityResponse = {
   available?: boolean;
   canResetPassword?: boolean;
   error?: string;
@@ -28,10 +23,9 @@ export async function checkUsernameAvailability(username: string): Promise<boole
     },
   });
 
-  let payload: UsernameAvailabilityResponse = {};
-
+  let payload: AvailabilityResponse = {};
   try {
-    payload = (await response.json()) as UsernameAvailabilityResponse;
+    payload = (await response.json()) as AvailabilityResponse;
   } catch {
     payload = {};
   }
@@ -55,16 +49,15 @@ export async function checkEmailAvailability(email: string): Promise<EmailAvaila
     },
   });
 
-  let payload: EmailAvailabilityResponse = {};
-
+  let payload: AvailabilityResponse = {};
   try {
-    payload = (await response.json()) as EmailAvailabilityResponse;
+    payload = (await response.json()) as AvailabilityResponse;
   } catch {
     payload = {};
   }
 
   if (!response.ok) {
-    throw new Error(payload.error ?? 'Unable to verify email right now.');
+    throw new Error(payload.error ?? 'Unable to verify email availability right now.');
   }
 
   return {
