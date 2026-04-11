@@ -14,6 +14,8 @@ const COLORS = {
   inputBackground: '#F8F9FB',
   inputText: '#2A2C33',
   placeholder: '#A3A7AF',
+  error: '#D54545',
+  success: '#1F7A57',
   buttonText: '#FFFFFF',
 };
 
@@ -99,12 +101,29 @@ export const styles = StyleSheet.create({
   },
   passwordInputContainer: {
     position: 'relative',
-    marginBottom: rs(36),
+    marginBottom: rs(16),
   },
   passwordInput: {
     paddingRight: rs(46),
     borderColor: COLORS.primary,
     backgroundColor: '#FFFFFF',
+  },
+  confirmPasswordInput: {
+    marginBottom: rs(14),
+  },
+  errorMessage: {
+    marginBottom: rs(8),
+    color: COLORS.error,
+    fontSize: rs(13),
+    fontWeight: '600',
+    letterSpacing: -0.1,
+  },
+  statusMessage: {
+    marginBottom: rs(8),
+    color: COLORS.success,
+    fontSize: rs(13),
+    fontWeight: '600',
+    letterSpacing: -0.1,
   },
   eyeButton: {
     position: 'absolute',
@@ -122,11 +141,11 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: rs(16),
-    shadowColor: '#0B6F7B',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
+    boxShadow: '0px 4px 8px rgba(11, 111, 123, 0.18)',
     elevation: 2,
+  },
+  primaryButtonDisabled: {
+    opacity: 0.72,
   },
   primaryButtonText: {
     fontSize: rs(18),
