@@ -87,7 +87,7 @@ export function LoginScreen() {
 
       if (emailStatus.canResetPassword) {
         const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-          redirectTo: 'https://trip-planner-main-three.vercel.app/reset-password',
+          redirectTo: `${process.env.EXPO_PUBLIC_APP_URL}/reset-password`,
         });
 
         if (error) {
