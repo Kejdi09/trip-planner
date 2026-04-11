@@ -1,4 +1,5 @@
 import { Feather, FontAwesome5, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React from 'react';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,68 +18,46 @@ type AppBottomNavProps = {
 
 export function AppBottomNav({ activeTab = 'Discover', onPressTab }: AppBottomNavProps) {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+
+  const handleTabPress = (tab: AppTab) => {
+    onPressTab?.(tab);
+
+    if (tab === 'Discover') router.push('/explore');
+    if (tab === 'Profile') router.push('/profile');
+  };
 
   return (
     <View style={[bottomNavStyles.bottomNav, { paddingBottom: Math.max(12, insets.bottom + 8) }]}>
       <BottomNavItem
         label="Feed"
         active={activeTab === 'Feed'}
-        onPress={() => onPressTab?.('Feed')}
-        icon={
-          <Feather
-            name="home"
-            size={24}
-            color={activeTab === 'Feed' ? colors.primary : colors.navIconInactive}
-          />
-        }
+        onPress={() => handleTabPress('Feed')}
+        icon={<Feather name="home" size={24} color={activeTab === 'Feed' ? colors.primary : colors.navIconInactive} />}
       />
       <BottomNavItem
         label="Discover"
         active={activeTab === 'Discover'}
-        onPress={() => onPressTab?.('Discover')}
-        icon={
-          <Feather
-            name="search"
-            size={24}
-            color={activeTab === 'Discover' ? colors.primary : colors.navIconInactive}
-          />
-        }
+        onPress={() => handleTabPress('Discover')}
+        icon={<Feather name="search" size={24} color={activeTab === 'Discover' ? colors.primary : colors.navIconInactive} />}
       />
       <BottomNavItem
         label="Groups"
         active={activeTab === 'Groups'}
-        onPress={() => onPressTab?.('Groups')}
-        icon={
-          <Ionicons
-            name="people-outline"
-            size={24}
-            color={activeTab === 'Groups' ? colors.primary : colors.navIconInactive}
-          />
-        }
+        onPress={() => handleTabPress('Groups')}
+        icon={<Ionicons name="people-outline" size={24} color={activeTab === 'Groups' ? colors.primary : colors.navIconInactive} />}
       />
       <BottomNavItem
         label="History"
         active={activeTab === 'History'}
-        onPress={() => onPressTab?.('History')}
-        icon={
-          <FontAwesome5
-            name="map-marked-alt"
-            size={22}
-            color={activeTab === 'History' ? colors.primary : colors.navIconInactive}
-          />
-        }
+        onPress={() => handleTabPress('History')}
+        icon={<FontAwesome5 name="map-marked-alt" size={22} color={activeTab === 'History' ? colors.primary : colors.navIconInactive} />}
       />
       <BottomNavItem
         label="Profile"
         active={activeTab === 'Profile'}
-        onPress={() => onPressTab?.('Profile')}
-        icon={
-          <MaterialCommunityIcons
-            name="account-outline"
-            size={24}
-            color={activeTab === 'Profile' ? colors.primary : colors.navIconInactive}
-          />
-        }
+        onPress={() => handleTabPress('Profile')}
+        icon={<MaterialCommunityIcons name="account-outline" size={24} color={activeTab === 'Profile' ? colors.primary : colors.navIconInactive} />}
       />
     </View>
   );
