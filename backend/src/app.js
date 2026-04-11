@@ -19,6 +19,7 @@ const supabaseAdmin = createClient(
 )
 
 const USERNAME_REGEX = /^[a-z0-9_]{3,24}$/
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PROD_ALIASES = new Set(['prod', 'production', 'main'])
 
 function normalizeAppEnv(value) {
@@ -143,8 +144,8 @@ app.get('/auth/email-available', ensureClientEnvMatches, async (req, res, next) 
   try {
     const email = String(req.query.email || '').trim().toLowerCase()
 
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required.' })
+    if (!EMAIL_REGEX.test(email)) {
+      return res.status(400).json({ error: 'Email must be a valid email address.' })
     }
 
     const perPage = 200
@@ -163,13 +164,16 @@ app.get('/auth/email-available', ensureClientEnvMatches, async (req, res, next) 
       const users = data?.users || []
       const match = users.find(user => user.email?.toLowerCase() === email)
 
-      if (match) return res.json({ available: false })
+      if (match) {
+        const canResetPassword = Boolean(match.email_confirmed_at || match.confirmed_at)
+        return res.json({ available: false, canResetPassword })
+      }
 
       hasMore = users.length === perPage
       page += 1
     }
 
-    return res.json({ available: true })
+    return res.json({ available: true, canResetPassword: false })
   } catch (error) {
     return next(error)
   }
