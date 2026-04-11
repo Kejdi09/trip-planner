@@ -4,8 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { checkEmailAvailability, checkUsernameAvailability } from '../../../lib/auth-api';
+import { checkUsernameAvailability, checkEmailAvailability } from '../../../lib/auth-api';
 import { supabase } from '../../../lib/supabase';
 import { styles } from '@/components/auth/login-screen.styles';
 
@@ -158,18 +157,14 @@ export function LoginScreen() {
 
     try {
       if (isSignup) {
-        const emailStatus = await checkEmailAvailability(normalizedEmail);
+        const isEmailAvailable = await checkEmailAvailability(normalizedEmail);
 
-        if (!emailStatus.available) {
-          setErrorMessage(
-            emailStatus.canResetPassword
-              ? 'An account with this email already exists. Try logging in.'
-              : 'This email is pending confirmation. Check your inbox.',
-          );
-          return;
-        }
+if (!isEmailAvailable) {
+  setErrorMessage('An account with this email already exists. Try logging in.');
+  return;
+}
 
-        const isAvailable = await checkUsernameAvailability(normalizedUsername);
+const isAvailable = await checkUsernameAvailability(normalizedUsername);
 
         if (!isAvailable) {
           setErrorMessage('That username is already taken.');
@@ -207,13 +202,6 @@ export function LoginScreen() {
         setConfirmPassword('');
         switchMode('login');
         setStatusMessage('Check your email and click the confirmation link to complete sign-up.');
-        return;
-      }
-
-      const emailStatus = await checkEmailAvailability(normalizedEmail);
-
-      if (!emailStatus.available && !emailStatus.canResetPassword) {
-        setErrorMessage('Please confirm your email before logging in.');
         return;
       }
 

@@ -37,7 +37,7 @@ export async function checkUsernameAvailability(username: string): Promise<boole
   return payload.available === true;
 }
 
-export async function checkEmailAvailability(email: string): Promise<EmailAvailabilityStatus> {
+export async function checkEmailAvailability(email: string): Promise<boolean> {
   const baseUrl = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
   const url = `${baseUrl}/auth/email-available?email=${encodeURIComponent(email)}`;
 
@@ -60,8 +60,5 @@ export async function checkEmailAvailability(email: string): Promise<EmailAvaila
     throw new Error(payload.error ?? 'Unable to verify email availability right now.');
   }
 
-  return {
-    available: payload.available === true,
-    canResetPassword: payload.canResetPassword === true,
-  };
+  return payload.available === true;
 }
