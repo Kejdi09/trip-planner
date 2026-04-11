@@ -1,79 +1,107 @@
 const express = require('express')
 const cors = require('cors')
 const { createClient } = require('@supabase/supabase-js')
-const { appEnv, supabaseServiceKey, supabaseUrl } = require('./config')
+const { version: backendVersion } = require('../package.json')
+require('dotenv').config()
 
-const USERNAME_REGEX = /^[a-z0-9_]{3,24}$/
-
-const normalizeEnv = value => {
-  const parsed = String(value || '').trim().toLowerCase()
-  return parsed === 'production' || parsed === 'prod' || parsed === 'main'
-    ? 'production'
-    : 'development'
-}
-
-const normalizeUsername = value => String(value || '').trim().toLowerCase()
+const required = ['SUPABASE_URL', 'SUPABASE_SERVICE_KEY']
+required.forEach(key => {
+  if (!process.env[key]) throw new Error(`Missing env var: ${key}`)
+})
 
 const app = express()
 app.use(cors())
 app.use(express.json())
 
 const supabaseAdmin = createClient(
-  supabaseUrl,
-  supabaseServiceKey
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
 )
 
-const usernameExists = async username => {
-  const perPage = 200
-  let page = 1
-  let hasMore = true
+const USERNAME_REGEX = /^[a-z0-9_]{3,24}$/
+const PROD_ALIASES = new Set(['prod', 'production', 'main'])
 
-  while (hasMore) {
-    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage })
-
-    if (error) {
-      const wrappedError = new Error(error.message || 'Failed to query users')
-      wrappedError.status = 502
-      throw wrappedError
-    }
-
-    const users = data?.users || []
-    const match = users.find(user => normalizeUsername(user.user_metadata?.username) === username)
-    if (match) {
-      return true
-    }
-
-    hasMore = users.length === perPage
-
-    page += 1
-  }
-
-  return false
+function normalizeAppEnv(value) {
+  const raw = String(value || '').trim().toLowerCase()
+  return PROD_ALIASES.has(raw) ? 'production' : 'development'
 }
 
-app.get('/health', (req, res) => res.json({ status: 'ok', env: appEnv }))
+const backendAppEnv = normalizeAppEnv(process.env.APP_ENV || process.env.NODE_ENV || 'development')
 
-app.use('/auth', (req, res, next) => {
-  const clientEnvHeader = req.get('x-app-env')
+const ENGINEERING_CODE = process.env.ENGINEERING_CODE || '1092'
+const engineeringItems = new Map()
 
-  if (!clientEnvHeader) {
+function verifyEngineeringCode(req, res, next) {
+  const code = req.headers['x-engineering-code']
+  if (code !== ENGINEERING_CODE) {
+    return res.status(403).json({ error: 'Forbidden' })
+  }
+  next()
+}
+
+function ensureClientEnvMatches(req, res, next) {
+  const headerValue = req.headers['x-app-env']
+  if (!headerValue) {
     return next()
   }
 
-  const clientEnv = normalizeEnv(clientEnvHeader)
-
-  if (clientEnv !== appEnv) {
+  const clientAppEnv = normalizeAppEnv(headerValue)
+  if (clientAppEnv !== backendAppEnv) {
     return res.status(409).json({
-      error: `Environment mismatch. Client requested ${clientEnv}, server is ${appEnv}.`,
+      error: `Environment mismatch: client=${clientAppEnv}, backend=${backendAppEnv}`,
     })
   }
 
   return next()
+}
+
+app.get('/health', (req, res) => res.json({
+  status: 'ok',
+  env: process.env.APP_ENV || process.env.NODE_ENV || 'development',
+}))
+
+app.get('/engineering/checks', (req, res) => {
+  return res.json({
+    status: 'ok',
+    backendVersion,
+    environment: process.env.APP_ENV || process.env.NODE_ENV || 'development',
+    commitSha: process.env.RENDER_GIT_COMMIT || process.env.COMMIT_SHA || process.env.GIT_SHA || null,
+    branch: process.env.RENDER_GIT_BRANCH || process.env.GIT_BRANCH || null,
+    engineeringModeEnabled: true,
+    timestamp: new Date().toISOString(),
+  })
 })
 
-app.get('/auth/username-available', async (req, res, next) => {
+app.post('/engineering/test-item', verifyEngineeringCode, (req, res) => {
+  const id = `${Date.now()}-${Math.floor(Math.random() * 10000)}`
+  const item = {
+    id,
+    value: req.body?.value ?? 'engineering-smoke-test',
+    createdAt: new Date().toISOString(),
+  }
+  engineeringItems.set(id, item)
+  return res.status(201).json(item)
+})
+
+app.get('/engineering/test-item/:id', verifyEngineeringCode, (req, res) => {
+  const item = engineeringItems.get(req.params.id)
+  if (!item) {
+    return res.status(404).json({ error: 'Not found' })
+  }
+  return res.json(item)
+})
+
+app.delete('/engineering/test-item/:id', verifyEngineeringCode, (req, res) => {
+  const existed = engineeringItems.delete(req.params.id)
+  if (!existed) {
+    return res.status(404).json({ error: 'Not found' })
+  }
+  return res.status(204).send()
+})
+
+app.get('/auth/username-available', ensureClientEnvMatches, async (req, res, next) => {
   try {
-    const username = normalizeUsername(req.query.username)
+    const username = String(req.query.username || '').trim().toLowerCase()
 
     if (!USERNAME_REGEX.test(username)) {
       return res.status(400).json({
@@ -81,9 +109,67 @@ app.get('/auth/username-available', async (req, res, next) => {
       })
     }
 
-    const exists = await usernameExists(username)
+    const perPage = 200
+    let page = 1
+    let hasMore = true
 
-    return res.json({ available: !exists })
+    while (hasMore) {
+      const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage })
+
+      if (error) {
+        const wrappedError = new Error(error.message || 'Failed to query users')
+        wrappedError.status = 502
+        throw wrappedError
+      }
+
+      const users = data?.users || []
+      const match = users.find(user =>
+        String(user.user_metadata?.username || '').trim().toLowerCase() === username
+      )
+
+      if (match) return res.json({ available: false })
+
+      hasMore = users.length === perPage
+      page += 1
+    }
+
+    return res.json({ available: true })
+  } catch (error) {
+    return next(error)
+  }
+})
+
+app.get('/auth/email-available', ensureClientEnvMatches, async (req, res, next) => {
+  try {
+    const email = String(req.query.email || '').trim().toLowerCase()
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required.' })
+    }
+
+    const perPage = 200
+    let page = 1
+    let hasMore = true
+
+    while (hasMore) {
+      const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage })
+
+      if (error) {
+        const wrappedError = new Error(error.message || 'Failed to query users')
+        wrappedError.status = 502
+        throw wrappedError
+      }
+
+      const users = data?.users || []
+      const match = users.find(user => user.email?.toLowerCase() === email)
+
+      if (match) return res.json({ available: false })
+
+      hasMore = users.length === perPage
+      page += 1
+    }
+
+    return res.json({ available: true })
   } catch (error) {
     return next(error)
   }
