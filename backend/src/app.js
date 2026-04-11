@@ -19,6 +19,14 @@ const supabaseAdmin = createClient(
 )
 
 const USERNAME_REGEX = /^[a-z0-9_]{3,24}$/
+const PROD_ALIASES = new Set(['prod', 'production', 'main'])
+
+function normalizeAppEnv(value) {
+  const raw = String(value || '').trim().toLowerCase()
+  return PROD_ALIASES.has(raw) ? 'production' : 'development'
+}
+
+const backendAppEnv = normalizeAppEnv(process.env.APP_ENV || process.env.NODE_ENV || 'development')
 
 const ENGINEERING_CODE = process.env.ENGINEERING_CODE || '1092'
 const engineeringItems = new Map()
@@ -29,6 +37,22 @@ function verifyEngineeringCode(req, res, next) {
     return res.status(403).json({ error: 'Forbidden' })
   }
   next()
+}
+
+function ensureClientEnvMatches(req, res, next) {
+  const headerValue = req.headers['x-app-env']
+  if (!headerValue) {
+    return next()
+  }
+
+  const clientAppEnv = normalizeAppEnv(headerValue)
+  if (clientAppEnv !== backendAppEnv) {
+    return res.status(409).json({
+      error: `Environment mismatch: client=${clientAppEnv}, backend=${backendAppEnv}`,
+    })
+  }
+
+  return next()
 }
 
 app.get('/health', (req, res) => res.json({
@@ -75,7 +99,7 @@ app.delete('/engineering/test-item/:id', verifyEngineeringCode, (req, res) => {
   return res.status(204).send()
 })
 
-app.get('/auth/username-available', async (req, res, next) => {
+app.get('/auth/username-available', ensureClientEnvMatches, async (req, res, next) => {
   try {
     const username = String(req.query.username || '').trim().toLowerCase()
 
@@ -115,7 +139,7 @@ app.get('/auth/username-available', async (req, res, next) => {
   }
 })
 
-app.get('/auth/email-available', async (req, res, next) => {
+app.get('/auth/email-available', ensureClientEnvMatches, async (req, res, next) => {
   try {
     const email = String(req.query.email || '').trim().toLowerCase()
 
