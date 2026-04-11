@@ -40,3 +40,6 @@ Thumbs.db
 *.key
 *.mobileprovision
 *.orig.*
+
+# Local project notes
+DEVOPS_STATUS.md

@@ -1,0 +1,89 @@
+name: CD - Backend (Render)
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+    paths:
+      - 'backend/**'
+
+jobs:
+  verify-backend:
+    name: Verify Backend Before Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Lint
+        working-directory: backend
+        run: npm run lint
+
+      - name: Test
+        working-directory: backend
+        run: npm test
+
+  deploy-staging:
+    name: Deploy Backend Staging
+    needs: verify-backend
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: backend-staging-deploy
+      cancel-in-progress: true
+    permissions:
+      contents: read
+    env:
+      DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL_STAGING }}
+
+    steps:
+      - name: Validate staging deploy hook secret
+        run: |
+          if [ -z "${DEPLOY_HOOK_URL}" ]; then
+            echo "Missing secret: RENDER_DEPLOY_HOOK_URL_STAGING"
+            exit 1
+          fi
+
+      - name: Trigger Render staging deploy
+        run: |
+          curl --fail --show-error --silent \
+            -X POST "${DEPLOY_HOOK_URL}"
+
+  deploy-production:
+    name: Deploy Backend Production
+    needs: verify-backend
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: backend-production-deploy
+      cancel-in-progress: true
+    permissions:
+      contents: read
+    env:
+      DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL_PRODUCTION }}
+
+    steps:
+      - name: Validate production deploy hook secret
+        run: |
+          if [ -z "${DEPLOY_HOOK_URL}" ]; then
+            echo "Missing secret: RENDER_DEPLOY_HOOK_URL_PRODUCTION"
+            exit 1
+          fi
+
+      - name: Trigger Render production deploy
+        run: |
+          curl --fail --show-error --silent \
+            -X POST "${DEPLOY_HOOK_URL}"
