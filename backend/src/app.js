@@ -4,6 +4,7 @@ const { createClient } = require('@supabase/supabase-js')
 const { appEnv, supabaseServiceKey, supabaseUrl } = require('./config')
 
 const USERNAME_REGEX = /^[a-z0-9_]{3,24}$/
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 const normalizeEnv = value => {
   const parsed = String(value || '').trim().toLowerCase()
@@ -13,6 +14,9 @@ const normalizeEnv = value => {
 }
 
 const normalizeUsername = value => String(value || '').trim().toLowerCase()
+const normalizeEmail = value => String(value || '').trim().toLowerCase()
+
+const isEmailConfirmed = user => Boolean(user?.email_confirmed_at || user?.confirmed_at)
 
 const app = express()
 app.use(cors())
@@ -23,7 +27,7 @@ const supabaseAdmin = createClient(
   supabaseServiceKey
 )
 
-const usernameExists = async username => {
+const findUser = async predicate => {
   const perPage = 200
   let page = 1
   let hasMore = true
@@ -38,9 +42,9 @@ const usernameExists = async username => {
     }
 
     const users = data?.users || []
-    const match = users.find(user => normalizeUsername(user.user_metadata?.username) === username)
+    const match = users.find(predicate)
     if (match) {
-      return true
+      return match
     }
 
     hasMore = users.length === perPage
@@ -48,8 +52,19 @@ const usernameExists = async username => {
     page += 1
   }
 
-  return false
+  return null
 }
+
+const usernameExists = async username => {
+  const user = await findUser(
+    currentUser => normalizeUsername(currentUser.user_metadata?.username) === username
+  )
+
+  return Boolean(user)
+}
+
+const getUserByEmail = email =>
+  findUser(currentUser => normalizeEmail(currentUser.email) === email)
 
 app.get('/health', (req, res) => res.json({ status: 'ok', env: appEnv }))
 
@@ -84,6 +99,29 @@ app.get('/auth/username-available', async (req, res, next) => {
     const exists = await usernameExists(username)
 
     return res.json({ available: !exists })
+  } catch (error) {
+    return next(error)
+  }
+})
+
+app.get('/auth/email-available', async (req, res, next) => {
+  try {
+    const email = normalizeEmail(req.query.email)
+
+    if (!EMAIL_REGEX.test(email)) {
+      return res.status(400).json({
+        error: 'Email must be a valid email address.',
+      })
+    }
+
+    const user = await getUserByEmail(email)
+    const exists = Boolean(user)
+    const canResetPassword = exists && isEmailConfirmed(user)
+
+    return res.json({
+      available: !exists,
+      canResetPassword,
+    })
   } catch (error) {
     return next(error)
   }

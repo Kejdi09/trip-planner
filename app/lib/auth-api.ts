@@ -5,6 +5,17 @@ type UsernameAvailabilityResponse = {
   error?: string;
 };
 
+type EmailAvailabilityResponse = {
+  available?: boolean;
+  canResetPassword?: boolean;
+  error?: string;
+};
+
+export type EmailAvailabilityStatus = {
+  available: boolean;
+  canResetPassword: boolean;
+};
+
 export async function checkUsernameAvailability(username: string): Promise<boolean> {
   const baseUrl = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
   const url = `${baseUrl}/auth/username-available?username=${encodeURIComponent(username)}`;
@@ -30,4 +41,34 @@ export async function checkUsernameAvailability(username: string): Promise<boole
   }
 
   return payload.available === true;
+}
+
+export async function checkEmailAvailability(email: string): Promise<EmailAvailabilityStatus> {
+  const baseUrl = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+  const url = `${baseUrl}/auth/email-available?email=${encodeURIComponent(email)}`;
+
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'content-type': 'application/json',
+      'x-app-env': APP_ENV,
+    },
+  });
+
+  let payload: EmailAvailabilityResponse = {};
+
+  try {
+    payload = (await response.json()) as EmailAvailabilityResponse;
+  } catch {
+    payload = {};
+  }
+
+  if (!response.ok) {
+    throw new Error(payload.error ?? 'Unable to verify email right now.');
+  }
+
+  return {
+    available: payload.available === true,
+    canResetPassword: payload.canResetPassword === true,
+  };
 }

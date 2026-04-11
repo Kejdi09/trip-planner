@@ -71,3 +71,61 @@ test('GET /auth/username-available blocks mismatched client env header', async (
   expect(res.statusCode).toBe(409)
   expect(res.body.error).toContain('Environment mismatch')
 })
+
+test('GET /auth/email-available validates email format', async () => {
+  const res = await request(app).get('/auth/email-available?email=not-an-email')
+
+  expect(res.statusCode).toBe(400)
+  expect(res.body.error).toContain('Email must be')
+  expect(mockListUsers).not.toHaveBeenCalled()
+})
+
+test('GET /auth/email-available returns canResetPassword=false when account does not exist', async () => {
+  mockListUsers.mockResolvedValue({ data: { users: [] }, error: null })
+
+  const res = await request(app).get('/auth/email-available?email=missing@example.com')
+
+  expect(res.statusCode).toBe(200)
+  expect(res.body.available).toBe(true)
+  expect(res.body.canResetPassword).toBe(false)
+})
+
+test('GET /auth/email-available returns canResetPassword=false when email is unconfirmed', async () => {
+  mockListUsers.mockResolvedValue({
+    data: {
+      users: [
+        {
+          email: 'traveler@example.com',
+          email_confirmed_at: null,
+        },
+      ],
+    },
+    error: null,
+  })
+
+  const res = await request(app).get('/auth/email-available?email=traveler@example.com')
+
+  expect(res.statusCode).toBe(200)
+  expect(res.body.available).toBe(false)
+  expect(res.body.canResetPassword).toBe(false)
+})
+
+test('GET /auth/email-available returns canResetPassword=true when email is confirmed', async () => {
+  mockListUsers.mockResolvedValue({
+    data: {
+      users: [
+        {
+          email: 'traveler@example.com',
+          email_confirmed_at: '2026-04-11T00:00:00.000Z',
+        },
+      ],
+    },
+    error: null,
+  })
+
+  const res = await request(app).get('/auth/email-available?email=traveler@example.com')
+
+  expect(res.statusCode).toBe(200)
+  expect(res.body.available).toBe(false)
+  expect(res.body.canResetPassword).toBe(true)
+})
