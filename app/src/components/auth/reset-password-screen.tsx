@@ -1,9 +1,9 @@
-import { router } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
 import { supabase } from '../../../lib/supabase';
 import { styles } from '@/components/auth/reset-password-screen.styles';
 import { BrandHeader } from '@/components/ui/brand-header';
@@ -12,7 +12,26 @@ import { StatusMessage } from '@/components/ui/status-message';
 
 const MIN_PASSWORD_LENGTH = 8;
 
+type RecoveryParams = {
+  code?: string | string[];
+  token_hash?: string | string[];
+  type?: string | string[];
+  access_token?: string | string[];
+  refresh_token?: string | string[];
+};
+
+function getParamValue(param: string | string[] | undefined): string | undefined {
+  return Array.isArray(param) ? param[0] : param;
+}
+
 export function ResetPasswordScreen() {
+  const params = useLocalSearchParams<RecoveryParams>();
+  const codeParam = getParamValue(params.code);
+  const tokenHashParam = getParamValue(params.token_hash);
+  const typeParam = getParamValue(params.type);
+  const accessTokenParam = getParamValue(params.access_token);
+  const refreshTokenParam = getParamValue(params.refresh_token);
+
   const [newPassword, setNewPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
   const [isPasswordVisible, setIsPasswordVisible] = React.useState(false);
@@ -30,7 +49,7 @@ export function ResetPasswordScreen() {
         return;
       }
 
-      if (event === 'PASSWORD_RECOVERY' && session) {
+      if ((event === 'PASSWORD_RECOVERY' || event === 'INITIAL_SESSION') && session) {
         setIsRecoveryReady(true);
         setErrorMessage(null);
         setStatusMessage('Enter your new password to continue.');
@@ -39,6 +58,49 @@ export function ResetPasswordScreen() {
 
     const initializeRecoverySession = async () => {
       try {
+        if (codeParam) {
+          const { error } = await supabase.auth.exchangeCodeForSession(codeParam);
+
+          if (error) {
+            throw error;
+          }
+        }
+
+        if (tokenHashParam && typeParam === 'recovery') {
+          const { error } = await supabase.auth.verifyOtp({
+            token_hash: tokenHashParam,
+            type: 'recovery',
+          });
+
+          if (error) {
+            throw error;
+          }
+        }
+
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+          const accessToken = hashParams.get('access_token') ?? accessTokenParam;
+          const refreshToken = hashParams.get('refresh_token') ?? refreshTokenParam;
+          const linkType = hashParams.get('type') ?? typeParam;
+
+          if (linkType === 'recovery' && accessToken && refreshToken) {
+            const { error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+
+            if (error) {
+              throw error;
+            }
+
+            window.history.replaceState(
+              null,
+              '',
+              `${window.location.pathname}${window.location.search}`,
+            );
+          }
+        }
+
         const { data, error } = await supabase.auth.getSession();
 
         if (error) {
@@ -82,7 +144,7 @@ export function ResetPasswordScreen() {
       isMounted = false;
       authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, [accessTokenParam, codeParam, refreshTokenParam, tokenHashParam, typeParam]);
 
   const onSubmit = async () => {
     if (isSubmitting || isPreparingSession) {

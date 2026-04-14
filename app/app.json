@@ -21,16 +21,17 @@
     },
     "plugins": [
       "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "backgroundColor": "#208AEF"
-        }
-      ]
+     [
+  "expo-splash-screen",
+  {
+    "backgroundColor": "#208AEF",
+    "image": "./assets/splash-icon.png",
+    "imageWidth": 200
+  }
+]
     ],
     "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
+      "typedRoutes": true
     },
     "extra": {
       "router": {},
