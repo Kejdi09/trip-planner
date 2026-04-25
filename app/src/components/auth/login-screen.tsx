@@ -4,20 +4,24 @@ import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { checkUsernameAvailability, checkEmailAvailability } from '../../../lib/auth-api';
 import { supabase } from '../../../lib/supabase';
 import { styles } from '@/components/auth/login-screen.styles';
 
 type AuthMode = 'login' | 'signup';
+type UsernameAvailabilityState = 'idle' | 'invalid' | 'checking' | 'available' | 'taken' | 'error';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USERNAME_REGEX = /^[a-z0-9_]{3,24}$/;
+const USERNAME_FORMAT_MESSAGE = 'Username must be 3-24 characters using lowercase letters, numbers, or underscores.';
 const FORGOT_PASSWORD_GENERIC_MESSAGE = 'If an account exists with this email, you will receive a reset link shortly.';
 
 export function LoginScreen() {
   const params = useLocalSearchParams<{ reset?: string | string[] }>();
   const resetParam = Array.isArray(params.reset) ? params.reset[0] : params.reset;
   const hasAppliedResetMessage = React.useRef(false);
+  const usernameCheckRequestId = React.useRef(0);
 
   const [mode, setMode] = React.useState<AuthMode>('login');
   const isSignup = mode === 'signup';
@@ -30,6 +34,7 @@ export function LoginScreen() {
   const [isPasswordVisible, setIsPasswordVisible] = React.useState(false);
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [usernameAvailabilityState, setUsernameAvailabilityState] = React.useState<UsernameAvailabilityState>('idle');
   const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
@@ -51,6 +56,76 @@ export function LoginScreen() {
       setStatusMessage('Password reset successfully. Please log in.');
     }
   }, [resetParam]);
+
+  React.useEffect(() => {
+    if (!isSignup) {
+      usernameCheckRequestId.current += 1;
+      setUsernameAvailabilityState('idle');
+      return;
+    }
+
+    const normalizedUsername = username.trim().toLowerCase();
+
+    if (!normalizedUsername) {
+      usernameCheckRequestId.current += 1;
+      setUsernameAvailabilityState('idle');
+      return;
+    }
+
+    if (!USERNAME_REGEX.test(normalizedUsername)) {
+      usernameCheckRequestId.current += 1;
+      setUsernameAvailabilityState('invalid');
+      return;
+    }
+
+    const requestId = usernameCheckRequestId.current + 1;
+    usernameCheckRequestId.current = requestId;
+    setUsernameAvailabilityState('checking');
+
+    const timeoutId = setTimeout(() => {
+      checkUsernameAvailability(normalizedUsername)
+        .then((isAvailable) => {
+          if (usernameCheckRequestId.current !== requestId) {
+            return;
+          }
+
+          setUsernameAvailabilityState(isAvailable ? 'available' : 'taken');
+        })
+        .catch(() => {
+          if (usernameCheckRequestId.current !== requestId) {
+            return;
+          }
+
+          setUsernameAvailabilityState('error');
+        });
+    }, 450);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [isSignup, username]);
+
+  const usernameAvailabilityMessage = React.useMemo(() => {
+    if (!isSignup) {
+      return null;
+    }
+
+    switch (usernameAvailabilityState) {
+      case 'invalid':
+        return USERNAME_FORMAT_MESSAGE;
+      case 'checking':
+        return 'Checking username availability...';
+      case 'available':
+        return 'Username is available.';
+      case 'taken':
+        return 'That username is already taken.';
+      case 'error':
+        return 'Unable to verify username availability right now.';
+      case 'idle':
+      default:
+        return null;
+    }
+  }, [isSignup, usernameAvailabilityState]);
 
   const openForgotPassword = () => {
     setIsForgotPasswordOpen(true);
@@ -138,7 +213,17 @@ export function LoginScreen() {
       }
 
       if (!USERNAME_REGEX.test(normalizedUsername)) {
-        setErrorMessage('Username must be 3-24 characters using lowercase letters, numbers, or underscores.');
+        setErrorMessage(USERNAME_FORMAT_MESSAGE);
+        return;
+      }
+
+      if (usernameAvailabilityState === 'checking') {
+        setErrorMessage('Please wait while we verify your username.');
+        return;
+      }
+
+      if (usernameAvailabilityState === 'taken') {
+        setErrorMessage('That username is already taken.');
         return;
       }
 
@@ -295,9 +380,23 @@ export function LoginScreen() {
                 textContentType="username"
                 placeholder="Choose a unique username"
                 placeholderTextColor="#A8A9AE"
-                style={[styles.input, styles.emailInput]}
+                style={[styles.input, styles.usernameInput]}
                 editable={!isSubmitting}
               />
+
+              {usernameAvailabilityMessage ? (
+                <Text
+                  style={[
+                    styles.usernameFeedback,
+                    usernameAvailabilityState === 'available'
+                      ? styles.usernameFeedbackSuccess
+                      : usernameAvailabilityState === 'checking'
+                      ? styles.usernameFeedbackInfo
+                      : styles.usernameFeedbackError,
+                  ]}>
+                  {usernameAvailabilityMessage}
+                </Text>
+              ) : null}
             </>
           ) : null}
 
