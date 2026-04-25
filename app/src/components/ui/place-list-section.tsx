@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { PlaceCard } from '@/components/ui/place-card';
+import { StatusMessage } from '@/components/ui/status-message';
 import type { Place } from '@/components/ui/types';
 
 const SECTION_THEME = {
@@ -46,9 +47,10 @@ export function PlaceListSection({
             />
           ))
         ) : (
-          <Text style={styles.noResultsText}>
-            {emptyStatePrefix} &quot;{searchQuery.trim()}&quot;.
-          </Text>
+          <StatusMessage
+            message={`${emptyStatePrefix} "${searchQuery.trim()}".`}
+            style={styles.noResultsText}
+          />
         )}
       </View>
     </>

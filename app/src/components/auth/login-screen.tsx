@@ -1,13 +1,16 @@
-import { Feather } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { checkUsernameAvailability, checkEmailAvailability } from '../../../lib/auth-api';
 import { supabase } from '../../../lib/supabase';
 import { styles } from '@/components/auth/login-screen.styles';
+import { BrandHeader } from '@/components/ui/brand-header';
+import { LabeledInput } from '@/components/ui/labeled-input';
+import { PasswordField } from '@/components/ui/password-field';
+import { StatusMessage } from '@/components/ui/status-message';
 
 type AuthMode = 'login' | 'signup';
 type UsernameAvailabilityState = 'idle' | 'invalid' | 'checking' | 'available' | 'taken' | 'error';
@@ -331,12 +334,11 @@ export function LoginScreen() {
 
       <View style={styles.screen}>
         <View style={styles.topSection}>
-          <View style={styles.brandRow}>
-            <View style={styles.logoBadge}>
-              <Feather name="navigation" size={20} color="#FFFFFF" />
-            </View>
-            <Text style={styles.brandText}>TripSync</Text>
-          </View>
+          <BrandHeader
+            containerStyle={styles.brandRow}
+            badgeStyle={styles.logoBadge}
+            brandTextStyle={styles.brandText}
+          />
 
           <View style={styles.tabsRow}>
             <Pressable
@@ -358,8 +360,9 @@ export function LoginScreen() {
 
           {isSignup ? (
             <>
-              <Text style={styles.inputLabel}>Full Name</Text>
-              <TextInput
+              <LabeledInput
+                label="Full Name"
+                labelStyle={styles.inputLabel}
                 value={fullName}
                 onChangeText={setFullName}
                 autoCapitalize="words"
@@ -367,12 +370,13 @@ export function LoginScreen() {
                 textContentType="name"
                 placeholder="Enter your full name"
                 placeholderTextColor="#A8A9AE"
-                style={[styles.input, styles.emailInput]}
+                inputStyle={[styles.input, styles.emailInput]}
                 editable={!isSubmitting}
               />
 
-              <Text style={styles.inputLabel}>Username</Text>
-              <TextInput
+              <LabeledInput
+                label="Username"
+                labelStyle={styles.inputLabel}
                 value={username}
                 onChangeText={setUsername}
                 autoCapitalize="none"
@@ -380,7 +384,7 @@ export function LoginScreen() {
                 textContentType="username"
                 placeholder="Choose a unique username"
                 placeholderTextColor="#A8A9AE"
-                style={[styles.input, styles.usernameInput]}
+                inputStyle={[styles.input, styles.usernameInput]}
                 editable={!isSubmitting}
               />
 
@@ -400,8 +404,9 @@ export function LoginScreen() {
             </>
           ) : null}
 
-          <Text style={styles.inputLabel}>Your Email</Text>
-          <TextInput
+          <LabeledInput
+            label="Your Email"
+            labelStyle={styles.inputLabel}
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
@@ -410,59 +415,52 @@ export function LoginScreen() {
             textContentType="emailAddress"
             placeholder="Enter your email"
             placeholderTextColor="#A8A9AE"
-            style={[styles.input, styles.emailInput]}
+            inputStyle={[styles.input, styles.emailInput]}
             editable={!isSubmitting}
           />
 
           {isSignup || !isForgotPasswordOpen ? (
             <>
-              <Text style={styles.inputLabel}>Password</Text>
+              <PasswordField
+                label="Password"
+                labelStyle={styles.inputLabel}
+                value={password}
+                onChangeText={setPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                textContentType="password"
+                placeholder="Enter password"
+                placeholderTextColor="#A8A9AE"
+                inputStyle={[styles.input, styles.passwordInput]}
+                containerStyle={styles.passwordInputContainer}
+                eyeButtonStyle={styles.eyeButton}
+                isPasswordVisible={isPasswordVisible}
+                onToggleVisibility={() => setIsPasswordVisible((current) => !current)}
+                editable={!isSubmitting}
+              />
 
-              <View style={styles.passwordInputContainer}>
-                <TextInput
-                  value={password}
-                  onChangeText={setPassword}
+              {isSignup ? (
+                <PasswordField
+                  label="Confirm Password"
+                  labelStyle={styles.inputLabel}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
                   autoCapitalize="none"
                   autoCorrect={false}
                   textContentType="password"
-                  secureTextEntry={!isPasswordVisible}
-                  placeholder="Enter password"
+                  placeholder="Re-enter password"
                   placeholderTextColor="#A8A9AE"
-                  style={[styles.input, styles.passwordInput]}
+                  inputStyle={[styles.input, styles.confirmPasswordInput]}
+                  isPasswordVisible={isPasswordVisible}
+                  showToggle={false}
                   editable={!isSubmitting}
                 />
-
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
-                  style={styles.eyeButton}
-                  onPress={() => setIsPasswordVisible((current) => !current)}>
-                  <Feather name={isPasswordVisible ? 'eye' : 'eye-off'} size={19} color="#B8BAC0" />
-                </Pressable>
-              </View>
-
-              {isSignup ? (
-                <>
-                  <Text style={styles.inputLabel}>Confirm Password</Text>
-                  <TextInput
-                    value={confirmPassword}
-                    onChangeText={setConfirmPassword}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    textContentType="password"
-                    secureTextEntry={!isPasswordVisible}
-                    placeholder="Re-enter password"
-                    placeholderTextColor="#A8A9AE"
-                    style={[styles.input, styles.confirmPasswordInput]}
-                    editable={!isSubmitting}
-                  />
-                </>
               ) : null}
             </>
           ) : null}
 
-          {errorMessage ? <Text style={styles.errorMessage}>{errorMessage}</Text> : null}
-          {statusMessage ? <Text style={styles.statusMessage}>{statusMessage}</Text> : null}
+          <StatusMessage message={errorMessage} style={styles.errorMessage} />
+          <StatusMessage message={statusMessage} style={styles.statusMessage} />
 
           <Pressable
             accessibilityRole="button"

@@ -1,12 +1,14 @@
-import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { supabase } from '../../../lib/supabase';
 import { styles } from '@/components/auth/reset-password-screen.styles';
+import { BrandHeader } from '@/components/ui/brand-header';
+import { PasswordField } from '@/components/ui/password-field';
+import { StatusMessage } from '@/components/ui/status-message';
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -136,58 +138,52 @@ export function ResetPasswordScreen() {
 
       <View style={styles.screen}>
         <View style={styles.topSection}>
-          <View style={styles.brandRow}>
-            <View style={styles.logoBadge}>
-              <Feather name="navigation" size={20} color="#FFFFFF" />
-            </View>
-            <Text style={styles.brandText}>TripSync</Text>
-          </View>
+          <BrandHeader
+            containerStyle={styles.brandRow}
+            badgeStyle={styles.logoBadge}
+            brandTextStyle={styles.brandText}
+          />
 
           <Text style={styles.title}>Reset Password</Text>
           <Text style={styles.subtitle}>Choose a new password for your account to finish recovery.</Text>
 
-          <Text style={styles.inputLabel}>New Password</Text>
-          <View style={styles.passwordInputContainer}>
-            <TextInput
-              value={newPassword}
-              onChangeText={setNewPassword}
-              autoCapitalize="none"
-              autoCorrect={false}
-              textContentType="newPassword"
-              secureTextEntry={!isPasswordVisible}
-              placeholder="Enter your new password"
-              placeholderTextColor="#A8A9AE"
-              style={[styles.input, styles.passwordInput]}
-              editable={!isBusy}
-            />
+          <PasswordField
+            label="New Password"
+            labelStyle={styles.inputLabel}
+            value={newPassword}
+            onChangeText={setNewPassword}
+            autoCapitalize="none"
+            autoCorrect={false}
+            textContentType="newPassword"
+            placeholder="Enter your new password"
+            placeholderTextColor="#A8A9AE"
+            inputStyle={[styles.input, styles.passwordInput]}
+            containerStyle={styles.passwordInputContainer}
+            eyeButtonStyle={styles.eyeButton}
+            isPasswordVisible={isPasswordVisible}
+            onToggleVisibility={() => setIsPasswordVisible((current) => !current)}
+            editable={!isBusy}
+          />
 
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
-              style={styles.eyeButton}
-              onPress={() => setIsPasswordVisible((current) => !current)}>
-              <Feather name={isPasswordVisible ? 'eye' : 'eye-off'} size={19} color="#B8BAC0" />
-            </Pressable>
-          </View>
+          <PasswordField
+            label="Confirm Password"
+            labelStyle={styles.inputLabel}
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            autoCapitalize="none"
+            autoCorrect={false}
+            textContentType="newPassword"
+            placeholder="Re-enter your new password"
+            placeholderTextColor="#A8A9AE"
+            inputStyle={[styles.input, styles.passwordInput]}
+            containerStyle={styles.passwordInputContainer}
+            isPasswordVisible={isPasswordVisible}
+            showToggle={false}
+            editable={!isBusy}
+          />
 
-          <Text style={styles.inputLabel}>Confirm Password</Text>
-          <View style={styles.passwordInputContainer}>
-            <TextInput
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              autoCapitalize="none"
-              autoCorrect={false}
-              textContentType="newPassword"
-              secureTextEntry={!isPasswordVisible}
-              placeholder="Re-enter your new password"
-              placeholderTextColor="#A8A9AE"
-              style={[styles.input, styles.passwordInput]}
-              editable={!isBusy}
-            />
-          </View>
-
-          {errorMessage ? <Text style={styles.errorMessage}>{errorMessage}</Text> : null}
-          {statusMessage ? <Text style={styles.statusMessage}>{statusMessage}</Text> : null}
+          <StatusMessage message={errorMessage} style={styles.errorMessage} />
+          <StatusMessage message={statusMessage} style={styles.statusMessage} />
 
           <Pressable
             accessibilityRole="button"
