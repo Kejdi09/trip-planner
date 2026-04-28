@@ -36,7 +36,7 @@ jobs:
 
       - name: Lint
         working-directory: app
-        run: npm run lint
+        run: npx eslint .
 
       - name: Test
         working-directory: app
