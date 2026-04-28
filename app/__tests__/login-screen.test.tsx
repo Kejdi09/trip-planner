@@ -149,3 +149,102 @@ test("can go back from forgot password to login", () => {
   fireEvent.press(screen.getByText("Back to log in"));
   expect(screen.getByText("Continue")).toBeTruthy();
 });
+
+// --- MISSING LOGIN TESTS ---
+
+test("shows error when email is not confirmed", async () => {
+  checkEmailAvailability.mockResolvedValue({ available: false, canResetPassword: false });
+
+  render(<LoginScreen />);
+  fireEvent.changeText(screen.getByPlaceholderText("Enter your email"), "unconfirmed@example.com");
+  fireEvent.changeText(screen.getByPlaceholderText("Enter password"), "password123");
+  fireEvent.press(screen.getByText("Continue"));
+
+  expect(await screen.findByText("Please confirm your email before logging in.")).toBeTruthy();
+});
+
+// --- MISSING SIGNUP TESTS ---
+
+test("shows error when password is too short", async () => {
+  checkUsernameAvailability.mockResolvedValue(true);
+  render(<LoginScreen />);
+  fireEvent.press(screen.getAllByText("Sign up")[0]);
+  fireEvent.changeText(screen.getByPlaceholderText("Enter your full name"), "John Doe");
+  fireEvent.changeText(screen.getByPlaceholderText("Choose a unique username"), "johndoe");
+  fireEvent.changeText(screen.getByPlaceholderText("Enter your email"), "test@example.com");
+  fireEvent.changeText(screen.getByPlaceholderText("Enter password"), "short");
+  fireEvent.changeText(screen.getByPlaceholderText("Re-enter password"), "short");
+
+  await screen.findByText("Username is available.");
+
+  fireEvent.press(screen.getAllByText("Sign up")[1]);
+  expect(await screen.findByText("Password must be at least 8 characters.")).toBeTruthy();
+});
+
+test("shows error when username format is invalid", async () => {
+  render(<LoginScreen />);
+  fireEvent.press(screen.getAllByText("Sign up")[0]);
+  fireEvent.changeText(screen.getByPlaceholderText("Choose a unique username"), "INVALID USER!");
+
+  expect(await screen.findByText("Username must be 3-24 characters using lowercase letters, numbers, or underscores.")).toBeTruthy();
+});
+
+test("shows error when username is already taken", async () => {
+  checkUsernameAvailability.mockResolvedValue(false);
+  render(<LoginScreen />);
+  fireEvent.press(screen.getAllByText("Sign up")[0]);
+  fireEvent.changeText(screen.getByPlaceholderText("Choose a unique username"), "takenuser");
+
+  expect(await screen.findByText("That username is already taken.")).toBeTruthy();
+});
+
+test("shows error when email already exists on signup", async () => {
+  checkUsernameAvailability.mockResolvedValue(true);
+  checkEmailAvailability.mockResolvedValue({ available: false, canResetPassword: true });
+
+  render(<LoginScreen />);
+  fireEvent.press(screen.getAllByText("Sign up")[0]);
+  fireEvent.changeText(screen.getByPlaceholderText("Enter your full name"), "John Doe");
+  fireEvent.changeText(screen.getByPlaceholderText("Choose a unique username"), "johndoe");
+  fireEvent.changeText(screen.getByPlaceholderText("Enter your email"), "existing@example.com");
+  fireEvent.changeText(screen.getByPlaceholderText("Enter password"), "password123");
+  fireEvent.changeText(screen.getByPlaceholderText("Re-enter password"), "password123");
+
+  await screen.findByText("Username is available.");
+
+  fireEvent.press(screen.getAllByText("Sign up")[1]);
+  expect(await screen.findByText("An account with this email already exists. Try logging in.")).toBeTruthy();
+});
+
+test("shows success message after successful signup", async () => {
+  checkUsernameAvailability.mockResolvedValue(true);
+  checkEmailAvailability.mockResolvedValue({ available: true, canResetPassword: false });
+  supabase.auth.signUp.mockResolvedValue({ error: null });
+
+  render(<LoginScreen />);
+  fireEvent.press(screen.getAllByText("Sign up")[0]);
+  fireEvent.changeText(screen.getByPlaceholderText("Enter your full name"), "John Doe");
+  fireEvent.changeText(screen.getByPlaceholderText("Choose a unique username"), "johndoe");
+  fireEvent.changeText(screen.getByPlaceholderText("Enter your email"), "new@example.com");
+  fireEvent.changeText(screen.getByPlaceholderText("Enter password"), "password123");
+  fireEvent.changeText(screen.getByPlaceholderText("Re-enter password"), "password123");
+
+  await screen.findByText("Username is available.");
+
+  fireEvent.press(screen.getAllByText("Sign up")[1]);
+  expect(await screen.findByText("Check your email and click the confirmation link to complete sign-up.")).toBeTruthy();
+});
+
+// --- MISSING FORGOT PASSWORD TESTS ---
+
+test("shows success message after sending reset link", async () => {
+  checkEmailAvailability.mockResolvedValue({ available: false, canResetPassword: true });
+  supabase.auth.resetPasswordForEmail.mockResolvedValue({ error: null });
+
+  render(<LoginScreen />);
+  fireEvent.changeText(screen.getByPlaceholderText("Enter your email"), "test@example.com");
+  fireEvent.press(screen.getByText("Forgot password?"));
+  fireEvent.press(screen.getByText("Send reset link"));
+
+  expect(await screen.findByText("If an account exists with this email, you will receive a reset link shortly.")).toBeTruthy();
+});
