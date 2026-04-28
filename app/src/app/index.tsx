@@ -1,6 +1,8 @@
-import React from 'react';
-import VotingScreen from './voting/VotingScreen';
+import React from "react";
 
-export default function Index() {
-  return <VotingScreen />;
+
+import { LoginScreen } from "@/components/auth/login-screen";
+
+export default function HomeScreen() {
+  return <LoginScreen />;
 }
