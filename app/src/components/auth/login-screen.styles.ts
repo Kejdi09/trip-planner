@@ -102,6 +102,24 @@ export const styles = StyleSheet.create({
   emailInput: {
     marginBottom: rs(16),
   },
+  usernameInput: {
+    marginBottom: rs(6),
+  },
+  usernameFeedback: {
+    marginBottom: rs(10),
+    fontSize: rs(13),
+    fontWeight: '600',
+    letterSpacing: -0.1,
+  },
+  usernameFeedbackInfo: {
+    color: '#6B7180',
+  },
+  usernameFeedbackSuccess: {
+    color: COLORS.success,
+  },
+  usernameFeedbackError: {
+    color: COLORS.error,
+  },
   passwordInputContainer: {
     position: 'relative',
     marginBottom: rs(16),

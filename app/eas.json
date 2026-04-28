@@ -12,12 +12,6 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
-      },
-      "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://rplpqgfnacwrigovsyrz.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJwbHBxZ2ZuYWN3cmlnb3ZzeXJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NDU4MjUsImV4cCI6MjA5MTIyMTgyNX0.VKXgHX9BJndoSBv1C-KMSXNVDzNhmcZc-YnGTT5gYY8",
-        "EXPO_PUBLIC_API_URL": "https://trip-planner-1-xcdc.onrender.com",
-        "EXPO_PUBLIC_APP_URL": "https://trip-planner-1-xcdc.onrender.com"
       }
     },
     "production": {
