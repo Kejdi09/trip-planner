@@ -3,7 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
+import { APP_URL } from '../../../lib/app-config';
 import { checkUsernameAvailability, checkEmailAvailability } from '../../../lib/auth-api';
 import { supabase } from '../../../lib/supabase';
 import { styles } from '@/components/auth/login-screen.styles';
@@ -11,7 +11,6 @@ import { BrandHeader } from '@/components/ui/brand-header';
 import { LabeledInput } from '@/components/ui/labeled-input';
 import { PasswordField } from '@/components/ui/password-field';
 import { StatusMessage } from '@/components/ui/status-message';
-
 type AuthMode = 'login' | 'signup';
 type UsernameAvailabilityState = 'idle' | 'invalid' | 'checking' | 'available' | 'taken' | 'error';
 
@@ -19,6 +18,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USERNAME_REGEX = /^[a-z0-9_]{3,24}$/;
 const USERNAME_FORMAT_MESSAGE = 'Username must be 3-24 characters using lowercase letters, numbers, or underscores.';
 const FORGOT_PASSWORD_GENERIC_MESSAGE = 'If an account exists with this email, you will receive a reset link shortly.';
+const RESET_PASSWORD_REDIRECT_URL = `${APP_URL.replace(/\/+$/, '')}/reset-password`;
 
 export function LoginScreen() {
   const params = useLocalSearchParams<{ reset?: string | string[] }>();
@@ -165,7 +165,7 @@ export function LoginScreen() {
 
       if (emailStatus.canResetPassword) {
         const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-          redirectTo: `${process.env.EXPO_PUBLIC_APP_URL}/reset-password`,
+          redirectTo: RESET_PASSWORD_REDIRECT_URL,
         });
 
         if (error) {
