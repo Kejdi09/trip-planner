@@ -1,10 +1,9 @@
-/* eslint-disable @typescript-eslint/no-require-imports */
+/*eslint-disable @typescript-eslint/no-require-imports */ 
 import React from "react";
 import { jest } from "@jest/globals";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react-native";
 import { LoginScreen } from "@/components/auth/login-screen";
-import { supabase } from "../lib/supabase";
-import { checkUsernameAvailability, checkEmailAvailability } from "../lib/auth-api";
+
 // Mocks
 jest.mock("expo-router", () => ({
   router: { replace: jest.fn() },
@@ -41,6 +40,9 @@ jest.mock("../lib/auth-api", () => ({
   checkEmailAvailability: jest.fn(),
 }));
 
+// helpers to get mocks inside tests
+const { supabase } = require("../lib/supabase");
+const { checkUsernameAvailability, checkEmailAvailability } = require("../lib/auth-api");
 
 // --- LOGIN TESTS ---
 
