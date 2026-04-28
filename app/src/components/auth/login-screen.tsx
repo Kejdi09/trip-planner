@@ -1,19 +1,31 @@
-import { Feather } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
 import { checkUsernameAvailability, checkEmailAvailability } from '../../../lib/auth-api';
 import { supabase } from '../../../lib/supabase';
 import { styles } from '@/components/auth/login-screen.styles';
+import { BrandHeader } from '@/components/ui/brand-header';
+import { LabeledInput } from '@/components/ui/labeled-input';
+import { PasswordField } from '@/components/ui/password-field';
+import { StatusMessage } from '@/components/ui/status-message';
 
 type AuthMode = 'login' | 'signup';
+type UsernameAvailabilityState = 'idle' | 'invalid' | 'checking' | 'available' | 'taken' | 'error';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USERNAME_REGEX = /^[a-z0-9_]{3,24}$/;
+const USERNAME_FORMAT_MESSAGE = 'Username must be 3-24 characters using lowercase letters, numbers, or underscores.';
+const FORGOT_PASSWORD_GENERIC_MESSAGE = 'If an account exists with this email, you will receive a reset link shortly.';
 
 export function LoginScreen() {
+  const params = useLocalSearchParams<{ reset?: string | string[] }>();
+  const resetParam = Array.isArray(params.reset) ? params.reset[0] : params.reset;
+  const hasAppliedResetMessage = React.useRef(false);
+  const usernameCheckRequestId = React.useRef(0);
+
   const [mode, setMode] = React.useState<AuthMode>('login');
   const isSignup = mode === 'signup';
 
@@ -23,14 +35,152 @@ export function LoginScreen() {
   const [password, setPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
   const [isPasswordVisible, setIsPasswordVisible] = React.useState(false);
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [usernameAvailabilityState, setUsernameAvailabilityState] = React.useState<UsernameAvailabilityState>('idle');
   const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   const switchMode = (nextMode: AuthMode) => {
     setMode(nextMode);
+    setIsForgotPasswordOpen(false);
     setStatusMessage(null);
     setErrorMessage(null);
+  };
+
+  React.useEffect(() => {
+    if (resetParam === 'success' && !hasAppliedResetMessage.current) {
+      hasAppliedResetMessage.current = true;
+      setMode('login');
+      setIsForgotPasswordOpen(false);
+      setPassword('');
+      setConfirmPassword('');
+      setErrorMessage(null);
+      setStatusMessage('Password reset successfully. Please log in.');
+    }
+  }, [resetParam]);
+
+  React.useEffect(() => {
+    if (!isSignup) {
+      usernameCheckRequestId.current += 1;
+      setUsernameAvailabilityState('idle');
+      return;
+    }
+
+    const normalizedUsername = username.trim().toLowerCase();
+
+    if (!normalizedUsername) {
+      usernameCheckRequestId.current += 1;
+      setUsernameAvailabilityState('idle');
+      return;
+    }
+
+    if (!USERNAME_REGEX.test(normalizedUsername)) {
+      usernameCheckRequestId.current += 1;
+      setUsernameAvailabilityState('invalid');
+      return;
+    }
+
+    const requestId = usernameCheckRequestId.current + 1;
+    usernameCheckRequestId.current = requestId;
+    setUsernameAvailabilityState('checking');
+
+    const timeoutId = setTimeout(() => {
+      checkUsernameAvailability(normalizedUsername)
+        .then((isAvailable) => {
+          if (usernameCheckRequestId.current !== requestId) {
+            return;
+          }
+
+          setUsernameAvailabilityState(isAvailable ? 'available' : 'taken');
+        })
+        .catch(() => {
+          if (usernameCheckRequestId.current !== requestId) {
+            return;
+          }
+
+          setUsernameAvailabilityState('error');
+        });
+    }, 450);
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, [isSignup, username]);
+
+  const usernameAvailabilityMessage = React.useMemo(() => {
+    if (!isSignup) {
+      return null;
+    }
+
+    switch (usernameAvailabilityState) {
+      case 'invalid':
+        return USERNAME_FORMAT_MESSAGE;
+      case 'checking':
+        return 'Checking username availability...';
+      case 'available':
+        return 'Username is available.';
+      case 'taken':
+        return 'That username is already taken.';
+      case 'error':
+        return 'Unable to verify username availability right now.';
+      case 'idle':
+      default:
+        return null;
+    }
+  }, [isSignup, usernameAvailabilityState]);
+
+  const openForgotPassword = () => {
+    setIsForgotPasswordOpen(true);
+    setPassword('');
+    setErrorMessage(null);
+    setStatusMessage(null);
+  };
+
+  const closeForgotPassword = () => {
+    setIsForgotPasswordOpen(false);
+    setErrorMessage(null);
+    setStatusMessage(null);
+  };
+
+  const onForgotPasswordSubmit = async () => {
+    if (isSubmitting) {
+      return;
+    }
+
+    setStatusMessage(null);
+    setErrorMessage(null);
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!EMAIL_REGEX.test(normalizedEmail)) {
+      setErrorMessage('Enter the email on your account first, then tap Forgot password.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const emailStatus = await checkEmailAvailability(normalizedEmail);
+
+      if (emailStatus.canResetPassword) {
+        const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+          redirectTo: `${process.env.EXPO_PUBLIC_APP_URL}/reset-password`,
+        });
+
+        if (error) {
+          throw error;
+        }
+      }
+
+      setErrorMessage(null);
+      setStatusMessage(FORGOT_PASSWORD_GENERIC_MESSAGE);
+    } catch {
+      setErrorMessage(null);
+      setStatusMessage(FORGOT_PASSWORD_GENERIC_MESSAGE);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const onSubmit = async () => {
@@ -50,6 +200,11 @@ export function LoginScreen() {
     }
 
     if (!password) {
+      if (!isSignup) {
+        setErrorMessage('Invalid credentials.');
+        return;
+      }
+
       setErrorMessage('Password is required.');
       return;
     }
@@ -61,7 +216,17 @@ export function LoginScreen() {
       }
 
       if (!USERNAME_REGEX.test(normalizedUsername)) {
-        setErrorMessage('Username must be 3-24 characters using lowercase letters, numbers, or underscores.');
+        setErrorMessage(USERNAME_FORMAT_MESSAGE);
+        return;
+      }
+
+      if (usernameAvailabilityState === 'checking') {
+        setErrorMessage('Please wait while we verify your username.');
+        return;
+      }
+
+      if (usernameAvailabilityState === 'taken') {
+        setErrorMessage('That username is already taken.');
         return;
       }
 
@@ -80,17 +245,21 @@ export function LoginScreen() {
 
     try {
       if (isSignup) {
-        const isEmailAvailable = await checkEmailAvailability(normalizedEmail);
+        const emailStatus = await checkEmailAvailability(normalizedEmail);
 
-if (!isEmailAvailable) {
-  setErrorMessage('An account with this email already exists. Try logging in.');
-  return;
-}
+        if (!emailStatus.available) {
+          setErrorMessage(
+            emailStatus.canResetPassword
+              ? 'An account with this email already exists. Try logging in.'
+              : 'This email is pending confirmation. Check your inbox.',
+          );
+          return;
+        }
 
-const isAvailable = await checkUsernameAvailability(normalizedUsername);
+        const isAvailable = await checkUsernameAvailability(normalizedUsername);
 
         if (!isAvailable) {
-          setErrorMessage('That username is already taken. Try a different one.');
+          setErrorMessage('That username is already taken.');
           return;
         }
 
@@ -106,6 +275,18 @@ const isAvailable = await checkUsernameAvailability(normalizedUsername);
         });
 
         if (error) {
+          const normalizedErrorMessage = error.message.toLowerCase();
+
+          if (normalizedErrorMessage.includes('already') && normalizedErrorMessage.includes('email')) {
+            setErrorMessage('An account with this email already exists. Try logging in.');
+            return;
+          }
+
+          if (normalizedErrorMessage.includes('confirm')) {
+            setErrorMessage('This email is pending confirmation. Check your inbox.');
+            return;
+          }
+
           throw error;
         }
 
@@ -116,17 +297,30 @@ const isAvailable = await checkUsernameAvailability(normalizedUsername);
         return;
       }
 
+      const emailStatus = await checkEmailAvailability(normalizedEmail);
+
+      if (!emailStatus.available && !emailStatus.canResetPassword) {
+        setErrorMessage('Please confirm your email before logging in.');
+        return;
+      }
+
       const { error } = await supabase.auth.signInWithPassword({
         email: normalizedEmail,
         password,
       });
 
       if (error) {
-        throw error;
+        setErrorMessage('Invalid credentials.');
+        return;
       }
 
       router.replace('/explore');
     } catch (error) {
+      if (!isSignup) {
+        setErrorMessage('Invalid credentials.');
+        return;
+      }
+
       const message = error instanceof Error ? error.message : 'Unable to complete authentication.';
       setErrorMessage(message);
     } finally {
@@ -140,12 +334,11 @@ const isAvailable = await checkUsernameAvailability(normalizedUsername);
 
       <View style={styles.screen}>
         <View style={styles.topSection}>
-          <View style={styles.brandRow}>
-            <View style={styles.logoBadge}>
-              <Feather name="navigation" size={20} color="#FFFFFF" />
-            </View>
-            <Text style={styles.brandText}>TripSync</Text>
-          </View>
+          <BrandHeader
+            containerStyle={styles.brandRow}
+            badgeStyle={styles.logoBadge}
+            brandTextStyle={styles.brandText}
+          />
 
           <View style={styles.tabsRow}>
             <Pressable
@@ -167,8 +360,9 @@ const isAvailable = await checkUsernameAvailability(normalizedUsername);
 
           {isSignup ? (
             <>
-              <Text style={styles.inputLabel}>Full Name</Text>
-              <TextInput
+              <LabeledInput
+                label="Full Name"
+                labelStyle={styles.inputLabel}
                 value={fullName}
                 onChangeText={setFullName}
                 autoCapitalize="words"
@@ -176,12 +370,13 @@ const isAvailable = await checkUsernameAvailability(normalizedUsername);
                 textContentType="name"
                 placeholder="Enter your full name"
                 placeholderTextColor="#A8A9AE"
-                style={[styles.input, styles.emailInput]}
+                inputStyle={[styles.input, styles.emailInput]}
                 editable={!isSubmitting}
               />
 
-              <Text style={styles.inputLabel}>Username</Text>
-              <TextInput
+              <LabeledInput
+                label="Username"
+                labelStyle={styles.inputLabel}
                 value={username}
                 onChangeText={setUsername}
                 autoCapitalize="none"
@@ -189,14 +384,29 @@ const isAvailable = await checkUsernameAvailability(normalizedUsername);
                 textContentType="username"
                 placeholder="Choose a unique username"
                 placeholderTextColor="#A8A9AE"
-                style={[styles.input, styles.emailInput]}
+                inputStyle={[styles.input, styles.usernameInput]}
                 editable={!isSubmitting}
               />
+
+              {usernameAvailabilityMessage ? (
+                <Text
+                  style={[
+                    styles.usernameFeedback,
+                    usernameAvailabilityState === 'available'
+                      ? styles.usernameFeedbackSuccess
+                      : usernameAvailabilityState === 'checking'
+                      ? styles.usernameFeedbackInfo
+                      : styles.usernameFeedbackError,
+                  ]}>
+                  {usernameAvailabilityMessage}
+                </Text>
+              ) : null}
             </>
           ) : null}
 
-          <Text style={styles.inputLabel}>Your Email</Text>
-          <TextInput
+          <LabeledInput
+            label="Your Email"
+            labelStyle={styles.inputLabel}
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
@@ -205,67 +415,76 @@ const isAvailable = await checkUsernameAvailability(normalizedUsername);
             textContentType="emailAddress"
             placeholder="Enter your email"
             placeholderTextColor="#A8A9AE"
-            style={[styles.input, styles.emailInput]}
+            inputStyle={[styles.input, styles.emailInput]}
             editable={!isSubmitting}
           />
 
-          <Text style={styles.inputLabel}>Password</Text>
-
-          <View style={styles.passwordInputContainer}>
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              autoCapitalize="none"
-              autoCorrect={false}
-              textContentType="password"
-              secureTextEntry={!isPasswordVisible}
-              placeholder="Enter password"
-              placeholderTextColor="#A8A9AE"
-              style={[styles.input, styles.passwordInput]}
-              editable={!isSubmitting}
-            />
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
-              style={styles.eyeButton}
-              onPress={() => setIsPasswordVisible((current) => !current)}>
-              <Feather name={isPasswordVisible ? 'eye' : 'eye-off'} size={19} color="#B8BAC0" />
-            </Pressable>
-          </View>
-
-          {isSignup ? (
+          {isSignup || !isForgotPasswordOpen ? (
             <>
-              <Text style={styles.inputLabel}>Confirm Password</Text>
-              <TextInput
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
+              <PasswordField
+                label="Password"
+                labelStyle={styles.inputLabel}
+                value={password}
+                onChangeText={setPassword}
                 autoCapitalize="none"
                 autoCorrect={false}
                 textContentType="password"
-                secureTextEntry={!isPasswordVisible}
-                placeholder="Re-enter password"
+                placeholder="Enter password"
                 placeholderTextColor="#A8A9AE"
-                style={[styles.input, styles.confirmPasswordInput]}
+                inputStyle={[styles.input, styles.passwordInput]}
+                containerStyle={styles.passwordInputContainer}
+                eyeButtonStyle={styles.eyeButton}
+                isPasswordVisible={isPasswordVisible}
+                onToggleVisibility={() => setIsPasswordVisible((current) => !current)}
                 editable={!isSubmitting}
               />
+
+              {isSignup ? (
+                <PasswordField
+                  label="Confirm Password"
+                  labelStyle={styles.inputLabel}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  textContentType="password"
+                  placeholder="Re-enter password"
+                  placeholderTextColor="#A8A9AE"
+                  inputStyle={[styles.input, styles.confirmPasswordInput]}
+                  isPasswordVisible={isPasswordVisible}
+                  showToggle={false}
+                  editable={!isSubmitting}
+                />
+              ) : null}
             </>
           ) : null}
 
-          {errorMessage ? <Text style={styles.errorMessage}>{errorMessage}</Text> : null}
-          {statusMessage ? <Text style={styles.statusMessage}>{statusMessage}</Text> : null}
+          <StatusMessage message={errorMessage} style={styles.errorMessage} />
+          <StatusMessage message={statusMessage} style={styles.statusMessage} />
 
           <Pressable
             accessibilityRole="button"
             style={[styles.primaryButton, isSubmitting && styles.primaryButtonDisabled]}
-            onPress={onSubmit}
+            onPress={isForgotPasswordOpen && !isSignup ? onForgotPasswordSubmit : onSubmit}
             disabled={isSubmitting}>
-            <Text style={styles.primaryButtonText}>{isSubmitting ? 'Please wait...' : isSignup ? 'Sign up' : 'Continue'}</Text>
+            <Text style={styles.primaryButtonText}>
+              {isSubmitting
+                ? 'Please wait...'
+                : isSignup
+                ? 'Sign up'
+                : isForgotPasswordOpen
+                ? 'Send reset link'
+                : 'Continue'}
+            </Text>
           </Pressable>
 
           {mode === 'login' ? (
-            <Pressable accessibilityRole="button" style={styles.forgotLink}>
-              <Text style={styles.forgotLinkText}>Forgot password?</Text>
+            <Pressable
+              accessibilityRole="button"
+              style={styles.forgotLink}
+              onPress={isForgotPasswordOpen ? closeForgotPassword : openForgotPassword}
+              disabled={isSubmitting}>
+              <Text style={styles.forgotLinkText}>{isForgotPasswordOpen ? 'Back to log in' : 'Forgot password?'}</Text>
             </Pressable>
           ) : null}
         </View>

@@ -8,12 +8,10 @@ const COLORS = {
   background: '#F5F6F8',
   primary: '#1097A8',
   text: '#111318',
-  mutedText: '#C7CAD1',
   label: '#2D2F37',
   border: '#D4D8DE',
   inputBackground: '#F8F9FB',
   inputText: '#2A2C33',
-  placeholder: '#A3A7AF',
   error: '#D54545',
   success: '#1F7A57',
   buttonText: '#FFFFFF',
@@ -38,7 +36,7 @@ export const styles = StyleSheet.create({
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: rs(34),
+    marginBottom: rs(26),
   },
   logoBadge: {
     width: rs(36),
@@ -55,34 +53,23 @@ export const styles = StyleSheet.create({
     color: COLORS.text,
     letterSpacing: -0.5,
   },
-  tabsRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    marginBottom: rs(20),
+  title: {
+    marginBottom: rs(8),
+    fontSize: rs(24),
+    fontWeight: '800',
+    color: COLORS.text,
+    letterSpacing: -0.4,
   },
-  tabButton: {
-    width: '50%',
-    alignItems: 'center',
-    paddingBottom: rs(8),
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  tabButtonActive: {
-    borderBottomColor: COLORS.primary,
-  },
-  tabLabel: {
-    fontSize: rs(18),
-    fontWeight: '700',
-    color: COLORS.mutedText,
-    letterSpacing: -0.3,
-  },
-  tabLabelActive: {
-    color: COLORS.primary,
+  subtitle: {
+    marginBottom: rs(18),
+    fontSize: rs(14),
+    fontWeight: '600',
+    color: '#6F7481',
+    lineHeight: rs(20),
   },
   inputLabel: {
     marginBottom: rs(8),
     fontSize: rs(15),
-    lineHeight: rs(18),
     fontWeight: '700',
     color: COLORS.label,
     letterSpacing: -0.2,
@@ -93,42 +80,27 @@ export const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: COLORS.border,
     paddingHorizontal: rs(14),
-    paddingVertical: 0,
     fontSize: rs(16),
-    lineHeight: rs(20),
     color: COLORS.inputText,
     backgroundColor: COLORS.inputBackground,
   },
-  emailInput: {
-    marginBottom: rs(16),
-  },
-  usernameInput: {
-    marginBottom: rs(6),
-  },
-  usernameFeedback: {
-    marginBottom: rs(10),
-    fontSize: rs(13),
-    fontWeight: '600',
-    letterSpacing: -0.1,
-  },
-  usernameFeedbackInfo: {
-    color: '#6B7180',
-  },
-  usernameFeedbackSuccess: {
-    color: COLORS.success,
-  },
-  usernameFeedbackError: {
-    color: COLORS.error,
-  },
   passwordInputContainer: {
     position: 'relative',
-    marginBottom: rs(16),
+    marginBottom: rs(14),
   },
   passwordInput: {
     paddingRight: rs(46),
+    borderColor: COLORS.primary,
+    backgroundColor: '#FFFFFF',
   },
-  confirmPasswordInput: {
-    marginBottom: rs(16),
+  eyeButton: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    height: rs(52),
+    width: rs(44),
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   errorMessage: {
     marginBottom: rs(8),
@@ -144,22 +116,14 @@ export const styles = StyleSheet.create({
     fontWeight: '600',
     letterSpacing: -0.1,
   },
-  eyeButton: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    height: rs(52),
-    width: rs(44),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   primaryButton: {
     height: rs(52),
     borderRadius: 12,
     backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: rs(16),
+    marginTop: rs(8),
+    marginBottom: rs(12),
     boxShadow: '0px 4px 8px rgba(11, 111, 123, 0.18)',
     elevation: 2,
   },
@@ -172,30 +136,12 @@ export const styles = StyleSheet.create({
     color: COLORS.buttonText,
     letterSpacing: -0.1,
   },
-  forgotLink: {
+  backLink: {
     alignSelf: 'center',
   },
-  forgotLinkText: {
+  backLinkText: {
     color: COLORS.primary,
     fontSize: rs(16),
-    fontWeight: '700',
-    letterSpacing: -0.1,
-  },
-  footerRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingBottom: rs(6),
-  },
-  footerText: {
-    color: '#8F949F',
-    fontSize: rs(14),
-    fontWeight: '600',
-    letterSpacing: -0.1,
-  },
-  footerAction: {
-    color: COLORS.primary,
-    fontSize: rs(15),
     fontWeight: '700',
     letterSpacing: -0.1,
   },
