@@ -54,6 +54,7 @@ export function DestinationReviewsScreen() {
   const [headerImage, setHeaderImage] = React.useState(DEFAULT_PLACE_IMAGE);
   const [rating, setRating] = React.useState(0);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [isEmpty, setIsEmpty] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   const handleBack = () => {
@@ -78,7 +79,18 @@ export function DestinationReviewsScreen() {
           : await fetchFirstPlace();
 
         if (!placeRecord) {
-          throw new Error('No destination found yet.');
+          if (!isMounted) {
+            return;
+          }
+
+          setIsEmpty(true);
+          setPlace(null);
+          setReviews([]);
+          setProfiles({});
+          setHeaderImage(DEFAULT_PLACE_IMAGE);
+          setRating(0);
+          setErrorMessage(null);
+          return;
         }
 
         const reviewRows = await fetchReviewsByPlace(placeRecord.id);
@@ -99,6 +111,7 @@ export function DestinationReviewsScreen() {
           return;
         }
 
+        setIsEmpty(false);
         setPlace(placeRecord);
         setReviews(reviewRows);
         setProfiles(profileMap);
@@ -111,6 +124,7 @@ export function DestinationReviewsScreen() {
 
         const message = error instanceof Error ? error.message : 'Unable to load reviews.';
         setErrorMessage(message);
+        setIsEmpty(false);
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -125,7 +139,7 @@ export function DestinationReviewsScreen() {
     };
   }, [params.id]);
 
-  const hasDestination = Boolean(place) && !errorMessage;
+  const hasDestination = Boolean(place) && !errorMessage && !isEmpty;
   const destinationTitle = place?.name ?? 'Destination';
   const destinationRegion = hasDestination
     ? formatPlaceRegion(place?.city ?? null, place?.country ?? null)
@@ -175,77 +189,97 @@ export function DestinationReviewsScreen() {
             <Feather name="arrow-left" size={20} color="#1A1C20" />
           </Pressable>
           <View style={styles.headerSummary}>
-            <DestinationSummary
-              title={destinationTitle}
-              region={destinationRegion}
-              rating={rating}
-              image={headerImage}
-              size="header"
-            />
+            {hasDestination ? (
+              <DestinationSummary
+                title={destinationTitle}
+                region={destinationRegion}
+                rating={rating}
+                image={headerImage}
+                size="header"
+              />
+            ) : (
+              <Text style={styles.headerTitle}>Reviews</Text>
+            )}
           </View>
         </FadeIn>
 
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}>
-          <FadeIn style={styles.tabRow} delay={80}>
-            <Pressable style={styles.tabButton} onPress={() => router.push('/destination-overview')}>
-              <Text style={styles.tabText}>Overview</Text>
-            </Pressable>
-            <Pressable style={[styles.tabButton, styles.tabButtonActive]}>
-              <Text style={[styles.tabText, styles.tabTextActive]}>Reviews</Text>
-            </Pressable>
-          </FadeIn>
-
-          <FadeIn style={styles.sortSection} delay={120}>
-            <Text style={styles.sortLabel}>Sort by</Text>
-            <View style={styles.sortRow}>
-              {SORT_OPTIONS.map((option) => {
-                const isActive = option === activeSort;
-                return (
-                  <Pressable
-                    key={option}
-                    style={[styles.sortChip, isActive && styles.sortChipActive]}
-                    onPress={() => setActiveSort(option)}>
-                    <Text style={[styles.sortChipText, isActive && styles.sortChipTextActive]}>
-                      {option}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+          {isEmpty ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>No destinations yet</Text>
+              <Text style={styles.emptyBody}>
+                Add your first place to start collecting reviews.
+              </Text>
+              <Pressable style={styles.emptyButton} onPress={() => router.replace('/explore')}>
+                <Text style={styles.emptyButtonText}>Back to Discover</Text>
+              </Pressable>
             </View>
-          </FadeIn>
+          ) : (
+            <>
+              <FadeIn style={styles.tabRow} delay={80}>
+                <Pressable
+                  style={styles.tabButton}
+                  onPress={() => router.push('/destination-overview')}>
+                  <Text style={styles.tabText}>Overview</Text>
+                </Pressable>
+                <Pressable style={[styles.tabButton, styles.tabButtonActive]}>
+                  <Text style={[styles.tabText, styles.tabTextActive]}>Reviews</Text>
+                </Pressable>
+              </FadeIn>
 
-          {errorMessage ? (
-            <StatusMessage message={errorMessage} style={styles.errorText} />
-          ) : isLoading ? (
-            <StatusMessage message="Loading reviews..." style={styles.statusText} />
-          ) : reviewItems.length === 0 ? (
-            <StatusMessage message="No reviews yet." style={styles.statusText} />
-          ) : hasDestination ? (
-            reviewItems.map((review, index) => (
-              <FadeIn key={review.id} delay={160 + index * 70}>
-                <View style={styles.reviewCard}>
-                  <View style={styles.reviewHeader}>
-                    <View style={[styles.avatar, { backgroundColor: review.avatarColor }]}>
-                      <Text style={styles.avatarText}>{review.initials}</Text>
-                    </View>
-                    <View style={styles.reviewMeta}>
-                      <View style={styles.titleRow}>
-                        <Text style={styles.reviewerName}>{review.name}</Text>
-                        <Text style={styles.reviewTime}>{review.timeAgo}</Text>
-                      </View>
-                      <View style={styles.ratingRow}>
-                        <RatingStars value={review.rating} size={12} />
-                      </View>
-                    </View>
-                  </View>
-                  <Text style={styles.reviewBody} numberOfLines={2}>
-                    {review.body}
-                  </Text>
+              <FadeIn style={styles.sortSection} delay={120}>
+                <Text style={styles.sortLabel}>Sort by</Text>
+                <View style={styles.sortRow}>
+                  {SORT_OPTIONS.map((option) => {
+                    const isActive = option === activeSort;
+                    return (
+                      <Pressable
+                        key={option}
+                        style={[styles.sortChip, isActive && styles.sortChipActive]}
+                        onPress={() => setActiveSort(option)}>
+                        <Text style={[styles.sortChipText, isActive && styles.sortChipTextActive]}>
+                          {option}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
               </FadeIn>
-            ))
+
+              {errorMessage ? (
+                <StatusMessage message={errorMessage} style={styles.errorText} />
+              ) : isLoading ? (
+                <StatusMessage message="Loading reviews..." style={styles.statusText} />
+              ) : reviewItems.length === 0 ? (
+                <StatusMessage message="No reviews yet." style={styles.statusText} />
+              ) : hasDestination ? (
+                reviewItems.map((review, index) => (
+                  <FadeIn key={review.id} delay={160 + index * 70}>
+                    <View style={styles.reviewCard}>
+                      <View style={styles.reviewHeader}>
+                        <View style={[styles.avatar, { backgroundColor: review.avatarColor }]}>
+                          <Text style={styles.avatarText}>{review.initials}</Text>
+                        </View>
+                        <View style={styles.reviewMeta}>
+                          <View style={styles.titleRow}>
+                            <Text style={styles.reviewerName}>{review.name}</Text>
+                            <Text style={styles.reviewTime}>{review.timeAgo}</Text>
+                          </View>
+                          <View style={styles.ratingRow}>
+                            <RatingStars value={review.rating} size={12} />
+                          </View>
+                        </View>
+                      </View>
+                      <Text style={styles.reviewBody} numberOfLines={2}>
+                        {review.body}
+                      </Text>
+                    </View>
+                  </FadeIn>
+                ))
+              ) : null}
+            </>
           )}
 
           {hasDestination && reviewItems.length > 0 ? (

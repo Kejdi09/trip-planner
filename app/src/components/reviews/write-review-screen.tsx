@@ -41,6 +41,7 @@ export function WriteReviewScreen() {
   const [selectedTags, setSelectedTags] = React.useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [isEmpty, setIsEmpty] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
 
@@ -66,7 +67,16 @@ export function WriteReviewScreen() {
           : await fetchFirstPlace();
 
         if (!placeRecord) {
-          throw new Error('No destination found yet.');
+          if (!isMounted) {
+            return;
+          }
+
+          setIsEmpty(true);
+          setPlace(null);
+          setDestinationRating(0);
+          setDestinationImage(DEFAULT_PLACE_IMAGE);
+          setErrorMessage(null);
+          return;
         }
 
         const reviews = await fetchReviewsByPlace(placeRecord.id);
@@ -78,6 +88,7 @@ export function WriteReviewScreen() {
           return;
         }
 
+        setIsEmpty(false);
         setPlace(placeRecord);
         setDestinationRating(averageRating(reviews));
         setDestinationImage(headerPhoto ?? DEFAULT_PLACE_IMAGE);
@@ -88,6 +99,7 @@ export function WriteReviewScreen() {
 
         const message = error instanceof Error ? error.message : 'Unable to load destination.';
         setErrorMessage(message);
+        setIsEmpty(false);
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -184,82 +196,102 @@ export function WriteReviewScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}>
-          {errorMessage ? (
-            <StatusMessage message={errorMessage} style={styles.errorText} />
-          ) : statusMessage ? (
-            <StatusMessage message={statusMessage} style={styles.statusText} />
-          ) : isLoading ? (
-            <StatusMessage message="Loading destination..." style={styles.statusText} />
-          ) : null}
-
-          <FadeIn style={styles.summaryWrapper} delay={90}>
-            <DestinationSummary
-              title={destinationTitle}
-              region={destinationRegion}
-              rating={destinationRating}
-              image={destinationImage}
-              size="card"
-            />
-          </FadeIn>
-
-          <FadeIn style={styles.section} delay={130}>
-            <Text style={styles.sectionLabel}>Your Rating</Text>
-            <RatingStars value={userRating} size={24} onChange={setUserRating} />
-          </FadeIn>
-
-          <FadeIn style={styles.section} delay={170}>
-            <Text style={styles.sectionLabel}>Your Review</Text>
-            <TextInput
-              style={styles.reviewInput}
-              placeholder="Share your experience..."
-              placeholderTextColor="#9AA0A6"
-              multiline
-              textAlignVertical="top"
-              value={reviewText}
-              onChangeText={setReviewText}
-            />
-            <Text style={styles.charCount}>{reviewText.length}/1400 characters</Text>
-          </FadeIn>
-
-          <FadeIn style={styles.section} delay={210}>
-            <Text style={styles.sectionLabel}>Add Photos</Text>
-            <View style={styles.photoRow}>
-              <Pressable style={styles.addPhotoButton}>
-                <Feather name="plus" size={20} color="#0B8F98" />
-                <Text style={styles.addPhotoText}>Add Photos</Text>
+          {isEmpty ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>No destinations yet</Text>
+              <Text style={styles.emptyBody}>
+                Add your first place before writing a review.
+              </Text>
+              <Pressable style={styles.emptyButton} onPress={() => router.replace('/explore')}>
+                <Text style={styles.emptyButtonText}>Back to Discover</Text>
               </Pressable>
-              <View style={styles.photoThumbRow}>
-                {PHOTO_THUMBNAILS.map((uri) => (
-                  <View key={uri} style={styles.photoThumb}>
-                    <Image source={{ uri }} style={styles.photoImage} accessibilityLabel="Review photo" />
-                    <Pressable style={styles.removeBadge}>
-                      <Feather name="x" size={12} color="#FFFFFF" />
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
             </View>
-          </FadeIn>
+          ) : (
+            <>
+              {errorMessage ? (
+                <StatusMessage message={errorMessage} style={styles.errorText} />
+              ) : statusMessage ? (
+                <StatusMessage message={statusMessage} style={styles.statusText} />
+              ) : isLoading ? (
+                <StatusMessage message="Loading destination..." style={styles.statusText} />
+              ) : null}
 
-          <FadeIn style={styles.section} delay={250}>
-            <Text style={styles.sectionLabel}>Add Tags</Text>
-            <View style={styles.tagRow}>
-              {TAGS.map((tag) => {
-                const isActive = selectedTags.includes(tag);
-                return (
-                  <Pressable
-                    key={tag}
-                    style={[styles.tagChip, isActive && styles.tagChipActive]}
-                    onPress={() => toggleTag(tag)}>
-                    <Text style={[styles.tagText, isActive && styles.tagTextActive]}>{tag}</Text>
+              <FadeIn style={styles.summaryWrapper} delay={90}>
+                <DestinationSummary
+                  title={destinationTitle}
+                  region={destinationRegion}
+                  rating={destinationRating}
+                  image={destinationImage}
+                  size="card"
+                />
+              </FadeIn>
+
+              <FadeIn style={styles.section} delay={130}>
+                <Text style={styles.sectionLabel}>Your Rating</Text>
+                <RatingStars value={userRating} size={24} onChange={setUserRating} />
+              </FadeIn>
+
+              <FadeIn style={styles.section} delay={170}>
+                <Text style={styles.sectionLabel}>Your Review</Text>
+                <TextInput
+                  style={styles.reviewInput}
+                  placeholder="Share your experience..."
+                  placeholderTextColor="#9AA0A6"
+                  multiline
+                  textAlignVertical="top"
+                  value={reviewText}
+                  onChangeText={setReviewText}
+                />
+                <Text style={styles.charCount}>{reviewText.length}/1400 characters</Text>
+              </FadeIn>
+
+              <FadeIn style={styles.section} delay={210}>
+                <Text style={styles.sectionLabel}>Add Photos</Text>
+                <View style={styles.photoRow}>
+                  <Pressable style={styles.addPhotoButton}>
+                    <Feather name="plus" size={20} color="#0B8F98" />
+                    <Text style={styles.addPhotoText}>Add Photos</Text>
                   </Pressable>
-                );
-              })}
-              <Pressable style={styles.tagChip}>
-                <Text style={styles.tagText}>+ Custom</Text>
-              </Pressable>
-            </View>
-          </FadeIn>
+                  <View style={styles.photoThumbRow}>
+                    {PHOTO_THUMBNAILS.map((uri) => (
+                      <View key={uri} style={styles.photoThumb}>
+                        <Image
+                          source={{ uri }}
+                          style={styles.photoImage}
+                          accessibilityLabel="Review photo"
+                        />
+                        <Pressable style={styles.removeBadge}>
+                          <Feather name="x" size={12} color="#FFFFFF" />
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              </FadeIn>
+
+              <FadeIn style={styles.section} delay={250}>
+                <Text style={styles.sectionLabel}>Add Tags</Text>
+                <View style={styles.tagRow}>
+                  {TAGS.map((tag) => {
+                    const isActive = selectedTags.includes(tag);
+                    return (
+                      <Pressable
+                        key={tag}
+                        style={[styles.tagChip, isActive && styles.tagChipActive]}
+                        onPress={() => toggleTag(tag)}>
+                        <Text style={[styles.tagText, isActive && styles.tagTextActive]}>
+                          {tag}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                  <Pressable style={styles.tagChip}>
+                    <Text style={styles.tagText}>+ Custom</Text>
+                  </Pressable>
+                </View>
+              </FadeIn>
+            </>
+          )}
         </ScrollView>
       </View>
     </SafeAreaView>

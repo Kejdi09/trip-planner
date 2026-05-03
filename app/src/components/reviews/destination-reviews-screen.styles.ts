@@ -27,6 +27,12 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'transparent',
   },
+  headerTitle: {
+    fontSize: rs(18),
+    fontWeight: '700',
+    color: '#111111',
+    fontFamily: REVIEW_FONTS.heading,
+  },
   headerSummary: {
     flex: 1,
   },
@@ -163,6 +169,38 @@ export const styles = StyleSheet.create({
     color: '#D54545',
     fontFamily: REVIEW_FONTS.body,
     lineHeight: rs(16),
+  },
+  emptyState: {
+    paddingVertical: rs(32),
+    paddingHorizontal: rs(20),
+    alignItems: 'center',
+    gap: rs(10),
+  },
+  emptyTitle: {
+    fontSize: rs(18),
+    fontWeight: '700',
+    color: '#111111',
+    fontFamily: REVIEW_FONTS.heading,
+  },
+  emptyBody: {
+    fontSize: rs(13),
+    lineHeight: rs(18),
+    color: '#6B6F76',
+    textAlign: 'center',
+    fontFamily: REVIEW_FONTS.body,
+  },
+  emptyButton: {
+    marginTop: rs(6),
+    paddingHorizontal: rs(20),
+    paddingVertical: rs(10),
+    borderRadius: 999,
+    backgroundColor: '#0B8F98',
+  },
+  emptyButtonText: {
+    fontSize: rs(13),
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontFamily: REVIEW_FONTS.body,
   },
   viewMoreButton: {
     marginTop: rs(6),

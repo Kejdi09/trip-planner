@@ -42,6 +42,7 @@ export function DestinationOverviewScreen() {
   const [tags, setTags] = React.useState<string[]>([]);
   const [friendsVisited, setFriendsVisited] = React.useState(0);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [isEmpty, setIsEmpty] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   const handleBack = () => {
@@ -66,7 +67,18 @@ export function DestinationOverviewScreen() {
           : await fetchFirstPlace();
 
         if (!placeRecord) {
-          throw new Error('No destination found yet.');
+          if (!isMounted) {
+            return;
+          }
+
+          setIsEmpty(true);
+          setPlace(null);
+          setRating(0);
+          setPhotos([]);
+          setTags([]);
+          setFriendsVisited(0);
+          setErrorMessage(null);
+          return;
         }
 
         const reviews = await fetchReviewsByPlace(placeRecord.id);
@@ -90,6 +102,7 @@ export function DestinationOverviewScreen() {
           return;
         }
 
+        setIsEmpty(false);
         setPlace(placeRecord);
         setRating(averageRating(reviews));
         setPhotos(photoUrls);
@@ -102,6 +115,7 @@ export function DestinationOverviewScreen() {
 
         const message = error instanceof Error ? error.message : 'Unable to load destination.';
         setErrorMessage(message);
+        setIsEmpty(false);
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -116,7 +130,7 @@ export function DestinationOverviewScreen() {
     };
   }, [params.id]);
 
-  const hasDestination = Boolean(place) && !errorMessage;
+  const hasDestination = Boolean(place) && !errorMessage && !isEmpty;
   const destinationTitle = place?.name ?? 'Destination';
   const destinationRegion = hasDestination
     ? formatPlaceRegion(place?.city ?? null, place?.country ?? null)
@@ -136,36 +150,52 @@ export function DestinationOverviewScreen() {
             <Feather name="arrow-left" size={20} color="#1A1C20" />
           </Pressable>
           <View style={styles.headerSummary}>
-            <DestinationSummary
-              title={destinationTitle}
-              region={destinationRegion}
-              rating={rating}
-              image={summaryImage}
-              size="header"
-            />
+            {hasDestination ? (
+              <DestinationSummary
+                title={destinationTitle}
+                region={destinationRegion}
+                rating={rating}
+                image={summaryImage}
+                size="header"
+              />
+            ) : (
+              <Text style={styles.headerTitle}>Destination Overview</Text>
+            )}
           </View>
         </FadeIn>
 
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}>
-          <FadeIn style={styles.tabRow} delay={80}>
-            <Pressable style={[styles.tabButton, styles.tabButtonActive]}>
-              <Text style={[styles.tabText, styles.tabTextActive]}>Overview</Text>
-            </Pressable>
-            <Pressable style={styles.tabButton} onPress={() => router.push('/destination-reviews')}>
-              <Text style={styles.tabText}>Reviews</Text>
-            </Pressable>
-          </FadeIn>
-
-          {errorMessage ? (
-            <StatusMessage message={errorMessage} style={styles.errorText} />
-          ) : isLoading ? (
-            <StatusMessage message="Loading destination..." style={styles.statusText} />
-          ) : null}
-
-          {hasDestination ? (
+          {isEmpty ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>No destinations yet</Text>
+              <Text style={styles.emptyBody}>
+                Add your first place to start exploring reviews and photos.
+              </Text>
+              <Pressable style={styles.emptyButton} onPress={() => router.replace('/explore')}>
+                <Text style={styles.emptyButtonText}>Back to Discover</Text>
+              </Pressable>
+            </View>
+          ) : (
             <>
+              <FadeIn style={styles.tabRow} delay={80}>
+                <Pressable style={[styles.tabButton, styles.tabButtonActive]}>
+                  <Text style={[styles.tabText, styles.tabTextActive]}>Overview</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.tabButton}
+                  onPress={() => router.push('/destination-reviews')}>
+                  <Text style={styles.tabText}>Reviews</Text>
+                </Pressable>
+              </FadeIn>
+
+              {errorMessage ? (
+                <StatusMessage message={errorMessage} style={styles.errorText} />
+              ) : isLoading ? (
+                <StatusMessage message="Loading destination..." style={styles.statusText} />
+              ) : null}
+
               <FadeIn style={styles.friendsRow} delay={120}>
                 <Text style={styles.friendsLabel}>{friendsVisited} friends visited</Text>
                 <View style={styles.avatarRow}>
@@ -216,7 +246,7 @@ export function DestinationOverviewScreen() {
                 </>
               ) : null}
             </>
-          ) : null}
+          )}
         </ScrollView>
       </View>
     </SafeAreaView>
