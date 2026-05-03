@@ -4,6 +4,7 @@ import {
   MaterialCommunityIcons,
   AntDesign,
 } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React from "react";
 import { Image, Pressable, ScrollView, Text, View } from "react-native";
 import {
@@ -18,11 +19,12 @@ type ProfileActionCardProps = {
   icon: React.ReactNode;
   title: string;
   subtitle: string;
+  onPress?: () => void;
 };
 
-function ProfileActionCard({ icon, title, subtitle }: ProfileActionCardProps) {
+function ProfileActionCard({ icon, title, subtitle, onPress }: ProfileActionCardProps) {
   return (
-    <Pressable style={styles.actionCard}>
+    <Pressable style={styles.actionCard} onPress={onPress}>
       <View style={styles.actionLeft}>
         <View style={styles.actionIconWrap}>{icon}</View>
         <View>
@@ -56,6 +58,7 @@ function SettingsRow({ icon, label }: SettingsRowProps) {
 
 export function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [activeTab, setActiveTab] = React.useState<AppTab>("Profile");
 
   return (
@@ -116,6 +119,7 @@ export function ProfileScreen() {
               icon={<Feather name="star" size={20} color="#51C98C" />}
               title="My Reviews"
               subtitle="24 reviews written"
+              onPress={() => router.push("/my-reviews")}
             />
 
             <ProfileActionCard

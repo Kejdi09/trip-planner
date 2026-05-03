@@ -1,0 +1,176 @@
+import { StyleSheet } from 'react-native';
+
+import { REVIEW_COLORS, REVIEW_FONTS, rs } from './review-theme';
+
+export const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  screen: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: rs(12),
+    paddingHorizontal: rs(20),
+    paddingTop: rs(10),
+    paddingBottom: rs(8),
+  },
+  backButton: {
+    height: rs(36),
+    width: rs(36),
+    borderRadius: rs(18),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  headerSummary: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: rs(20),
+    paddingBottom: rs(32),
+    paddingTop: rs(6),
+    gap: rs(16),
+  },
+  tabRow: {
+    flexDirection: 'row',
+    gap: rs(18),
+    paddingBottom: rs(6),
+  },
+  tabButton: {
+    paddingBottom: rs(8),
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabButtonActive: {
+    borderBottomColor: '#0B8F98',
+  },
+  tabText: {
+    fontSize: rs(14),
+    fontWeight: '700',
+    color: '#9AA0A6',
+    fontFamily: REVIEW_FONTS.body,
+  },
+  tabTextActive: {
+    color: '#0B8F98',
+  },
+  friendsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: rs(10),
+  },
+  friendsLabel: {
+    fontSize: rs(13),
+    fontWeight: '700',
+    color: '#8A8A8A',
+    fontFamily: REVIEW_FONTS.body,
+  },
+  avatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatar: {
+    width: rs(30),
+    height: rs(30),
+    borderRadius: rs(15),
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+  },
+  avatarText: {
+    fontSize: rs(11),
+    fontWeight: '700',
+    color: '#1A1C20',
+    fontFamily: REVIEW_FONTS.body,
+  },
+  avatarCounter: {
+    marginLeft: -10,
+    width: rs(30),
+    height: rs(30),
+    borderRadius: rs(15),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EEF1F4',
+    borderWidth: 1,
+    borderColor: '#FFFFFF',
+  },
+  avatarCounterText: {
+    fontSize: rs(11),
+    fontWeight: '700',
+    color: '#7B7F86',
+    fontFamily: REVIEW_FONTS.body,
+  },
+  tagRow: {
+    flexDirection: 'row',
+    gap: rs(8),
+    flexWrap: 'wrap',
+  },
+  tagChip: {
+    paddingHorizontal: rs(12),
+    paddingVertical: rs(6),
+    borderRadius: 999,
+    backgroundColor: '#0B8F98',
+  },
+  tagText: {
+    fontSize: rs(12),
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontFamily: REVIEW_FONTS.body,
+  },
+  descriptionCard: {
+    backgroundColor: '#F2F4F5',
+    borderRadius: rs(14),
+    padding: rs(14),
+  },
+  descriptionText: {
+    fontSize: rs(13),
+    lineHeight: rs(18),
+    color: '#4F4F4F',
+    fontFamily: REVIEW_FONTS.body,
+  },
+  statusText: {
+    fontSize: rs(12),
+    fontWeight: '600',
+    color: '#8A8A8A',
+    fontFamily: REVIEW_FONTS.body,
+    lineHeight: rs(16),
+  },
+  errorText: {
+    fontSize: rs(12),
+    fontWeight: '600',
+    color: '#D54545',
+    fontFamily: REVIEW_FONTS.body,
+    lineHeight: rs(16),
+  },
+  sectionHeader: {
+    marginTop: rs(4),
+  },
+  sectionTitle: {
+    fontSize: rs(18),
+    fontWeight: '700',
+    color: '#111111',
+    fontFamily: REVIEW_FONTS.heading,
+  },
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: rs(12),
+  },
+  photoTile: {
+    flexBasis: '48%',
+    aspectRatio: 1,
+    borderRadius: rs(16),
+    overflow: 'hidden',
+    backgroundColor: '#EEF1F4',
+  },
+  photoImage: {
+    width: '100%',
+    height: '100%',
+  },
+});
