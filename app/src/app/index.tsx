@@ -1,8 +1,6 @@
-import React from "react";
+import React from 'react';
+import SocialFeedScreen from './SocialFeedScreen';
 
-
-import { LoginScreen } from "@/components/auth/login-screen";
-
-export default function HomeScreen() {
-  return <LoginScreen />;
+export default function Index() {
+  return <SocialFeedScreen />;
 }
