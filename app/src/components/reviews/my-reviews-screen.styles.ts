@@ -102,6 +102,19 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: rs(8),
   },
+  reviewActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: rs(8),
+  },
+  deleteButton: {
+    width: rs(28),
+    height: rs(28),
+    borderRadius: rs(14),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: REVIEW_COLORS.surfaceMuted,
+  },
   destinationTitle: {
     fontSize: rs(15),
     fontWeight: '700',
@@ -122,6 +135,23 @@ export const styles = StyleSheet.create({
     fontSize: rs(13),
     lineHeight: rs(18),
     color: REVIEW_COLORS.textSecondary,
+  },
+  reviewTagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: rs(8),
+    marginTop: rs(8),
+  },
+  reviewTagChip: {
+    paddingHorizontal: rs(10),
+    paddingVertical: rs(4),
+    borderRadius: 999,
+    backgroundColor: REVIEW_COLORS.chip,
+  },
+  reviewTagText: {
+    fontSize: rs(11),
+    fontWeight: '700',
+    color: REVIEW_COLORS.chipText,
   },
   statusText: {
     fontSize: rs(12),
@@ -150,5 +180,58 @@ export const styles = StyleSheet.create({
     fontSize: rs(13),
     fontWeight: '700',
     color: REVIEW_COLORS.textPrimary,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: rs(24),
+  },
+  modalCard: {
+    width: '100%',
+    borderRadius: rs(18),
+    backgroundColor: REVIEW_COLORS.surface,
+    padding: rs(18),
+    borderWidth: 1,
+    borderColor: REVIEW_COLORS.border,
+  },
+  modalTitle: {
+    fontSize: rs(16),
+    fontWeight: '700',
+    color: REVIEW_COLORS.textPrimary,
+  },
+  modalBody: {
+    marginTop: rs(6),
+    fontSize: rs(13),
+    color: REVIEW_COLORS.textSecondary,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: rs(10),
+    marginTop: rs(16),
+  },
+  modalCancelButton: {
+    paddingHorizontal: rs(14),
+    paddingVertical: rs(10),
+    borderRadius: rs(10),
+    backgroundColor: REVIEW_COLORS.surfaceMuted,
+  },
+  modalCancelText: {
+    fontSize: rs(12),
+    fontWeight: '700',
+    color: REVIEW_COLORS.textPrimary,
+  },
+  modalDeleteButton: {
+    paddingHorizontal: rs(14),
+    paddingVertical: rs(10),
+    borderRadius: rs(10),
+    backgroundColor: REVIEW_COLORS.error,
+  },
+  modalDeleteText: {
+    fontSize: rs(12),
+    fontWeight: '700',
+    color: REVIEW_COLORS.buttonText,
   },
 });

@@ -167,23 +167,6 @@ export const styles = StyleSheet.create({
     lineHeight: rs(16),
     color: REVIEW_COLORS.textSecondary,
   },
-  reviewTagsRow: {
-    marginTop: rs(10),
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: rs(6),
-  },
-  reviewTagChip: {
-    paddingHorizontal: rs(10),
-    paddingVertical: rs(4),
-    borderRadius: 999,
-    backgroundColor: REVIEW_COLORS.accentSoft,
-  },
-  reviewTagText: {
-    fontSize: rs(11),
-    fontWeight: '700',
-    color: REVIEW_COLORS.accent,
-  },
   statusText: {
     fontSize: rs(12),
     fontWeight: '600',

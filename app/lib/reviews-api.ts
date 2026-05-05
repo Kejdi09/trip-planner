@@ -1,3 +1,4 @@
+import { REVIEW_PHOTO_BUCKET } from './app-config';
 import { supabase } from './supabase';
 
 type SelectResult<T> = T | null;
@@ -36,11 +37,6 @@ type ReviewPhotoRecord = {
 type TagRecord = {
   id: string;
   name: string | null;
-};
-
-type ReviewTagLinkRecord = {
-  review_id: string | null;
-  tag_id: string | null;
 };
 
 export type { PlaceRecord, ReviewRecord, ProfileRecord, ReviewPhotoRecord, TagRecord };
@@ -143,7 +139,7 @@ export async function fetchTagsByReviewIds(reviewIds: string[]): Promise<TagReco
   return (tags as TagRecord[]) ?? [];
 }
 
-export async function fetchReviewTagsByReviewIds(
+export async function fetchTagNamesByReviewIds(
   reviewIds: string[],
 ): Promise<Record<string, string[]>> {
   if (reviewIds.length === 0) return {};
@@ -155,12 +151,14 @@ export async function fetchReviewTagsByReviewIds(
 
   if (tagLinkError) throw tagLinkError;
 
-  const links = (tagLinks as ReviewTagLinkRecord[]) ?? [];
-  const tagIds = Array.from(
-    new Set(links.map((row) => row.tag_id).filter(Boolean) as string[]),
-  );
+  const links = (tagLinks ?? []).filter((row) => row.review_id && row.tag_id) as {
+    review_id: string;
+    tag_id: string;
+  }[];
 
-  if (tagIds.length === 0) return {};
+  if (links.length === 0) return {};
+
+  const tagIds = Array.from(new Set(links.map((row) => row.tag_id)));
 
   const { data: tags, error: tagsError } = await supabase
     .from('tags')
@@ -169,28 +167,23 @@ export async function fetchReviewTagsByReviewIds(
 
   if (tagsError) throw tagsError;
 
-  const tagById = new Map<string, string>();
-  (tags as TagRecord[] | null)?.forEach((tag) => {
+  const tagMap = (tags ?? []).reduce<Record<string, string>>((acc, tag) => {
     if (tag.id && tag.name) {
-      tagById.set(tag.id, tag.name);
+      acc[tag.id] = tag.name;
     }
-  });
+    return acc;
+  }, {});
 
-  const tagMap: Record<string, string[]> = {};
-
-  for (const link of links) {
-    if (!link.review_id || !link.tag_id) continue;
-    const tagName = tagById.get(link.tag_id);
-    if (!tagName) continue;
-
-    const existing = tagMap[link.review_id] ?? [];
-    if (!existing.includes(tagName)) {
-      existing.push(tagName);
-      tagMap[link.review_id] = existing;
+  return links.reduce<Record<string, string[]>>((acc, link) => {
+    const name = tagMap[link.tag_id];
+    if (!name) return acc;
+    const label = `#${name}`;
+    const existing = acc[link.review_id] ?? [];
+    if (!existing.includes(label)) {
+      acc[link.review_id] = [...existing, label];
     }
-  }
-
-  return tagMap;
+    return acc;
+  }, {});
 }
 
 type CreateReviewInput = {
@@ -199,7 +192,62 @@ type CreateReviewInput = {
   rating: number;
   review: string;
   tagNames?: string[];
+  photoUris?: string[];
 };
+
+const getFileExtension = (uri: string): string => {
+  const cleanUri = uri.split('?')[0] ?? uri;
+  const extension = cleanUri.split('.').pop();
+  return extension && extension.length <= 5 ? extension.toLowerCase() : 'jpg';
+};
+
+const getContentType = (extension: string, fallbackType?: string): string => {
+  if (fallbackType) return fallbackType;
+  if (extension === 'png') return 'image/png';
+  if (extension === 'webp') return 'image/webp';
+  return 'image/jpeg';
+};
+
+async function uploadReviewPhotos(
+  reviewId: string,
+  userId: string,
+  photoUris: string[],
+): Promise<string[]> {
+  if (photoUris.length === 0) return [];
+
+  const uploadedUrls: string[] = [];
+
+  for (let index = 0; index < photoUris.length; index += 1) {
+    const uri = photoUris[index];
+    const extension = getFileExtension(uri);
+    const fileName = `${Date.now()}-${index}.${extension}`;
+    const filePath = `${userId}/${reviewId}/${fileName}`;
+
+    const response = await fetch(uri);
+    const blob = await response.blob();
+
+    const { error: uploadError } = await supabase.storage
+      .from(REVIEW_PHOTO_BUCKET)
+      .upload(filePath, blob, {
+        contentType: getContentType(extension, blob.type),
+        upsert: false,
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data: publicData } = supabase.storage
+      .from(REVIEW_PHOTO_BUCKET)
+      .getPublicUrl(filePath);
+
+    if (!publicData?.publicUrl) {
+      throw new Error('Unable to resolve uploaded photo URL.');
+    }
+
+    uploadedUrls.push(publicData.publicUrl);
+  }
+
+  return uploadedUrls;
+}
 
 export async function createReviewWithTags({
   userId,
@@ -207,6 +255,7 @@ export async function createReviewWithTags({
   rating,
   review,
   tagNames = [],
+  photoUris = [],
 }: CreateReviewInput): Promise<string> {
   const { data, error } = await supabase
     .from('reviews')
@@ -222,6 +271,22 @@ export async function createReviewWithTags({
   if (error) throw error;
   const reviewId = data.id as string;
 
+  if (photoUris.length > 0) {
+    const uploadedUrls = await uploadReviewPhotos(reviewId, userId, photoUris);
+    if (uploadedUrls.length > 0) {
+      const { error: photoInsertError } = await supabase
+        .from('review_photos')
+        .insert(
+          uploadedUrls.map((url) => ({
+            review_id: reviewId,
+            image_url: url,
+          })),
+        );
+
+      if (photoInsertError) throw photoInsertError;
+    }
+  }
+
   const normalizedNames = Array.from(
     new Set(
       tagNames
@@ -234,6 +299,13 @@ export async function createReviewWithTags({
     return reviewId;
   }
 
+  const tagUpserts = normalizedNames.map((name) => ({ name }));
+  const { error: upsertError } = await supabase
+    .from('tags')
+    .upsert(tagUpserts, { onConflict: 'name' });
+
+  if (upsertError) throw upsertError;
+
   const { data: tagRows, error: tagError } = await supabase
     .from('tags')
     .select('id, name')
@@ -241,40 +313,11 @@ export async function createReviewWithTags({
 
   if (tagError) throw tagError;
 
-  const existingTags = (tagRows ?? []) as TagRecord[];
-  const existingTagNames = new Set(
-    existingTags.map((row) => row.name).filter(Boolean) as string[],
-  );
-  const missingNames = normalizedNames.filter((name) => !existingTagNames.has(name));
-
-  let insertedTags: TagRecord[] = [];
-
-  if (missingNames.length > 0) {
-    const { data: newTags, error: insertError } = await supabase
-      .from('tags')
-      .insert(missingNames.map((name) => ({ name })))
-      .select('id, name');
-
-    if (insertError) {
-      const { data: retryTags, error: retryError } = await supabase
-        .from('tags')
-        .select('id, name')
-        .in('name', missingNames);
-
-      if (retryError) throw insertError;
-      insertedTags = (retryTags ?? []) as TagRecord[];
-    } else {
-      insertedTags = (newTags ?? []) as TagRecord[];
-    }
-  }
-
-  const tagIds = [...existingTags, ...insertedTags]
+  const tagIds = (tagRows ?? [])
     .map((row) => row.id)
     .filter(Boolean) as string[];
 
-  if (tagIds.length === 0) {
-    return reviewId;
-  }
+  if (tagIds.length === 0) return reviewId;
 
   const reviewTagRows = tagIds.map((tagId) => ({
     review_id: reviewId,

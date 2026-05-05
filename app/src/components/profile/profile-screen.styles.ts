@@ -132,6 +132,11 @@ export const styles = StyleSheet.create({
     marginTop: 26,
     paddingHorizontal: 22,
   },
+  logoutMessage: {
+    marginTop: 10,
+    fontSize: 12,
+    color: '#D54545',
+  },
   settingsHeading: {
     fontSize: 22,
     fontWeight: "700",

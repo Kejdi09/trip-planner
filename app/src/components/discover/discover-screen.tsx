@@ -3,13 +3,12 @@ import { useRouter } from 'expo-router';
 import { ScrollView, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { buildCountryFilterGroups } from '@/components/discover/discover-data';
+import { FILTER_GROUPS } from '@/components/discover/discover-data';
 import { AppBottomNav } from '@/components/ui/app-bottom-nav';
 import { FilterSheet } from '@/components/ui/filter-sheet';
 import { PlaceListSection } from '@/components/ui/place-list-section';
 import { SearchHeader } from '@/components/ui/search-header';
 import { StatusMessage } from '@/components/ui/status-message';
-import type { FilterOption } from '@/components/ui/types';
 import type { DiscoverPlace } from '../../../lib/discover-api';
 import { fetchDiscoverPlaces } from '../../../lib/discover-api';
 import { styles } from './discover-screen.styles';
@@ -18,34 +17,12 @@ export function DiscoverScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [isFilterOpen, setIsFilterOpen] = React.useState(false);
-  const [selectedFilters, setSelectedFilters] = React.useState<string[]>([]);
+  const [selectedFilters, setSelectedFilters] = React.useState<string[]>(['high', 'culture', 'history']);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [savedPlaceIds, setSavedPlaceIds] = React.useState<string[]>([]);
   const [places, setPlaces] = React.useState<DiscoverPlace[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
-
-  const countryOptions = React.useMemo<FilterOption[]>(() => {
-    const countryMap = new Map<string, string>();
-
-    places.forEach((place) => {
-      const country = place.country?.trim();
-      if (!country) return;
-      const key = country.toLowerCase();
-      if (!countryMap.has(key)) {
-        countryMap.set(key, country);
-      }
-    });
-
-    return Array.from(countryMap.entries())
-      .map(([id, label]) => ({ id, label }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [places]);
-
-  const filterGroups = React.useMemo(
-    () => buildCountryFilterGroups(countryOptions),
-    [countryOptions],
-  );
 
   React.useEffect(() => {
     let isMounted = true;
@@ -84,21 +61,15 @@ export function DiscoverScreen() {
 
   const filteredPlaces = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    const activeCountries = selectedFilters;
 
-    return places.filter((place) => {
-      const matchesSearch = !query
-        ? true
-        : `${place.title} ${place.region} ${place.visited}`.toLowerCase().includes(query);
+    if (!query) {
+      return places;
+    }
 
-      const placeCountry = place.country?.toLowerCase() ?? '';
-      const matchesCountry =
-        activeCountries.length === 0 ||
-        (placeCountry && activeCountries.includes(placeCountry));
-
-      return matchesSearch && matchesCountry;
-    });
-  }, [places, searchQuery, selectedFilters]);
+    return places.filter((place) =>
+      `${place.title} ${place.region} ${place.visited}`.toLowerCase().includes(query),
+    );
+  }, [places, searchQuery]);
 
   const toggleFilter = (filterId: string) => {
     setSelectedFilters((current) =>
@@ -164,7 +135,7 @@ export function DiscoverScreen() {
 
           <FilterSheet
             isOpen={isFilterOpen}
-            groups={filterGroups}
+            groups={FILTER_GROUPS}
             selectedFilters={selectedFilters}
             onToggleFilter={toggleFilter}
             onApplyFilters={() => setIsFilterOpen(false)}
