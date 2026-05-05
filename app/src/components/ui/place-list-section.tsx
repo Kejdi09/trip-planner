@@ -34,8 +34,13 @@ export function PlaceListSection({
   onToggleSavedPlace,
   onPressPlaceDetails,
   onPressAddPlace,
-  emptyStatePrefix = 'No places found for',
+  emptyStatePrefix = 'No places found',
 }: PlaceListSectionProps) {
+  const trimmedQuery = searchQuery.trim();
+  const emptyMessage = trimmedQuery
+    ? `${emptyStatePrefix} for "${trimmedQuery}".`
+    : `${emptyStatePrefix}.`;
+
   return (
     <>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -54,7 +59,7 @@ export function PlaceListSection({
           ))
         ) : (
           <StatusMessage
-            message={`${emptyStatePrefix} "${searchQuery.trim()}".`}
+            message={emptyMessage}
             style={styles.noResultsText}
           />
         )}
