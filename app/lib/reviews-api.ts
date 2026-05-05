@@ -39,11 +39,6 @@ type TagRecord = {
   name: string | null;
 };
 
-type ReviewTagLinkRecord = {
-  review_id: string | null;
-  tag_id: string | null;
-};
-
 export type { PlaceRecord, ReviewRecord, ProfileRecord, ReviewPhotoRecord, TagRecord };
 
 export async function fetchPlaceById(placeId: string): Promise<PlaceRecord | null> {
