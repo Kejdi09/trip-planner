@@ -8,6 +8,7 @@ export type DiscoverPlace = {
   visited: string;
   rating: number;
   image: string;
+  country: string | null;
 };
 
 type PlaceRow = {
@@ -35,6 +36,7 @@ const formatVisitedLabel = (count: number) => {
   if (count === 1) return '1 friend visited';
   return `${count} friends visited`;
 };
+
 
 export async function fetchDiscoverPlaces(): Promise<DiscoverPlace[]> {
   const { data, error } = await supabase
@@ -101,13 +103,17 @@ export async function fetchDiscoverPlaces(): Promise<DiscoverPlace[]> {
       placeReviews.map((review) => review.user_id).filter(Boolean) as string[],
     );
 
+    const rating = averageRating(placeReviews);
+    const visitCount = uniqueUsers.size;
+
     return {
       id: place.id,
       title: place.name?.trim() || 'Untitled destination',
       region: formatPlaceRegion(place.city, place.country),
-      visited: formatVisitedLabel(uniqueUsers.size),
-      rating: averageRating(placeReviews),
+      visited: formatVisitedLabel(visitCount),
+      rating,
       image: imageByPlaceId.get(place.id) ?? DEFAULT_PLACE_IMAGE,
+      country: place.country?.trim() || null,
     };
   });
 

@@ -38,6 +38,11 @@ type TagRecord = {
   name: string | null;
 };
 
+type ReviewTagLinkRecord = {
+  review_id: string | null;
+  tag_id: string | null;
+};
+
 export type { PlaceRecord, ReviewRecord, ProfileRecord, ReviewPhotoRecord, TagRecord };
 
 export async function fetchPlaceById(placeId: string): Promise<PlaceRecord | null> {
@@ -138,6 +143,56 @@ export async function fetchTagsByReviewIds(reviewIds: string[]): Promise<TagReco
   return (tags as TagRecord[]) ?? [];
 }
 
+export async function fetchReviewTagsByReviewIds(
+  reviewIds: string[],
+): Promise<Record<string, string[]>> {
+  if (reviewIds.length === 0) return {};
+
+  const { data: tagLinks, error: tagLinkError } = await supabase
+    .from('review_tags')
+    .select('review_id, tag_id')
+    .in('review_id', reviewIds);
+
+  if (tagLinkError) throw tagLinkError;
+
+  const links = (tagLinks as ReviewTagLinkRecord[]) ?? [];
+  const tagIds = Array.from(
+    new Set(links.map((row) => row.tag_id).filter(Boolean) as string[]),
+  );
+
+  if (tagIds.length === 0) return {};
+
+  const { data: tags, error: tagsError } = await supabase
+    .from('tags')
+    .select('id, name')
+    .in('id', tagIds);
+
+  if (tagsError) throw tagsError;
+
+  const tagById = new Map<string, string>();
+  (tags as TagRecord[] | null)?.forEach((tag) => {
+    if (tag.id && tag.name) {
+      tagById.set(tag.id, tag.name);
+    }
+  });
+
+  const tagMap: Record<string, string[]> = {};
+
+  for (const link of links) {
+    if (!link.review_id || !link.tag_id) continue;
+    const tagName = tagById.get(link.tag_id);
+    if (!tagName) continue;
+
+    const existing = tagMap[link.review_id] ?? [];
+    if (!existing.includes(tagName)) {
+      existing.push(tagName);
+      tagMap[link.review_id] = existing;
+    }
+  }
+
+  return tagMap;
+}
+
 type CreateReviewInput = {
   userId: string;
   placeId: string;
@@ -186,7 +241,34 @@ export async function createReviewWithTags({
 
   if (tagError) throw tagError;
 
-  const tagIds = (tagRows ?? [])
+  const existingTags = (tagRows ?? []) as TagRecord[];
+  const existingTagNames = new Set(
+    existingTags.map((row) => row.name).filter(Boolean) as string[],
+  );
+  const missingNames = normalizedNames.filter((name) => !existingTagNames.has(name));
+
+  let insertedTags: TagRecord[] = [];
+
+  if (missingNames.length > 0) {
+    const { data: newTags, error: insertError } = await supabase
+      .from('tags')
+      .insert(missingNames.map((name) => ({ name })))
+      .select('id, name');
+
+    if (insertError) {
+      const { data: retryTags, error: retryError } = await supabase
+        .from('tags')
+        .select('id, name')
+        .in('name', missingNames);
+
+      if (retryError) throw insertError;
+      insertedTags = (retryTags ?? []) as TagRecord[];
+    } else {
+      insertedTags = (newTags ?? []) as TagRecord[];
+    }
+  }
+
+  const tagIds = [...existingTags, ...insertedTags]
     .map((row) => row.id)
     .filter(Boolean) as string[];
 

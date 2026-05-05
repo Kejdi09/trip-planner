@@ -33,6 +33,8 @@ export function WriteReviewScreen() {
   const [userRating, setUserRating] = React.useState(0);
   const [reviewText, setReviewText] = React.useState('');
   const [selectedTags, setSelectedTags] = React.useState<string[]>([]);
+  const [customTagText, setCustomTagText] = React.useState('');
+  const [isCustomTagOpen, setIsCustomTagOpen] = React.useState(false);
   const [selectedPhotos, setSelectedPhotos] = React.useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -118,6 +120,32 @@ export function WriteReviewScreen() {
     setSelectedTags((current) =>
       current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag]
     );
+  };
+
+  const normalizeTag = (value: string) => {
+    const cleaned = value.replace(/^#/, '').trim().toLowerCase();
+    return cleaned ? `#${cleaned}` : null;
+  };
+
+  const toggleCustomTagInput = () => {
+    setIsCustomTagOpen((current) => !current);
+    setCustomTagText('');
+  };
+
+  const handleAddCustomTag = () => {
+    const normalized = normalizeTag(customTagText);
+
+    if (!normalized) {
+      setCustomTagText('');
+      setIsCustomTagOpen(false);
+      return;
+    }
+
+    setSelectedTags((current) =>
+      current.includes(normalized) ? current : [...current, normalized],
+    );
+    setCustomTagText('');
+    setIsCustomTagOpen(false);
   };
 
   const handleAddPhoto = async () => {
@@ -325,10 +353,32 @@ export function WriteReviewScreen() {
                       </Pressable>
                     );
                   })}
-                  <Pressable style={styles.tagChip}>
-                    <Text style={styles.tagText}>+ Custom</Text>
+                  <Pressable
+                    style={[styles.tagChip, isCustomTagOpen && styles.tagChipActive]}
+                    onPress={toggleCustomTagInput}>
+                    <Text style={[styles.tagText, isCustomTagOpen && styles.tagTextActive]}>
+                      + Custom
+                    </Text>
                   </Pressable>
                 </View>
+                {isCustomTagOpen ? (
+                  <View style={styles.customTagRow}>
+                    <TextInput
+                      style={styles.customTagInput}
+                      placeholder="#add-tag"
+                      placeholderTextColor={REVIEW_COLORS.textSecondary}
+                      value={customTagText}
+                      onChangeText={setCustomTagText}
+                      onSubmitEditing={handleAddCustomTag}
+                      returnKeyType="done"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                    <Pressable style={styles.customTagButton} onPress={handleAddCustomTag}>
+                      <Text style={styles.customTagButtonText}>Add</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
               </FadeIn>
             </>
           )}

@@ -15,6 +15,7 @@ import {
   fetchProfilesByIds,
   fetchReviewPhotosByReviewIds,
   fetchReviewsByPlace,
+  fetchReviewTagsByReviewIds,
 } from '../../../lib/reviews-api';
 import {
   averageRating,
@@ -38,6 +39,7 @@ type ReviewItem = {
   timeAgo: string;
   body: string;
   avatarColor: string;
+  tags: string[];
 };
 
 const AVATAR_COLORS = ['#D6EEF1', '#FCE5C8', '#DDEAF9', '#E7EAF3'];
@@ -50,6 +52,7 @@ export function DestinationReviewsScreen() {
   const [place, setPlace] = React.useState<PlaceRecord | null>(null);
   const [reviews, setReviews] = React.useState<ReviewRecord[]>([]);
   const [profiles, setProfiles] = React.useState<Record<string, ProfileRecord>>({});
+  const [reviewTags, setReviewTags] = React.useState<Record<string, string[]>>({});
   const [headerImage, setHeaderImage] = React.useState(DEFAULT_PLACE_IMAGE);
   const [rating, setRating] = React.useState(0);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -91,6 +94,7 @@ export function DestinationReviewsScreen() {
           setPlace(null);
           setReviews([]);
           setProfiles({});
+          setReviewTags({});
           setHeaderImage(DEFAULT_PLACE_IMAGE);
           setRating(0);
           setErrorMessage(null);
@@ -100,6 +104,7 @@ export function DestinationReviewsScreen() {
         const reviewRows = await fetchReviewsByPlace(placeRecord.id);
         const reviewIds = reviewRows.map((review) => review.id);
         const photos = await fetchReviewPhotosByReviewIds(reviewIds);
+        const tagMap = await fetchReviewTagsByReviewIds(reviewIds);
         const headerPhoto = photos.find((photo) => Boolean(photo.image_url))?.image_url;
 
         const userIds = Array.from(
@@ -119,6 +124,7 @@ export function DestinationReviewsScreen() {
         setPlace(placeRecord);
         setReviews(reviewRows);
         setProfiles(profileMap);
+        setReviewTags(tagMap);
         setHeaderImage(headerPhoto ?? DEFAULT_PLACE_IMAGE);
         setRating(averageRating(reviewRows));
       } catch (error) {
@@ -129,6 +135,7 @@ export function DestinationReviewsScreen() {
         const message = error instanceof Error ? error.message : 'Unable to load reviews.';
         setErrorMessage(message);
         setIsEmpty(false);
+        setReviewTags({});
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -154,6 +161,7 @@ export function DestinationReviewsScreen() {
       const profile = review.user_id ? profiles[review.user_id] : undefined;
       const name = profile?.full_name || profile?.username || 'User';
       const ratingValue = typeof review.rating === 'number' ? review.rating : 0;
+      const tagNames = reviewTags[review.id] ?? [];
       return {
         id: review.id,
         name,
@@ -162,6 +170,7 @@ export function DestinationReviewsScreen() {
         timeAgo: formatRelativeTime(review.created_at),
         body: review.review ?? '',
         avatarColor: AVATAR_COLORS[index % AVATAR_COLORS.length],
+        tags: tagNames.map((tag) => `#${tag}`),
       };
     });
 
@@ -183,7 +192,7 @@ export function DestinationReviewsScreen() {
       const dateB = reviewById[b.id]?.created_at ?? '';
       return dateB.localeCompare(dateA);
     });
-  }, [activeSort, profiles, reviews]);
+  }, [activeSort, profiles, reviewTags, reviews]);
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -301,6 +310,15 @@ export function DestinationReviewsScreen() {
                       <Text style={styles.reviewBody} numberOfLines={2}>
                         {review.body}
                       </Text>
+                      {review.tags.length > 0 ? (
+                        <View style={styles.reviewTagsRow}>
+                          {review.tags.map((tag) => (
+                            <View key={`${review.id}-${tag}`} style={styles.reviewTagChip}>
+                              <Text style={styles.reviewTagText}>{tag}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      ) : null}
                     </View>
                   </FadeIn>
                 ))
