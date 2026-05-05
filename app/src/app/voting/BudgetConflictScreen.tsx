@@ -19,9 +19,9 @@ import {
   VotedLabel,
   VoteProgress,
   VoterAvatars,
-} from './components';
+} from './_components';
 import { AppBottomNav } from '@/components/ui/app-bottom-nav';
-import { BudgetOption, MOCK_CONFLICT_BUDGETS, VotingTab } from './types';
+import { BudgetOption, MOCK_CONFLICT_BUDGETS, VotingTab } from './_types';
 
 const ConflictBanner = () => (
   <View style={cb.banner}>

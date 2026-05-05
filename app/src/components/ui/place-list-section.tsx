@@ -21,6 +21,8 @@ type PlaceListSectionProps = {
   savedPlaceIds: string[];
   searchQuery: string;
   onToggleSavedPlace: (placeId: string) => void;
+  onPressPlaceDetails?: (place: Place) => void;
+  onPressAddPlace?: (place: Place) => void;
   emptyStatePrefix?: string;
 };
 
@@ -30,6 +32,8 @@ export function PlaceListSection({
   savedPlaceIds,
   searchQuery,
   onToggleSavedPlace,
+  onPressPlaceDetails,
+  onPressAddPlace,
   emptyStatePrefix = 'No places found for',
 }: PlaceListSectionProps) {
   return (
@@ -44,6 +48,8 @@ export function PlaceListSection({
               place={place}
               isSaved={savedPlaceIds.includes(place.id)}
               onToggleSaved={() => onToggleSavedPlace(place.id)}
+              onPressDetails={() => onPressPlaceDetails?.(place)}
+              onPressAdd={() => onPressAddPlace?.(place)}
             />
           ))
         ) : (

@@ -1,0 +1,154 @@
+import { StyleSheet } from 'react-native';
+
+import { REVIEW_COLORS, rs } from './review-theme';
+
+export const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: REVIEW_COLORS.surface,
+  },
+  screen: {
+    flex: 1,
+    backgroundColor: REVIEW_COLORS.surface,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: rs(8),
+    paddingHorizontal: rs(20),
+    paddingTop: rs(10),
+    paddingBottom: rs(12),
+  },
+  backButton: {
+    height: rs(36),
+    width: rs(36),
+    borderRadius: rs(18),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  headerTitle: {
+    fontSize: rs(24),
+    fontWeight: '700',
+    color: REVIEW_COLORS.textPrimary,
+  },
+  headerDivider: {
+    height: 1,
+    backgroundColor: REVIEW_COLORS.border,
+  },
+  sortSection: {
+    paddingHorizontal: rs(20),
+    paddingTop: rs(10),
+    paddingBottom: rs(10),
+    gap: rs(10),
+  },
+  sortLabel: {
+    fontSize: rs(13),
+    fontWeight: '700',
+    color: REVIEW_COLORS.textSecondary,
+  },
+  sortRow: {
+    flexDirection: 'row',
+    gap: rs(12),
+  },
+  sortChip: {
+    paddingHorizontal: rs(16),
+    paddingVertical: rs(8),
+    borderRadius: 999,
+    backgroundColor: REVIEW_COLORS.surfaceMuted,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  sortChipActive: {
+    backgroundColor: REVIEW_COLORS.accent,
+    borderColor: REVIEW_COLORS.accent,
+  },
+  sortChipText: {
+    fontSize: rs(13),
+    fontWeight: '700',
+    color: REVIEW_COLORS.chipText,
+  },
+  sortChipTextActive: {
+    color: REVIEW_COLORS.chipTextActive,
+  },
+  scrollContent: {
+    paddingHorizontal: rs(20),
+    paddingBottom: rs(120),
+    gap: rs(14),
+  },
+  reviewCard: {
+    backgroundColor: REVIEW_COLORS.surface,
+    borderRadius: rs(16),
+    padding: rs(14),
+    borderWidth: 1,
+    borderColor: REVIEW_COLORS.border,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: rs(12),
+  },
+  avatar: {
+    width: rs(32),
+    height: rs(32),
+    borderRadius: rs(16),
+  },
+  reviewMeta: {
+    flex: 1,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: rs(8),
+  },
+  destinationTitle: {
+    fontSize: rs(15),
+    fontWeight: '700',
+    color: REVIEW_COLORS.textPrimary,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: rs(6),
+  },
+  reviewTime: {
+    fontSize: rs(12),
+    fontWeight: '600',
+    color: REVIEW_COLORS.textSecondary,
+  },
+  reviewBody: {
+    marginTop: rs(8),
+    fontSize: rs(13),
+    lineHeight: rs(18),
+    color: REVIEW_COLORS.textSecondary,
+  },
+  statusText: {
+    fontSize: rs(12),
+    fontWeight: '600',
+    color: REVIEW_COLORS.textSecondary,
+    lineHeight: rs(16),
+  },
+  errorText: {
+    fontSize: rs(12),
+    fontWeight: '600',
+    color: REVIEW_COLORS.error,
+    lineHeight: rs(16),
+  },
+  viewMoreButton: {
+    marginTop: rs(8),
+    marginBottom: rs(16),
+    alignSelf: 'center',
+    paddingHorizontal: rs(32),
+    paddingVertical: rs(10),
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: REVIEW_COLORS.border,
+    backgroundColor: REVIEW_COLORS.surface,
+  },
+  viewMoreText: {
+    fontSize: rs(13),
+    fontWeight: '700',
+    color: REVIEW_COLORS.textPrimary,
+  },
+});

@@ -26,6 +26,7 @@ type PlaceCardProps = {
   isSaved: boolean;
   onToggleSaved: () => void;
   onPressAdd?: () => void;
+  onPressDetails?: () => void;
   showAddButton?: boolean;
 };
 
@@ -34,10 +35,25 @@ export function PlaceCard({
   isSaved,
   onToggleSaved,
   onPressAdd,
+  onPressDetails,
   showAddButton = true,
 }: PlaceCardProps) {
+  const handleCardPress = () => {
+    onPressDetails?.();
+  };
+
+  const handleAddPress = (event: { stopPropagation: () => void }) => {
+    event.stopPropagation();
+    onPressAdd?.();
+  };
+
+  const handleSavePress = (event: { stopPropagation: () => void }) => {
+    event.stopPropagation();
+    onToggleSaved();
+  };
+
   return (
-    <View style={styles.card}>
+    <Pressable style={styles.card} onPress={handleCardPress}>
       <View style={styles.imageWrapper}>
         <Image source={{ uri: place.image }} style={styles.cardImage} />
         <View style={styles.ratingPill}>
@@ -57,16 +73,16 @@ export function PlaceCard({
 
         <View style={styles.cardActionGroup}>
           {showAddButton ? (
-            <Pressable style={styles.plusButton} onPress={onPressAdd}>
+            <Pressable style={styles.plusButton} onPress={handleAddPress}>
               <Feather name="plus" size={24} color={colors.primary} />
             </Pressable>
           ) : null}
-          <Pressable style={styles.saveButton} onPress={onToggleSaved}>
+          <Pressable style={styles.saveButton} onPress={handleSavePress}>
             <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={20} color={colors.primary} />
           </Pressable>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 

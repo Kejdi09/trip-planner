@@ -1,0 +1,194 @@
+import { StyleSheet } from 'react-native';
+
+import { REVIEW_COLORS, rs } from './review-theme';
+
+export const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: REVIEW_COLORS.background,
+  },
+  screen: {
+    flex: 1,
+    backgroundColor: REVIEW_COLORS.background,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: rs(20),
+    paddingTop: rs(10),
+    paddingBottom: rs(6),
+    gap: rs(10),
+  },
+  backButton: {
+    height: rs(36),
+    width: rs(36),
+    borderRadius: rs(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: REVIEW_COLORS.surface,
+    borderWidth: 1,
+    borderColor: REVIEW_COLORS.border,
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: rs(22),
+    fontWeight: '700',
+    color: REVIEW_COLORS.textPrimary,
+  },
+  postButton: {
+    paddingHorizontal: rs(16),
+    paddingVertical: rs(8),
+    borderRadius: 999,
+    backgroundColor: REVIEW_COLORS.accent,
+  },
+  postButtonDisabled: {
+    opacity: 0.6,
+  },
+  postButtonText: {
+    fontSize: rs(12),
+    fontWeight: '700',
+    color: REVIEW_COLORS.buttonText,
+  },
+  scrollContent: {
+    paddingHorizontal: rs(20),
+    paddingBottom: rs(32),
+    gap: rs(18),
+  },
+  summaryWrapper: {
+    marginTop: rs(8),
+  },
+  section: {
+    gap: rs(10),
+  },
+  sectionLabel: {
+    fontSize: rs(14),
+    fontWeight: '700',
+    color: REVIEW_COLORS.textPrimary,
+  },
+  reviewInput: {
+    minHeight: rs(120),
+    borderRadius: rs(16),
+    borderWidth: 1,
+    borderColor: REVIEW_COLORS.border,
+    backgroundColor: REVIEW_COLORS.surface,
+    padding: rs(14),
+    fontSize: rs(13),
+    lineHeight: rs(18),
+    color: REVIEW_COLORS.textPrimary,
+  },
+  charCount: {
+    fontSize: rs(11),
+    fontWeight: '600',
+    color: REVIEW_COLORS.textSecondary,
+  },
+  statusText: {
+    fontSize: rs(12),
+    fontWeight: '600',
+    color: REVIEW_COLORS.success,
+  },
+  errorText: {
+    fontSize: rs(12),
+    fontWeight: '600',
+    color: REVIEW_COLORS.error,
+  },
+  emptyState: {
+    paddingVertical: rs(32),
+    paddingHorizontal: rs(20),
+    alignItems: 'center',
+    gap: rs(10),
+  },
+  emptyTitle: {
+    fontSize: rs(18),
+    fontWeight: '700',
+    color: REVIEW_COLORS.textPrimary,
+  },
+  emptyBody: {
+    fontSize: rs(13),
+    lineHeight: rs(18),
+    color: REVIEW_COLORS.textSecondary,
+    textAlign: 'center',
+  },
+  emptyButton: {
+    marginTop: rs(6),
+    paddingHorizontal: rs(20),
+    paddingVertical: rs(10),
+    borderRadius: 999,
+    backgroundColor: REVIEW_COLORS.accent,
+  },
+  emptyButtonText: {
+    fontSize: rs(13),
+    fontWeight: '700',
+    color: REVIEW_COLORS.buttonText,
+  },
+  photoRow: {
+    gap: rs(12),
+  },
+  addPhotoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: rs(8),
+    paddingHorizontal: rs(12),
+    paddingVertical: rs(10),
+    borderRadius: rs(12),
+    borderWidth: 1,
+    borderColor: REVIEW_COLORS.accent,
+    backgroundColor: REVIEW_COLORS.accentSoft,
+    alignSelf: 'flex-start',
+  },
+  addPhotoText: {
+    fontSize: rs(12),
+    fontWeight: '700',
+    color: REVIEW_COLORS.accent,
+  },
+  photoThumbRow: {
+    flexDirection: 'row',
+    gap: rs(12),
+    flexWrap: 'wrap',
+  },
+  photoThumb: {
+    width: rs(70),
+    height: rs(70),
+    borderRadius: rs(12),
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: REVIEW_COLORS.border,
+    backgroundColor: REVIEW_COLORS.surfaceMuted,
+  },
+  photoImage: {
+    width: '100%',
+    height: '100%',
+  },
+  removeBadge: {
+    position: 'absolute',
+    top: rs(6),
+    right: rs(6),
+    width: rs(18),
+    height: rs(18),
+    borderRadius: rs(9),
+    backgroundColor: REVIEW_COLORS.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tagRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: rs(8),
+  },
+  tagChip: {
+    paddingHorizontal: rs(12),
+    paddingVertical: rs(6),
+    borderRadius: 999,
+    backgroundColor: REVIEW_COLORS.chip,
+  },
+  tagChipActive: {
+    backgroundColor: REVIEW_COLORS.chipActive,
+  },
+  tagText: {
+    fontSize: rs(12),
+    fontWeight: '700',
+    color: REVIEW_COLORS.chipText,
+  },
+  tagTextActive: {
+    color: REVIEW_COLORS.chipTextActive,
+  },
+});

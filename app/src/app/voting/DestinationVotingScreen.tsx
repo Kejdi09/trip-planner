@@ -17,9 +17,9 @@ import {
   VotedLabel,
   VoteProgress,
   VoterAvatars,
-} from './components';
+} from './_components';
 import { AppBottomNav } from '@/components/ui/app-bottom-nav';
-import { DestinationOption, MOCK_DESTINATIONS, VotingTab } from './types';
+import { DestinationOption, MOCK_DESTINATIONS, VotingTab } from './_types';
 
 interface DestinationVotingScreenProps {
   tripName?: string;
