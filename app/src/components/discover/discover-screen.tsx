@@ -66,6 +66,39 @@ export function DiscoverScreen() {
     return () => { isMounted = false; };
   }, []);
 
+  const countryOptions = React.useMemo(() => {
+    const optionMap = new Map<string, string>();
+
+    places.forEach((place) => {
+      const country = place.country?.trim();
+      if (!country) return;
+      const id = buildCountryFilterId(country);
+
+      if (!optionMap.has(id)) {
+        optionMap.set(id, country);
+      }
+    });
+
+    return Array.from(optionMap, ([id, label]) => ({ id, label })).sort((a, b) =>
+      a.label.localeCompare(b.label),
+    );
+  }, [places]);
+
+  const filterGroups = React.useMemo<readonly FilterGroup[]>(() => {
+    if (countryOptions.length === 0) {
+      return [];
+    }
+
+    return [
+      {
+        id: 'countries',
+        title: 'Filter by Country',
+        options: countryOptions,
+        layout: 'wrap',
+      },
+    ];
+  }, [countryOptions]);
+
   const filteredPlaces = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     const activeCountries = selectedFilters;

@@ -1,7 +1,8 @@
 import { Feather } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
-import { Image, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DestinationSummary } from '@/components/reviews/destination-summary';
@@ -17,8 +18,8 @@ import {
   fetchReviewsByPlace,
   fetchTagNamesByReviewIds,
 } from '../../../lib/reviews-api';
+import { formatPlaceRegion } from '../../../lib/reviews-utils';
 import { supabase } from '../../../lib/supabase';
-import { averageRating, DEFAULT_PLACE_IMAGE, formatPlaceRegion } from '../../../lib/reviews-utils';
 import { REVIEW_COLORS } from './review-theme';
 import { styles } from './write-review-screen.styles';
 
@@ -43,7 +44,7 @@ export function WriteReviewScreen() {
 
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [isEmpty, setIsEmpty] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
 
@@ -59,7 +60,7 @@ export function WriteReviewScreen() {
   React.useEffect(() => {
     let isMounted = true;
 
-    const loadDestination = async () => {
+    const loadPlace = async () => {
       setIsLoading(true);
       setErrorMessage(null);
 
@@ -99,7 +100,6 @@ export function WriteReviewScreen() {
 
         if (!isMounted) return;
 
-        setIsEmpty(false);
         setPlace(placeRecord);
         setDestinationRating(averageRating(reviews));
         setDestinationImage(headerPhoto ?? DEFAULT_PLACE_IMAGE);
@@ -108,7 +108,6 @@ export function WriteReviewScreen() {
         if (!isMounted) return;
         const message = error instanceof Error ? error.message : 'Unable to load destination.';
         setErrorMessage(message);
-        setIsEmpty(false);
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -142,7 +141,7 @@ export function WriteReviewScreen() {
     setCustomTagInput('');
   };
 
-  const handleAddPhoto = async () => {
+  const handlePickPhotos = async () => {
     setErrorMessage(null);
 
     if (selectedPhotos.length >= MAX_PHOTOS) {
@@ -179,7 +178,7 @@ export function WriteReviewScreen() {
   };
 
   const handleRemovePhoto = (uri: string) => {
-    setSelectedPhotos((current) => current.filter((item) => item !== uri));
+    setPhotoUris((current) => current.filter((item) => item !== uri));
   };
 
   const handleSubmit = async () => {
@@ -196,29 +195,41 @@ export function WriteReviewScreen() {
     if (!user) { setErrorMessage('Log in to post a review.'); return; }
 
     setIsSubmitting(true);
+    setErrorMessage(null);
+    setStatusMessage(null);
 
     try {
+      const { data } = await supabase.auth.getUser();
+      const user = data.user;
+
+      if (!user) {
+        throw new Error('Log in to post a review.');
+      }
+
       await createReviewWithTags({
         userId: user.id,
         placeId: place.id,
-        rating: userRating,
-        review: reviewText.trim(),
-        tagNames: selectedTags,
-        photoUris: selectedPhotos,
+        rating,
+        review: trimmedReview,
+        tagNames: tags,
+        photoUris,
       });
 
       setStatusMessage('Review posted!');
       router.replace({ pathname: '/destination-reviews', params: { id: place.id } });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to post review right now.';
+      const message = error instanceof Error ? error.message : 'Unable to post review.';
       setErrorMessage(message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const canPost = Boolean(place) && rating > 0 && reviewText.trim().length > 0 && !isSubmitting;
   const destinationTitle = place?.name ?? 'Destination';
-  const destinationRegion = formatPlaceRegion(place?.city ?? null, place?.country ?? null);
+  const destinationRegion = place
+    ? formatPlaceRegion(place.city ?? null, place.country ?? null)
+    : '';
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -227,11 +238,11 @@ export function WriteReviewScreen() {
           <Pressable style={styles.backButton} onPress={handleBack}>
             <Feather name="arrow-left" size={20} color={REVIEW_COLORS.textPrimary} />
           </Pressable>
-          <Text style={styles.headerTitle}>Write Review</Text>
+          <Text style={styles.headerTitle}>Write a review</Text>
           <Pressable
-            style={[styles.postButton, isSubmitting && styles.postButtonDisabled]}
+            style={[styles.postButton, !canPost && styles.postButtonDisabled]}
+            disabled={!canPost}
             onPress={handleSubmit}
-            disabled={isSubmitting}
           >
             <Text style={styles.postButtonText}>{isSubmitting ? 'Posting...' : 'Post'}</Text>
           </Pressable>
@@ -280,8 +291,13 @@ export function WriteReviewScreen() {
               <FadeIn style={styles.section} delay={160}>
                 <Text style={styles.sectionLabel}>Your Review</Text>
                 <TextInput
+                  value={reviewText}
+                  onChangeText={(text) => {
+                    setReviewText(text);
+                    setStatusMessage(null);
+                  }}
                   style={styles.reviewInput}
-                  placeholder="Share your experience..."
+                  placeholder="Share the highlights, tips, and anything to know before visiting."
                   placeholderTextColor={REVIEW_COLORS.textSecondary}
                   multiline
                   textAlignVertical="top"
@@ -369,6 +385,8 @@ export function WriteReviewScreen() {
                 {/* Custom tag input */}
                 <View style={styles.customTagRow}>
                   <TextInput
+                    value={tagInput}
+                    onChangeText={setTagInput}
                     style={styles.customTagInput}
                     placeholder="#your own tag"
                     placeholderTextColor={REVIEW_COLORS.textSecondary}
@@ -392,7 +410,7 @@ export function WriteReviewScreen() {
                 </View>
               </FadeIn>
             </>
-          )}
+          ) : null}
         </ScrollView>
       </View>
     </SafeAreaView>

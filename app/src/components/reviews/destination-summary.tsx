@@ -8,7 +8,7 @@ type DestinationSummaryProps = {
   title: string;
   region: string;
   rating: number;
-  image: string;
+  image?: string | null;
   size?: 'compact' | 'card' | 'header';
 };
 
@@ -25,11 +25,15 @@ export function DestinationSummary({
 
   return (
     <View style={[styles.container, isCard && styles.containerCard]}>
-      <Image
-        source={{ uri: image }}
-        style={[styles.image, isCard && styles.imageCard, isHeader && styles.imageHeader]}
-        accessibilityLabel={`${title} photo`}
-      />
+      {image ? (
+        <Image
+          source={{ uri: image }}
+          style={[styles.image, isCard && styles.imageCard, isHeader && styles.imageHeader]}
+          accessibilityLabel={`${title} photo`}
+        />
+      ) : (
+        <View style={[styles.image, isCard && styles.imageCard, isHeader && styles.imageHeader]} />
+      )}
       <View style={styles.textGroup}>
         <Text style={[styles.title, isCard && styles.titleCard, isHeader && styles.titleHeader]}>
           {title}

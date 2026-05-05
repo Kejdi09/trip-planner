@@ -39,11 +39,6 @@ type TagRecord = {
   name: string | null;
 };
 
-type ReviewTagLinkRecord = {
-  review_id: string | null;
-  tag_id: string | null;
-};
-
 export type { PlaceRecord, ReviewRecord, ProfileRecord, ReviewPhotoRecord, TagRecord };
 
 export async function fetchPlaceById(placeId: string): Promise<PlaceRecord | null> {
@@ -183,7 +178,10 @@ export async function fetchTagNamesByReviewIds(
     const name = tagMap[link.tag_id];
     if (!name) return acc;
     const label = `#${name}`;
-    acc[link.review_id] = acc[link.review_id] ? [...acc[link.review_id], label] : [label];
+    const existing = acc[link.review_id] ?? [];
+    if (!existing.includes(label)) {
+      acc[link.review_id] = [...existing, label];
+    }
     return acc;
   }, {});
 }
@@ -315,34 +313,7 @@ export async function createReviewWithTags({
 
   if (tagError) throw tagError;
 
-  const existingTags = (tagRows ?? []) as TagRecord[];
-  const existingTagNames = new Set(
-    existingTags.map((row) => row.name).filter(Boolean) as string[],
-  );
-  const missingNames = normalizedNames.filter((name) => !existingTagNames.has(name));
-
-  let insertedTags: TagRecord[] = [];
-
-  if (missingNames.length > 0) {
-    const { data: newTags, error: insertError } = await supabase
-      .from('tags')
-      .insert(missingNames.map((name) => ({ name })))
-      .select('id, name');
-
-    if (insertError) {
-      const { data: retryTags, error: retryError } = await supabase
-        .from('tags')
-        .select('id, name')
-        .in('name', missingNames);
-
-      if (retryError) throw insertError;
-      insertedTags = (retryTags ?? []) as TagRecord[];
-    } else {
-      insertedTags = (newTags ?? []) as TagRecord[];
-    }
-  }
-
-  const tagIds = [...existingTags, ...insertedTags]
+  const tagIds = (tagRows ?? [])
     .map((row) => row.id)
     .filter(Boolean) as string[];
 
@@ -360,14 +331,4 @@ export async function createReviewWithTags({
   if (reviewTagError) throw reviewTagError;
 
   return reviewId;
-}
-
-export async function deleteReviewById(reviewId: string, userId: string): Promise<void> {
-  const { error } = await supabase
-    .from('reviews')
-    .delete()
-    .eq('id', reviewId)
-    .eq('user_id', userId);
-
-  if (error) throw error;
 }
