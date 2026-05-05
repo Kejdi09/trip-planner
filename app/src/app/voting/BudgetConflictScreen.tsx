@@ -20,7 +20,6 @@ import {
   VoteProgress,
   VoterAvatars,
 } from './_components';
-import { AppBottomNav } from '@/components/ui/app-bottom-nav';
 import { BudgetOption, MOCK_CONFLICT_BUDGETS, VotingTab } from './_types';
 
 const ConflictBanner = () => (
@@ -137,7 +136,6 @@ const BudgetConflictScreen: React.FC<BudgetConflictScreenProps> = ({
           <Text style={styles.btnText}>End Voting</Text>
         </TouchableOpacity>
       </ScrollView>
-      <AppBottomNav activeTab="Groups" />
     </SafeAreaView>
   );
 };

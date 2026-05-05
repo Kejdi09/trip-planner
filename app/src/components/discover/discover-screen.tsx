@@ -4,7 +4,6 @@ import { ScrollView, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FILTER_GROUPS } from '@/components/discover/discover-data';
-import { AppBottomNav } from '@/components/ui/app-bottom-nav';
 import { FilterSheet } from '@/components/ui/filter-sheet';
 import { PlaceListSection } from '@/components/ui/place-list-section';
 import { SearchHeader } from '@/components/ui/search-header';
@@ -142,7 +141,6 @@ export function DiscoverScreen() {
           />
         </View>
 
-        <AppBottomNav activeTab="Discover" />
       </View>
     </SafeAreaView>
   );

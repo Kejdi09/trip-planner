@@ -20,7 +20,6 @@ import {
   VoteProgress,
   VoterAvatars,
 } from './_components';
-import { AppBottomNav } from '@/components/ui/app-bottom-nav';
 import { BudgetOption, MOCK_BUDGETS, VotingTab } from './_types';
 
 const SLIDER_MIN = 0;
@@ -126,7 +125,6 @@ const BudgetVotingScreen: React.FC<BudgetVotingScreenProps> = ({
           <Text style={styles.btnText}>Finish Voting</Text>
         </TouchableOpacity>
       </ScrollView>
-      <AppBottomNav activeTab="Groups" />
     </SafeAreaView>
   );
 };

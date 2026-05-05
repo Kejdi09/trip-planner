@@ -8,10 +8,12 @@ export function formatPlaceRegion(city?: string | null, country?: string | null)
 
 export function formatRelativeTime(isoDate?: string | null): string {
   if (!isoDate) return '';
-  const date = new Date(isoDate);
+  const normalized = isoDate.replace(/(\.\d{3})\d+/, '$1');
+  const hasTimezone = /[zZ]|[+-]\d{2}:\d{2}$/.test(normalized);
+  const date = new Date(hasTimezone ? normalized : `${normalized}Z`);
   if (Number.isNaN(date.getTime())) return '';
 
-  const diffMs = Date.now() - date.getTime();
+  const diffMs = Math.max(0, Date.now() - date.getTime());
   const diffSec = Math.floor(diffMs / 1000);
 
   if (diffSec < 60) return 'now';

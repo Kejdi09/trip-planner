@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DestinationSummary } from '@/components/reviews/destination-summary';
@@ -12,6 +12,7 @@ import type { PlaceRecord, ProfileRecord, ReviewRecord } from '../../../lib/revi
 import {
   fetchFirstPlace,
   fetchPlaceById,
+  fetchTagNamesByReviewIds,
   fetchProfilesByIds,
   fetchReviewPhotosByReviewIds,
   fetchReviewsByPlace,
@@ -27,6 +28,7 @@ import { REVIEW_COLORS } from './review-theme';
 import { styles } from './destination-reviews-screen.styles';
 
 const SORT_OPTIONS = ['Newest', 'Highest', 'Lowest'] as const;
+const INITIAL_VISIBLE_REVIEWS = 3;
 
 type SortOption = (typeof SORT_OPTIONS)[number];
 
@@ -38,6 +40,18 @@ type ReviewItem = {
   timeAgo: string;
   body: string;
   avatarColor: string;
+  tags: string[];
+  photos: string[];
+};
+
+type ReviewPhoto = {
+  url: string;
+  reviewerName: string;
+};
+
+const isValidTag = (tag: string) => {
+  const normalized = tag.replace(/^#/, '').trim();
+  return normalized.length > 0 && normalized !== '0' && normalized !== '1';
 };
 
 const AVATAR_COLORS = ['#D6EEF1', '#FCE5C8', '#DDEAF9', '#E7EAF3'];
@@ -50,11 +64,16 @@ export function DestinationReviewsScreen() {
   const [place, setPlace] = React.useState<PlaceRecord | null>(null);
   const [reviews, setReviews] = React.useState<ReviewRecord[]>([]);
   const [profiles, setProfiles] = React.useState<Record<string, ProfileRecord>>({});
+  const [tagsByReviewId, setTagsByReviewId] = React.useState<Record<string, string[]>>({});
+  const [photosByReviewId, setPhotosByReviewId] = React.useState<Record<string, string[]>>({});
   const [headerImage, setHeaderImage] = React.useState(DEFAULT_PLACE_IMAGE);
   const [rating, setRating] = React.useState(0);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isEmpty, setIsEmpty] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [showAllReviews, setShowAllReviews] = React.useState(false);
+  const [expandedReviews, setExpandedReviews] = React.useState<string[]>([]);
+  const [activePhoto, setActivePhoto] = React.useState<ReviewPhoto | null>(null);
 
   const handleBack = () => {
     const canGoBack =
@@ -101,6 +120,15 @@ export function DestinationReviewsScreen() {
         const reviewIds = reviewRows.map((review) => review.id);
         const photos = await fetchReviewPhotosByReviewIds(reviewIds);
         const headerPhoto = photos.find((photo) => Boolean(photo.image_url))?.image_url;
+        const tagMap = await fetchTagNamesByReviewIds(reviewIds);
+        const photoMap = photos.reduce<Record<string, string[]>>((acc, photo) => {
+          if (photo.review_id && photo.image_url) {
+            acc[photo.review_id] = acc[photo.review_id]
+              ? [...acc[photo.review_id], photo.image_url]
+              : [photo.image_url];
+          }
+          return acc;
+        }, {});
 
         const userIds = Array.from(
           new Set(reviewRows.map((review) => review.user_id).filter(Boolean)),
@@ -119,6 +147,8 @@ export function DestinationReviewsScreen() {
         setPlace(placeRecord);
         setReviews(reviewRows);
         setProfiles(profileMap);
+        setTagsByReviewId(tagMap);
+        setPhotosByReviewId(photoMap);
         setHeaderImage(headerPhoto ?? DEFAULT_PLACE_IMAGE);
         setRating(averageRating(reviewRows));
       } catch (error) {
@@ -162,6 +192,8 @@ export function DestinationReviewsScreen() {
         timeAgo: formatRelativeTime(review.created_at),
         body: review.review ?? '',
         avatarColor: AVATAR_COLORS[index % AVATAR_COLORS.length],
+        tags: (tagsByReviewId[review.id] ?? []).filter(isValidTag),
+        photos: photosByReviewId[review.id] ?? [],
       };
     });
 
@@ -183,7 +215,26 @@ export function DestinationReviewsScreen() {
       const dateB = reviewById[b.id]?.created_at ?? '';
       return dateB.localeCompare(dateA);
     });
-  }, [activeSort, profiles, reviews]);
+  }, [activeSort, profiles, reviews, tagsByReviewId, photosByReviewId]);
+
+  React.useEffect(() => {
+    setShowAllReviews(false);
+    setExpandedReviews([]);
+  }, [activeSort, reviews.length]);
+
+  const visibleReviews = showAllReviews
+    ? reviewItems
+    : reviewItems.slice(0, INITIAL_VISIBLE_REVIEWS);
+
+  const shouldShowToggle = reviewItems.length > INITIAL_VISIBLE_REVIEWS;
+
+  const handleToggleReview = (reviewId: string) => {
+    setExpandedReviews((current) =>
+      current.includes(reviewId)
+        ? current.filter((id) => id !== reviewId)
+        : [...current, reviewId],
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -281,9 +332,19 @@ export function DestinationReviewsScreen() {
               ) : reviewItems.length === 0 ? (
                 <StatusMessage message="No reviews yet." style={styles.statusText} />
               ) : hasDestination ? (
-                reviewItems.map((review, index) => (
-                  <FadeIn key={review.id} delay={160 + index * 70}>
-                    <View style={styles.reviewCard}>
+                visibleReviews.map((review, index) => {
+                  const isExpanded = expandedReviews.includes(review.id);
+                  const hasPhotos = review.photos.length > 0;
+
+                  return (
+                    <FadeIn key={review.id} delay={160 + index * 70}>
+                      <Pressable
+                        style={[styles.reviewCard, isExpanded && styles.reviewCardExpanded]}
+                        accessibilityRole="button"
+                        accessibilityHint="Expand or collapse review"
+                        hitSlop={6}
+                        onPress={() => handleToggleReview(review.id)}
+                      >
                       <View style={styles.reviewHeader}>
                         <View style={[styles.avatar, { backgroundColor: review.avatarColor }]}>
                           <Text style={styles.avatarText}>{review.initials}</Text>
@@ -291,25 +352,99 @@ export function DestinationReviewsScreen() {
                         <View style={styles.reviewMeta}>
                           <View style={styles.titleRow}>
                             <Text style={styles.reviewerName}>{review.name}</Text>
+                          <View style={styles.reviewMetaRight}>
+                            {hasPhotos ? (
+                              <View style={styles.photoBadge}>
+                                <Feather name="image" size={12} color={REVIEW_COLORS.buttonText} />
+                                <Text style={styles.photoBadgeText}>{review.photos.length}</Text>
+                              </View>
+                            ) : null}
+                            <Feather name={isExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={REVIEW_COLORS.textSecondary} />
                             <Text style={styles.reviewTime}>{review.timeAgo}</Text>
+                          </View>
                           </View>
                           <View style={styles.ratingRow}>
                             <RatingStars value={review.rating} size={12} />
                           </View>
                         </View>
                       </View>
-                      <Text style={styles.reviewBody} numberOfLines={2}>
+                    <Text style={styles.reviewBody} numberOfLines={isExpanded ? undefined : 2}>
                         {review.body}
                       </Text>
-                    </View>
-                  </FadeIn>
-                ))
+                    {isExpanded && hasPhotos ? (
+                      <View style={styles.reviewPhotoGrid}>
+                        {review.photos.map((uri) => (
+                          <Pressable
+                            key={`${review.id}-${uri}`}
+                            style={styles.reviewPhotoTile}
+                            accessibilityRole="button"
+                            accessibilityHint="Open review photo"
+                            onPress={() => setActivePhoto({ url: uri, reviewerName: review.name })}
+                          >
+                            <Image
+                              source={{ uri }}
+                              style={styles.reviewPhotoImage}
+                              accessibilityLabel={`Review photo by ${review.name}`}
+                            />
+                          </Pressable>
+                        ))}
+                      </View>
+                    ) : null}
+                      {review.tags.length > 0 ? (
+                        <View style={styles.reviewTagsRow}>
+                          {review.tags.map((tag) => (
+                            <View key={`${review.id}-${tag}`} style={styles.reviewTagChip}>
+                              <Text style={styles.reviewTagText}>{tag}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      ) : null}
+                      </Pressable>
+                    </FadeIn>
+                  );
+                })
               ) : null}
             </>
           )}
 
+          {hasDestination && shouldShowToggle ? (
+            <Pressable
+              style={styles.viewMoreButton}
+              onPress={() => setShowAllReviews((current) => !current)}
+            >
+              <Text style={styles.viewMoreText}>
+                {showAllReviews ? 'View less' : `View more (${reviewItems.length - INITIAL_VISIBLE_REVIEWS})`}
+              </Text>
+            </Pressable>
+          ) : null}
+
         </ScrollView>
       </View>
+
+      <Modal
+        visible={Boolean(activePhoto)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setActivePhoto(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Pressable style={styles.modalClose} onPress={() => setActivePhoto(null)}>
+              <Feather name="x" size={20} color={REVIEW_COLORS.textPrimary} />
+            </Pressable>
+            {activePhoto ? (
+              <>
+                <Image
+                  source={{ uri: activePhoto.url }}
+                  style={styles.modalImage}
+                  accessibilityLabel={`Review photo by ${activePhoto.reviewerName}`}
+                />
+                <Text style={styles.modalName}>{activePhoto.reviewerName}</Text>
+              </>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }

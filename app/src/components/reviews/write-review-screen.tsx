@@ -33,6 +33,7 @@ export function WriteReviewScreen() {
   const [userRating, setUserRating] = React.useState(0);
   const [reviewText, setReviewText] = React.useState('');
   const [selectedTags, setSelectedTags] = React.useState<string[]>([]);
+  const [customTagInput, setCustomTagInput] = React.useState('');
   const [selectedPhotos, setSelectedPhotos] = React.useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -120,6 +121,34 @@ export function WriteReviewScreen() {
     );
   };
 
+  const displayTags = React.useMemo(
+    () => Array.from(new Set([...TAGS, ...selectedTags])),
+    [selectedTags],
+  );
+
+  const handleAddCustomTag = () => {
+    const trimmed = customTagInput.trim();
+    if (!trimmed) {
+      setErrorMessage('Enter a hashtag to add.');
+      return;
+    }
+
+    const normalized = trimmed.replace(/^#+/, '');
+    if (!normalized) {
+      setErrorMessage('Enter a hashtag to add.');
+      return;
+    }
+
+    const label = `#${normalized}`;
+    if (selectedTags.includes(label)) {
+      setErrorMessage('That hashtag is already selected.');
+      return;
+    }
+
+    setSelectedTags((current) => [...current, label]);
+    setCustomTagInput('');
+  };
+
   const handleAddPhoto = async () => {
     setErrorMessage(null);
 
@@ -196,6 +225,7 @@ export function WriteReviewScreen() {
         rating: userRating,
         review: reviewText.trim(),
         tagNames: selectedTags,
+        photoUris: selectedPhotos,
       });
 
       setStatusMessage('Review posted successfully.');
@@ -312,7 +342,7 @@ export function WriteReviewScreen() {
               <FadeIn style={styles.section} delay={250}>
                 <Text style={styles.sectionLabel}>Add Tags</Text>
                 <View style={styles.tagRow}>
-                  {TAGS.map((tag) => {
+                  {displayTags.map((tag) => {
                     const isActive = selectedTags.includes(tag);
                     return (
                       <Pressable
@@ -325,8 +355,19 @@ export function WriteReviewScreen() {
                       </Pressable>
                     );
                   })}
-                  <Pressable style={styles.tagChip}>
-                    <Text style={styles.tagText}>+ Custom</Text>
+                </View>
+                <View style={styles.customTagRow}>
+                  <TextInput
+                    style={styles.customTagInput}
+                    placeholder="Add custom hashtag"
+                    placeholderTextColor={REVIEW_COLORS.textSecondary}
+                    value={customTagInput}
+                    onChangeText={setCustomTagInput}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  <Pressable style={styles.customTagButton} onPress={handleAddCustomTag}>
+                    <Text style={styles.customTagButtonText}>Add</Text>
                   </Pressable>
                 </View>
               </FadeIn>
