@@ -54,12 +54,7 @@ export function DestinationOverviewScreen() {
       typeof (router as { canGoBack?: () => boolean }).canGoBack === 'function'
         ? (router as { canGoBack?: () => boolean }).canGoBack?.() === true
         : false;
-
-    if (canGoBack) {
-      router.back();
-      return;
-    }
-
+    if (canGoBack) { router.back(); return; }
     router.replace('/explore');
   };
 
@@ -76,10 +71,7 @@ export function DestinationOverviewScreen() {
           : await fetchFirstPlace();
 
         if (!placeRecord) {
-          if (!isMounted) {
-            return;
-          }
-
+          if (!isMounted) return;
           setIsEmpty(true);
           setPlace(null);
           setRating(0);
@@ -108,14 +100,8 @@ export function DestinationOverviewScreen() {
           return acc;
         }, {});
 
-        const topRatedReviewIds = new Set(
-          reviews
-            .filter((review) => typeof review.rating === 'number' && review.rating >= 4)
-            .map((review) => review.id),
-        );
-
+        // Show ALL photos from reviews (no rating filter), attributed to reviewer
         const photoItems = reviewPhotos
-          .filter((photo) => photo.review_id && topRatedReviewIds.has(photo.review_id))
           .map((photo) => {
             const review = photo.review_id ? reviewById[photo.review_id] : undefined;
             const profile = review?.user_id ? profileMap[review.user_id] : undefined;
@@ -127,6 +113,7 @@ export function DestinationOverviewScreen() {
             };
           })
           .filter((photo) => Boolean(photo.url));
+
         const tagCounts = Object.values(tagMap).reduce<Record<string, number>>(
           (acc, tagsForReview) => {
             tagsForReview.forEach((tag) => {
@@ -135,6 +122,7 @@ export function DestinationOverviewScreen() {
             });
             return acc;
           },
+          {},
         );
 
         const topTags = Object.entries(tagCounts)
@@ -146,9 +134,7 @@ export function DestinationOverviewScreen() {
           reviews.map((review: ReviewRecord) => review.user_id).filter(Boolean),
         ).size;
 
-        if (!isMounted) {
-          return;
-        }
+        if (!isMounted) return;
 
         setIsEmpty(false);
         setPlace(placeRecord);
@@ -158,25 +144,17 @@ export function DestinationOverviewScreen() {
         setFriendsVisited(uniqueUserCount);
         setReviewCount(reviews.length);
       } catch (error) {
-        if (!isMounted) {
-          return;
-        }
-
+        if (!isMounted) return;
         const message = error instanceof Error ? error.message : 'Unable to load destination.';
         setErrorMessage(message);
         setIsEmpty(false);
       } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        if (isMounted) setIsLoading(false);
       }
     };
 
     void loadDestination();
-
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, [params.id]);
 
   const hasDestination = Boolean(place) && !errorMessage && !isEmpty;
@@ -283,17 +261,22 @@ export function DestinationOverviewScreen() {
               {!isLoading && !errorMessage ? (
                 <>
                   <FadeIn style={styles.sectionHeader} delay={240}>
-                    <Text style={styles.sectionTitle}>Photos</Text>
+                    <View style={styles.photoSectionRow}>
+                      <Text style={styles.sectionTitle}>Photos</Text>
+                      {displayPhotos.length > 0 ? (
+                        <Text style={styles.photoCount}>{displayPhotos.length} photo{displayPhotos.length === 1 ? '' : 's'}</Text>
+                      ) : null}
+                    </View>
                   </FadeIn>
 
                   {displayPhotos.length > 0 ? (
                     <View style={styles.photoGrid}>
                       {displayPhotos.map((photo, index) => (
-                        <FadeIn key={photo.id} delay={260 + index * 60} style={styles.photoTile}>
+                        <FadeIn key={photo.id} delay={260 + index * 50} style={styles.photoTile}>
                           <Pressable
                             style={styles.photoTilePressable}
                             accessibilityRole="button"
-                            accessibilityHint="Open review photo"
+                            accessibilityHint="Open photo"
                             onPress={() => setActivePhoto(photo)}
                           >
                             <Image
@@ -302,14 +285,16 @@ export function DestinationOverviewScreen() {
                               accessibilityLabel={`Photo by ${photo.reviewerName}`}
                             />
                             <View style={styles.photoOverlay}>
-                              <Text style={styles.photoName}>{photo.reviewerName}</Text>
+                              <Text style={styles.photoName} numberOfLines={1}>
+                                {photo.reviewerName}
+                              </Text>
                             </View>
                           </Pressable>
                         </FadeIn>
                       ))}
                     </View>
                   ) : (
-                    <Text style={styles.sectionHint}>No 4+ star photos yet.</Text>
+                    <Text style={styles.sectionHint}>No photos yet. Write a review to add some!</Text>
                   )}
                 </>
               ) : null}
@@ -318,29 +303,34 @@ export function DestinationOverviewScreen() {
         </ScrollView>
       </View>
 
+      {/* Photo lightbox modal */}
       <Modal
         visible={Boolean(activePhoto)}
         transparent
         animationType="fade"
         onRequestClose={() => setActivePhoto(null)}
       >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setActivePhoto(null)}>
+          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
             <Pressable style={styles.modalClose} onPress={() => setActivePhoto(null)}>
-              <Feather name="x" size={20} color={REVIEW_COLORS.textPrimary} />
+              <Feather name="x" size={18} color={REVIEW_COLORS.textPrimary} />
             </Pressable>
             {activePhoto ? (
               <>
                 <Image
                   source={{ uri: activePhoto.url }}
                   style={styles.modalImage}
+                  resizeMode="cover"
                   accessibilityLabel={`Photo by ${activePhoto.reviewerName}`}
                 />
-                <Text style={styles.modalName}>{activePhoto.reviewerName}</Text>
+                <View style={styles.modalMeta}>
+                  <Feather name="user" size={14} color={REVIEW_COLORS.textSecondary} />
+                  <Text style={styles.modalName}>{activePhoto.reviewerName}</Text>
+                </View>
               </>
             ) : null}
-          </View>
-        </View>
+          </Pressable>
+        </Pressable>
       </Modal>
     </SafeAreaView>
   );

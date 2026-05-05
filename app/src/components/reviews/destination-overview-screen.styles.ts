@@ -254,4 +254,20 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
     color: REVIEW_COLORS.textPrimary,
   },
+  photoSectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: rs(8),
+  },
+  photoCount: {
+    fontSize: rs(13),
+    fontWeight: '600',
+    color: REVIEW_COLORS.textSecondary,
+  },
+  modalMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: rs(8),
+  },
 });
