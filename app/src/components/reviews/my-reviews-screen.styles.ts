@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { REVIEW_COLORS, REVIEW_FONTS, rs } from './review-theme';
+import { REVIEW_COLORS, rs } from './review-theme';
 
 export const styles = StyleSheet.create({
   safeArea: {
@@ -31,7 +31,6 @@ export const styles = StyleSheet.create({
     fontSize: rs(24),
     fontWeight: '700',
     color: REVIEW_COLORS.textPrimary,
-    fontFamily: REVIEW_FONTS.heading,
   },
   headerDivider: {
     height: 1,
@@ -47,7 +46,6 @@ export const styles = StyleSheet.create({
     fontSize: rs(13),
     fontWeight: '700',
     color: REVIEW_COLORS.textSecondary,
-    fontFamily: REVIEW_FONTS.body,
   },
   sortRow: {
     flexDirection: 'row',
@@ -69,7 +67,6 @@ export const styles = StyleSheet.create({
     fontSize: rs(13),
     fontWeight: '700',
     color: REVIEW_COLORS.chipText,
-    fontFamily: REVIEW_FONTS.body,
   },
   sortChipTextActive: {
     color: REVIEW_COLORS.chipTextActive,
@@ -109,7 +106,6 @@ export const styles = StyleSheet.create({
     fontSize: rs(15),
     fontWeight: '700',
     color: REVIEW_COLORS.textPrimary,
-    fontFamily: REVIEW_FONTS.heading,
   },
   ratingRow: {
     flexDirection: 'row',
@@ -120,27 +116,23 @@ export const styles = StyleSheet.create({
     fontSize: rs(12),
     fontWeight: '600',
     color: REVIEW_COLORS.textSecondary,
-    fontFamily: REVIEW_FONTS.body,
   },
   reviewBody: {
     marginTop: rs(8),
     fontSize: rs(13),
     lineHeight: rs(18),
     color: REVIEW_COLORS.textSecondary,
-    fontFamily: REVIEW_FONTS.body,
   },
   statusText: {
     fontSize: rs(12),
     fontWeight: '600',
     color: REVIEW_COLORS.textSecondary,
-    fontFamily: REVIEW_FONTS.body,
     lineHeight: rs(16),
   },
   errorText: {
     fontSize: rs(12),
     fontWeight: '600',
     color: REVIEW_COLORS.error,
-    fontFamily: REVIEW_FONTS.body,
     lineHeight: rs(16),
   },
   viewMoreButton: {
@@ -158,6 +150,5 @@ export const styles = StyleSheet.create({
     fontSize: rs(13),
     fontWeight: '700',
     color: REVIEW_COLORS.textPrimary,
-    fontFamily: REVIEW_FONTS.body,
   },
 });

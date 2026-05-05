@@ -16,6 +16,7 @@ import {
   fetchTagsByReviewIds,
 } from '../../../lib/reviews-api';
 import { averageRating, DEFAULT_PLACE_IMAGE, formatPlaceRegion } from '../../../lib/reviews-utils';
+import { REVIEW_COLORS } from './review-theme';
 import { styles } from './destination-overview-screen.styles';
 
 const DEFAULT_TAGS = ['#nature', '#adventure'];
@@ -144,14 +145,17 @@ export function DestinationOverviewScreen() {
     : '';
   const displayTags = hasDestination ? (tags.length > 0 ? tags : DEFAULT_TAGS) : [];
   const displayPhotos = hasDestination ? (photos.length > 0 ? photos : DEFAULT_PHOTOS) : [];
-  const hasFriendsVisited = friendsVisited > 0;
+  const friendsLabel =
+    friendsVisited === 0
+      ? 'No friends visited yet'
+      : `${friendsVisited} friend${friendsVisited === 1 ? '' : 's'} visited`;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.screen}>
         <FadeIn style={styles.headerRow}>
           <Pressable style={styles.backButton} onPress={handleBack}>
-            <Feather name="arrow-left" size={20} color="#1A1C20" />
+            <Feather name="arrow-left" size={20} color={REVIEW_COLORS.textPrimary} />
           </Pressable>
           <View style={styles.headerSummary}>
             {hasDestination ? (
@@ -189,7 +193,13 @@ export function DestinationOverviewScreen() {
                 </Pressable>
                 <Pressable
                   style={styles.tabButton}
-                  onPress={() => router.push('/destination-reviews')}>
+                  onPress={() =>
+                    router.push(
+                      place?.id
+                        ? { pathname: '/destination-reviews', params: { id: place.id } }
+                        : '/destination-reviews',
+                    )
+                  }>
                   <Text style={styles.tabText}>Reviews</Text>
                 </Pressable>
               </FadeIn>
@@ -201,25 +211,7 @@ export function DestinationOverviewScreen() {
               ) : null}
 
               <FadeIn style={styles.friendsRow} delay={120}>
-                <Text style={styles.friendsLabel}>
-                  {hasFriendsVisited ? `${friendsVisited} friends visited` : 'No friends visited yet'}
-                </Text>
-                {hasFriendsVisited ? (
-                  <View style={styles.avatarRow}>
-                    <View style={[styles.avatar, { backgroundColor: '#D6EEF1' }]}>
-                      <Text style={styles.avatarText}>SM</Text>
-                    </View>
-                    <View style={[styles.avatar, { backgroundColor: '#FCE5C8', marginLeft: -10 }]}>
-                      <Text style={styles.avatarText}>JM</Text>
-                    </View>
-                    <View style={[styles.avatar, { backgroundColor: '#DDEAF9', marginLeft: -10 }]}>
-                      <Text style={styles.avatarText}>KL</Text>
-                    </View>
-                    <View style={styles.avatarCounter}>
-                      <Text style={styles.avatarCounterText}>+1</Text>
-                    </View>
-                  </View>
-                ) : null}
+                <Text style={styles.friendsLabel}>{friendsLabel}</Text>
               </FadeIn>
 
               <FadeIn style={styles.tagRow} delay={160}>

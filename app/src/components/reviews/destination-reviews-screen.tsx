@@ -23,6 +23,7 @@ import {
   formatRelativeTime,
   getInitials,
 } from '../../../lib/reviews-utils';
+import { REVIEW_COLORS } from './review-theme';
 import { styles } from './destination-reviews-screen.styles';
 
 const SORT_OPTIONS = ['Newest', 'Highest', 'Lowest'] as const;
@@ -189,7 +190,7 @@ export function DestinationReviewsScreen() {
       <View style={styles.screen}>
         <FadeIn style={styles.headerRow}>
           <Pressable style={styles.backButton} onPress={handleBack}>
-            <Feather name="arrow-left" size={20} color="#1A1C20" />
+            <Feather name="arrow-left" size={20} color={REVIEW_COLORS.textPrimary} />
           </Pressable>
           <View style={styles.headerSummary}>
             {hasDestination ? (
@@ -224,13 +225,35 @@ export function DestinationReviewsScreen() {
               <FadeIn style={styles.tabRow} delay={80}>
                 <Pressable
                   style={styles.tabButton}
-                  onPress={() => router.push('/destination-overview')}>
+                  onPress={() =>
+                    router.push(
+                      place?.id
+                        ? { pathname: '/destination-overview', params: { id: place.id } }
+                        : '/destination-overview',
+                    )
+                  }>
                   <Text style={styles.tabText}>Overview</Text>
                 </Pressable>
                 <Pressable style={[styles.tabButton, styles.tabButtonActive]}>
                   <Text style={[styles.tabText, styles.tabTextActive]}>Reviews</Text>
                 </Pressable>
               </FadeIn>
+
+              {hasDestination && !isLoading ? (
+                <FadeIn style={styles.writeReviewRow} delay={100}>
+                  <Pressable
+                    style={styles.writeReviewButton}
+                    onPress={() =>
+                      router.push(
+                        place?.id ? { pathname: '/write-review', params: { id: place.id } } : '/write-review',
+                      )
+                    }
+                  >
+                    <Feather name="edit-3" size={16} color={REVIEW_COLORS.buttonText} />
+                    <Text style={styles.writeReviewText}>Write a review</Text>
+                  </Pressable>
+                </FadeIn>
+              ) : null}
 
               <FadeIn style={styles.sortSection} delay={120}>
                 <Text style={styles.sortLabel}>Sort by</Text>
@@ -285,11 +308,6 @@ export function DestinationReviewsScreen() {
             </>
           )}
 
-          {hasDestination && reviewItems.length > 0 ? (
-            <Pressable style={styles.viewMoreButton}>
-              <Text style={styles.viewMoreText}>View More</Text>
-            </Pressable>
-          ) : null}
         </ScrollView>
       </View>
     </SafeAreaView>

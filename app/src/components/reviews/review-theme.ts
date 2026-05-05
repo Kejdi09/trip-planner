@@ -7,29 +7,24 @@ const UI_SCALE = 1.06;
 export const rs = (value: number) => Math.round(value * TYPE_SCALE * UI_SCALE);
 
 export const REVIEW_COLORS = {
-  background: '#F7F4F0',
+  background: '#FFFFFF',
   surface: '#FFFFFF',
-  surfaceMuted: '#F0F4F7',
-  textPrimary: '#1A1C20',
-  textSecondary: '#7B7F86',
-  accent: '#0B8F98',
-  accentSoft: '#DDF2F4',
-  accentWarm: '#FDE7C6',
-  border: '#E3E1DD',
-  chip: '#E7EBEF',
-  chipActive: '#0B8F98',
-  chipText: '#1B1E23',
+  surfaceMuted: '#E3E8EC',
+  textPrimary: '#000000',
+  textSecondary: '#A19D9D',
+  accent: '#008D9B',
+  accentSoft: '#D7EDF0',
+  accentWarm: '#FFF4CC',
+  border: '#CFCFCF',
+  chip: '#D3DAE0',
+  chipActive: '#008D9B',
+  chipText: '#091018',
   chipTextActive: '#FFFFFF',
   star: '#F4B400',
   starMuted: '#D1D5DB',
-  tabMuted: '#9AA0A6',
-  divider: '#E5E3DE',
+  tabMuted: '#A19D9D',
+  divider: '#CCCCCC',
   buttonText: '#FFFFFF',
-  success: '#1F7A57',
+  success: '#008D9B',
   error: '#D54545',
-} as const;
-
-export const REVIEW_FONTS = {
-  heading: 'Avenir Next',
-  body: 'SF Pro Rounded',
 } as const;

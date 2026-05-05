@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
-import { Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Image, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DestinationSummary } from '@/components/reviews/destination-summary';
@@ -18,14 +18,10 @@ import {
 } from '../../../lib/reviews-api';
 import { supabase } from '../../../lib/supabase';
 import { averageRating, DEFAULT_PLACE_IMAGE, formatPlaceRegion } from '../../../lib/reviews-utils';
+import { REVIEW_COLORS } from './review-theme';
 import { styles } from './write-review-screen.styles';
 
 const TAGS = ['#food', '#culture', '#nightlife', '#nature', '#adventure', '#relaxation'];
-
-const PHOTO_THUMBNAILS = [
-  'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=300&q=80',
-  'https://images.unsplash.com/photo-1504805572947-34fad45aed93?auto=format&fit=crop&w=300&q=80',
-];
 
 export function WriteReviewScreen() {
   const router = useRouter();
@@ -37,6 +33,7 @@ export function WriteReviewScreen() {
   const [userRating, setUserRating] = React.useState(0);
   const [reviewText, setReviewText] = React.useState('');
   const [selectedTags, setSelectedTags] = React.useState<string[]>([]);
+  const [selectedPhotos, setSelectedPhotos] = React.useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isEmpty, setIsEmpty] = React.useState(false);
@@ -123,6 +120,44 @@ export function WriteReviewScreen() {
     );
   };
 
+  const handleAddPhoto = async () => {
+    setErrorMessage(null);
+
+    if (Platform.OS === 'web') {
+      setErrorMessage('Photo picker is not available on web. Use the mobile app.');
+      return;
+    }
+
+    const ImagePicker = await import('expo-image-picker');
+
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      setErrorMessage('Photo access is required to add images.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+    });
+
+    if (result.canceled) {
+      return;
+    }
+
+    const uris = result.assets
+      .map((asset) => asset.uri)
+      .filter(Boolean) as string[];
+
+    if (uris.length > 0) {
+      setSelectedPhotos((current) => [...current, ...uris]);
+    }
+  };
+
+  const handleRemovePhoto = (uri: string) => {
+    setSelectedPhotos((current) => current.filter((item) => item !== uri));
+  };
+
   const handleSubmit = async () => {
     if (isSubmitting) return;
 
@@ -164,7 +199,7 @@ export function WriteReviewScreen() {
       });
 
       setStatusMessage('Review posted successfully.');
-      router.push({ pathname: '/destination-reviews', params: { id: place.id } });
+      router.replace({ pathname: '/destination-reviews', params: { id: place.id } });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to post review right now.';
       setErrorMessage(message);
@@ -178,13 +213,10 @@ export function WriteReviewScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
-      <View pointerEvents="none" style={styles.backgroundOrb} />
-      <View pointerEvents="none" style={styles.backgroundOrbTwo} />
-
       <View style={styles.screen}>
         <FadeIn style={styles.headerRow}>
           <Pressable style={styles.backButton} onPress={handleBack}>
-            <Feather name="arrow-left" size={20} color="#1A1C20" />
+            <Feather name="arrow-left" size={20} color={REVIEW_COLORS.textPrimary} />
           </Pressable>
           <Text style={styles.headerTitle}>Write Review</Text>
           <Pressable
@@ -239,7 +271,7 @@ export function WriteReviewScreen() {
                 <TextInput
                   style={styles.reviewInput}
                   placeholder="Share your experience..."
-                  placeholderTextColor="#9AA0A6"
+                  placeholderTextColor={REVIEW_COLORS.textSecondary}
                   multiline
                   textAlignVertical="top"
                   value={reviewText}
@@ -248,29 +280,34 @@ export function WriteReviewScreen() {
                 <Text style={styles.charCount}>{reviewText.length}/1400 characters</Text>
               </FadeIn>
 
-              <FadeIn style={styles.section} delay={210}>
-                <Text style={styles.sectionLabel}>Add Photos</Text>
-                <View style={styles.photoRow}>
-                  <Pressable style={styles.addPhotoButton}>
-                    <Feather name="plus" size={20} color="#0B8F98" />
-                    <Text style={styles.addPhotoText}>Add Photos</Text>
-                  </Pressable>
-                  <View style={styles.photoThumbRow}>
-                    {PHOTO_THUMBNAILS.map((uri) => (
-                      <View key={uri} style={styles.photoThumb}>
-                        <Image
-                          source={{ uri }}
-                          style={styles.photoImage}
-                          accessibilityLabel="Review photo"
-                        />
-                        <Pressable style={styles.removeBadge}>
-                          <Feather name="x" size={12} color="#FFFFFF" />
-                        </Pressable>
-                      </View>
-                    ))}
+              {place ? (
+                <FadeIn style={styles.section} delay={210}>
+                  <Text style={styles.sectionLabel}>Add Photos</Text>
+                  <View style={styles.photoRow}>
+                    <Pressable style={styles.addPhotoButton} onPress={handleAddPhoto}>
+                      <Feather name="plus" size={20} color={REVIEW_COLORS.accent} />
+                      <Text style={styles.addPhotoText}>Add Photos</Text>
+                    </Pressable>
+                    <View style={styles.photoThumbRow}>
+                      {selectedPhotos.map((uri) => (
+                        <View key={uri} style={styles.photoThumb}>
+                          <Image
+                            source={{ uri }}
+                            style={styles.photoImage}
+                            accessibilityLabel="Review photo"
+                          />
+                          <Pressable
+                            style={styles.removeBadge}
+                            onPress={() => handleRemovePhoto(uri)}
+                          >
+                            <Feather name="x" size={12} color="#FFFFFF" />
+                          </Pressable>
+                        </View>
+                      ))}
+                    </View>
                   </View>
-                </View>
-              </FadeIn>
+                </FadeIn>
+              ) : null}
 
               <FadeIn style={styles.section} delay={250}>
                 <Text style={styles.sectionLabel}>Add Tags</Text>

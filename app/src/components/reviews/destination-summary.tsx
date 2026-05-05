@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 
-import { REVIEW_COLORS, REVIEW_FONTS, rs } from './review-theme';
+import { REVIEW_COLORS, rs } from './review-theme';
 
 type DestinationSummaryProps = {
   title: string;
@@ -82,7 +82,6 @@ const styles = StyleSheet.create({
     fontSize: rs(14),
     fontWeight: '700',
     color: REVIEW_COLORS.textPrimary,
-    fontFamily: REVIEW_FONTS.heading,
   },
   titleCard: {
     fontSize: rs(18),
@@ -94,7 +93,6 @@ const styles = StyleSheet.create({
     marginTop: rs(2),
     fontSize: rs(12),
     color: REVIEW_COLORS.textSecondary,
-    fontFamily: REVIEW_FONTS.body,
   },
   regionHeader: {
     fontSize: rs(13),
@@ -113,7 +111,6 @@ const styles = StyleSheet.create({
     fontSize: rs(12),
     fontWeight: '700',
     color: REVIEW_COLORS.textPrimary,
-    fontFamily: REVIEW_FONTS.body,
   },
   ratingTextHeader: {
     fontSize: rs(13),

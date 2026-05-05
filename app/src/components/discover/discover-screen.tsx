@@ -1,4 +1,5 @@
 import React from 'react';
+import { useRouter } from 'expo-router';
 import { ScrollView, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -11,6 +12,7 @@ import { styles } from './discover-screen.styles';
 
 export function DiscoverScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [isFilterOpen, setIsFilterOpen] = React.useState(false);
   const [selectedFilters, setSelectedFilters] = React.useState<string[]>(['high', 'culture', 'history']);
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -67,6 +69,8 @@ export function DiscoverScreen() {
               savedPlaceIds={savedPlaceIds}
               searchQuery={searchQuery}
               onToggleSavedPlace={toggleSavedPlace}
+              onPressPlaceDetails={() => router.push('/destination-overview')}
+              onPressAddPlace={() => router.push('/write-review')}
             />
           </ScrollView>
 

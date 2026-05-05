@@ -1,6 +1,6 @@
 import { StyleSheet } from 'react-native';
 
-import { REVIEW_COLORS, REVIEW_FONTS, rs } from './review-theme';
+import { REVIEW_COLORS, rs } from './review-theme';
 
 export const styles = StyleSheet.create({
   safeArea: {
@@ -31,7 +31,6 @@ export const styles = StyleSheet.create({
     fontSize: rs(18),
     fontWeight: '700',
     color: REVIEW_COLORS.textPrimary,
-    fontFamily: REVIEW_FONTS.heading,
   },
   headerSummary: {
     flex: 1,
@@ -47,6 +46,25 @@ export const styles = StyleSheet.create({
     gap: rs(18),
     paddingBottom: rs(4),
   },
+  writeReviewRow: {
+    paddingTop: rs(6),
+  },
+  writeReviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: rs(8),
+    paddingHorizontal: rs(18),
+    paddingVertical: rs(12),
+    borderRadius: 999,
+    backgroundColor: REVIEW_COLORS.accent,
+    width: '100%',
+  },
+  writeReviewText: {
+    fontSize: rs(14),
+    fontWeight: '700',
+    color: REVIEW_COLORS.buttonText,
+  },
   tabButton: {
     paddingBottom: rs(8),
     borderBottomWidth: 2,
@@ -59,7 +77,6 @@ export const styles = StyleSheet.create({
     fontSize: rs(14),
     fontWeight: '700',
     color: REVIEW_COLORS.tabMuted,
-    fontFamily: REVIEW_FONTS.body,
   },
   tabTextActive: {
     color: REVIEW_COLORS.accent,
@@ -71,7 +88,6 @@ export const styles = StyleSheet.create({
     fontSize: rs(13),
     fontWeight: '700',
     color: REVIEW_COLORS.textSecondary,
-    fontFamily: REVIEW_FONTS.body,
   },
   sortRow: {
     flexDirection: 'row',
@@ -93,7 +109,6 @@ export const styles = StyleSheet.create({
     fontSize: rs(13),
     fontWeight: '700',
     color: REVIEW_COLORS.chipText,
-    fontFamily: REVIEW_FONTS.body,
   },
   sortChipTextActive: {
     color: REVIEW_COLORS.chipTextActive,
@@ -121,7 +136,6 @@ export const styles = StyleSheet.create({
     fontSize: rs(12),
     fontWeight: '700',
     color: REVIEW_COLORS.textPrimary,
-    fontFamily: REVIEW_FONTS.body,
   },
   reviewMeta: {
     flex: 1,
@@ -136,7 +150,6 @@ export const styles = StyleSheet.create({
     fontSize: rs(14),
     fontWeight: '700',
     color: REVIEW_COLORS.textPrimary,
-    fontFamily: REVIEW_FONTS.heading,
   },
   ratingRow: {
     flexDirection: 'row',
@@ -147,27 +160,23 @@ export const styles = StyleSheet.create({
     fontSize: rs(12),
     fontWeight: '600',
     color: REVIEW_COLORS.textSecondary,
-    fontFamily: REVIEW_FONTS.body,
   },
   reviewBody: {
     marginTop: rs(8),
     fontSize: rs(12.5),
     lineHeight: rs(16),
     color: REVIEW_COLORS.textSecondary,
-    fontFamily: REVIEW_FONTS.body,
   },
   statusText: {
     fontSize: rs(12),
     fontWeight: '600',
     color: REVIEW_COLORS.textSecondary,
-    fontFamily: REVIEW_FONTS.body,
     lineHeight: rs(16),
   },
   errorText: {
     fontSize: rs(12),
     fontWeight: '600',
     color: REVIEW_COLORS.error,
-    fontFamily: REVIEW_FONTS.body,
     lineHeight: rs(16),
   },
   emptyState: {
@@ -180,14 +189,12 @@ export const styles = StyleSheet.create({
     fontSize: rs(18),
     fontWeight: '700',
     color: REVIEW_COLORS.textPrimary,
-    fontFamily: REVIEW_FONTS.heading,
   },
   emptyBody: {
     fontSize: rs(13),
     lineHeight: rs(18),
     color: REVIEW_COLORS.textSecondary,
     textAlign: 'center',
-    fontFamily: REVIEW_FONTS.body,
   },
   emptyButton: {
     marginTop: rs(6),
@@ -200,7 +207,6 @@ export const styles = StyleSheet.create({
     fontSize: rs(13),
     fontWeight: '700',
     color: REVIEW_COLORS.buttonText,
-    fontFamily: REVIEW_FONTS.body,
   },
   viewMoreButton: {
     marginTop: rs(6),
@@ -216,6 +222,5 @@ export const styles = StyleSheet.create({
     fontSize: rs(13),
     fontWeight: '700',
     color: REVIEW_COLORS.textPrimary,
-    fontFamily: REVIEW_FONTS.body,
   },
 });

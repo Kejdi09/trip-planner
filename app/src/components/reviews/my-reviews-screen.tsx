@@ -12,6 +12,7 @@ import type { PlaceRecord, ReviewRecord } from '../../../lib/reviews-api';
 import { fetchPlacesByIds, fetchReviewsByUser } from '../../../lib/reviews-api';
 import { supabase } from '../../../lib/supabase';
 import { formatRelativeTime } from '../../../lib/reviews-utils';
+import { REVIEW_COLORS } from './review-theme';
 import { styles } from './my-reviews-screen.styles';
 
 const SORT_OPTIONS = ['Newest', 'Highest', 'Lowest'] as const;
@@ -20,6 +21,7 @@ type SortOption = (typeof SORT_OPTIONS)[number];
 
 type ReviewItem = {
   id: string;
+  placeId: string | null;
   destination: string;
   rating: number;
   timeAgo: string;
@@ -82,6 +84,7 @@ export function MyReviewsScreen() {
           const ratingValue = typeof review.rating === 'number' ? review.rating : 0;
           return {
             id: review.id,
+            placeId: review.place_id ?? null,
             destination: place?.name ?? 'Unknown place',
             rating: ratingValue,
             timeAgo: formatRelativeTime(review.created_at),
@@ -134,7 +137,7 @@ export function MyReviewsScreen() {
       <View style={styles.screen}>
         <FadeIn style={styles.headerRow}>
           <Pressable style={styles.backButton} onPress={handleBack}>
-            <Feather name="arrow-left" size={20} color="#1A1C20" />
+            <Feather name="arrow-left" size={20} color={REVIEW_COLORS.textPrimary} />
           </Pressable>
           <Text style={styles.headerTitle}>My Reviews</Text>
         </FadeIn>
@@ -171,7 +174,16 @@ export function MyReviewsScreen() {
           ) : (
             sortedReviews.map((review, index) => (
               <FadeIn key={review.id} delay={160 + index * 70}>
-                <View style={styles.reviewCard}>
+                <Pressable
+                  style={styles.reviewCard}
+                  onPress={() =>
+                    router.push(
+                      review.placeId
+                        ? { pathname: '/destination-reviews', params: { id: review.placeId } }
+                        : '/destination-reviews',
+                    )
+                  }
+                >
                   <View style={styles.reviewHeader}>
                     <View style={[styles.avatar, { backgroundColor: review.avatarColor }]} />
                     <View style={styles.reviewMeta}>
@@ -187,7 +199,7 @@ export function MyReviewsScreen() {
                   <Text style={styles.reviewBody} numberOfLines={2}>
                     {review.body}
                   </Text>
-                </View>
+                </Pressable>
               </FadeIn>
             ))
           )}
