@@ -174,6 +174,33 @@ export const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: rs(8),
   },
+  customTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: rs(8),
+  },
+  customTagInput: {
+    flex: 1,
+    minHeight: rs(40),
+    borderRadius: rs(12),
+    borderWidth: 1,
+    borderColor: REVIEW_COLORS.border,
+    backgroundColor: REVIEW_COLORS.surface,
+    paddingHorizontal: rs(12),
+    fontSize: rs(13),
+    color: REVIEW_COLORS.textPrimary,
+  },
+  customTagButton: {
+    paddingHorizontal: rs(14),
+    paddingVertical: rs(10),
+    borderRadius: rs(12),
+    backgroundColor: REVIEW_COLORS.accent,
+  },
+  customTagButtonText: {
+    fontSize: rs(12),
+    fontWeight: '700',
+    color: REVIEW_COLORS.buttonText,
+  },
   tagChip: {
     paddingHorizontal: rs(12),
     paddingVertical: rs(6),

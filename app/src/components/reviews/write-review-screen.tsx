@@ -33,8 +33,7 @@ export function WriteReviewScreen() {
   const [userRating, setUserRating] = React.useState(0);
   const [reviewText, setReviewText] = React.useState('');
   const [selectedTags, setSelectedTags] = React.useState<string[]>([]);
-  const [customTagText, setCustomTagText] = React.useState('');
-  const [isCustomTagOpen, setIsCustomTagOpen] = React.useState(false);
+  const [customTagInput, setCustomTagInput] = React.useState('');
   const [selectedPhotos, setSelectedPhotos] = React.useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -122,30 +121,32 @@ export function WriteReviewScreen() {
     );
   };
 
-  const normalizeTag = (value: string) => {
-    const cleaned = value.replace(/^#/, '').trim().toLowerCase();
-    return cleaned ? `#${cleaned}` : null;
-  };
-
-  const toggleCustomTagInput = () => {
-    setIsCustomTagOpen((current) => !current);
-    setCustomTagText('');
-  };
+  const displayTags = React.useMemo(
+    () => Array.from(new Set([...TAGS, ...selectedTags])),
+    [selectedTags],
+  );
 
   const handleAddCustomTag = () => {
-    const normalized = normalizeTag(customTagText);
-
-    if (!normalized) {
-      setCustomTagText('');
-      setIsCustomTagOpen(false);
+    const trimmed = customTagInput.trim();
+    if (!trimmed) {
+      setErrorMessage('Enter a hashtag to add.');
       return;
     }
 
-    setSelectedTags((current) =>
-      current.includes(normalized) ? current : [...current, normalized],
-    );
-    setCustomTagText('');
-    setIsCustomTagOpen(false);
+    const normalized = trimmed.replace(/^#+/, '');
+    if (!normalized) {
+      setErrorMessage('Enter a hashtag to add.');
+      return;
+    }
+
+    const label = `#${normalized}`;
+    if (selectedTags.includes(label)) {
+      setErrorMessage('That hashtag is already selected.');
+      return;
+    }
+
+    setSelectedTags((current) => [...current, label]);
+    setCustomTagInput('');
   };
 
   const handleAddPhoto = async () => {
@@ -224,6 +225,7 @@ export function WriteReviewScreen() {
         rating: userRating,
         review: reviewText.trim(),
         tagNames: selectedTags,
+        photoUris: selectedPhotos,
       });
 
       setStatusMessage('Review posted successfully.');
@@ -340,7 +342,7 @@ export function WriteReviewScreen() {
               <FadeIn style={styles.section} delay={250}>
                 <Text style={styles.sectionLabel}>Add Tags</Text>
                 <View style={styles.tagRow}>
-                  {TAGS.map((tag) => {
+                  {displayTags.map((tag) => {
                     const isActive = selectedTags.includes(tag);
                     return (
                       <Pressable
@@ -353,12 +355,19 @@ export function WriteReviewScreen() {
                       </Pressable>
                     );
                   })}
-                  <Pressable
-                    style={[styles.tagChip, isCustomTagOpen && styles.tagChipActive]}
-                    onPress={toggleCustomTagInput}>
-                    <Text style={[styles.tagText, isCustomTagOpen && styles.tagTextActive]}>
-                      + Custom
-                    </Text>
+                </View>
+                <View style={styles.customTagRow}>
+                  <TextInput
+                    style={styles.customTagInput}
+                    placeholder="Add custom hashtag"
+                    placeholderTextColor={REVIEW_COLORS.textSecondary}
+                    value={customTagInput}
+                    onChangeText={setCustomTagInput}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  <Pressable style={styles.customTagButton} onPress={handleAddCustomTag}>
+                    <Text style={styles.customTagButtonText}>Add</Text>
                   </Pressable>
                 </View>
                 {isCustomTagOpen ? (

@@ -3,8 +3,7 @@ import { useRouter } from 'expo-router';
 import { ScrollView, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { buildCountryFilterGroups } from '@/components/discover/discover-data';
-import { AppBottomNav } from '@/components/ui/app-bottom-nav';
+import { FILTER_GROUPS } from '@/components/discover/discover-data';
 import { FilterSheet } from '@/components/ui/filter-sheet';
 import { PlaceListSection } from '@/components/ui/place-list-section';
 import { SearchHeader } from '@/components/ui/search-header';
@@ -171,7 +170,6 @@ export function DiscoverScreen() {
           />
         </View>
 
-        <AppBottomNav activeTab="Discover" />
       </View>
     </SafeAreaView>
   );

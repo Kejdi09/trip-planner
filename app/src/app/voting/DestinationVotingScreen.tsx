@@ -18,7 +18,6 @@ import {
   VoteProgress,
   VoterAvatars,
 } from './_components';
-import { AppBottomNav } from '@/components/ui/app-bottom-nav';
 import { DestinationOption, MOCK_DESTINATIONS, VotingTab } from './_types';
 
 interface DestinationVotingScreenProps {
@@ -93,7 +92,6 @@ const DestinationVotingScreen: React.FC<DestinationVotingScreenProps> = ({
           </OptionCard>
         ))}
       </ScrollView>
-      <AppBottomNav activeTab="Groups" />
     </SafeAreaView>
   );
 };
