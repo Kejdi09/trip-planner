@@ -14,8 +14,8 @@ export type Place = {
   id: string;
   title: string;
   region: string;
-  country?: string | null;
   visited: string;
   rating: number;
   image: string;
+  country?: string | null;
 };

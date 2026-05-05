@@ -120,6 +120,9 @@ export const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: REVIEW_COLORS.border,
   },
+  reviewCardExpanded: {
+    backgroundColor: REVIEW_COLORS.surfaceMuted,
+  },
   reviewHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -145,6 +148,12 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: rs(8),
+  },
+  reviewMetaRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: rs(8),
+    marginLeft: 'auto',
   },
   reviewerName: {
     fontSize: rs(14),
@@ -183,6 +192,20 @@ export const styles = StyleSheet.create({
   reviewPhotoImage: {
     width: '100%',
     height: '100%',
+  },
+  photoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: rs(4),
+    paddingHorizontal: rs(8),
+    paddingVertical: rs(4),
+    borderRadius: 999,
+    backgroundColor: REVIEW_COLORS.accent,
+  },
+  photoBadgeText: {
+    fontSize: rs(11),
+    fontWeight: '700',
+    color: REVIEW_COLORS.buttonText,
   },
   reviewTagsRow: {
     flexDirection: 'row',
@@ -254,6 +277,40 @@ export const styles = StyleSheet.create({
   },
   viewMoreText: {
     fontSize: rs(13),
+    fontWeight: '700',
+    color: REVIEW_COLORS.textPrimary,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: rs(20),
+  },
+  modalCard: {
+    width: '100%',
+    borderRadius: rs(18),
+    backgroundColor: REVIEW_COLORS.surface,
+    padding: rs(16),
+    gap: rs(12),
+  },
+  modalClose: {
+    alignSelf: 'flex-end',
+    height: rs(28),
+    width: rs(28),
+    borderRadius: rs(14),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: REVIEW_COLORS.surfaceMuted,
+  },
+  modalImage: {
+    width: '100%',
+    height: rs(320),
+    borderRadius: rs(16),
+    backgroundColor: REVIEW_COLORS.surfaceMuted,
+  },
+  modalName: {
+    fontSize: rs(15),
     fontWeight: '700',
     color: REVIEW_COLORS.textPrimary,
   },

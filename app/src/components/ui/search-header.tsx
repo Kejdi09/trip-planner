@@ -24,6 +24,8 @@ type SearchHeaderProps = {
   searchPlaceholder?: string;
   showFilterButton?: boolean;
   onPressFilter?: () => void;
+  // BATCH 1: badge count for active filters
+  activeFilterCount?: number;
 };
 
 export function SearchHeader({
@@ -33,6 +35,7 @@ export function SearchHeader({
   searchPlaceholder = 'Search...',
   showFilterButton = true,
   onPressFilter,
+  activeFilterCount = 0,
 }: SearchHeaderProps) {
   return (
     <View style={styles.container}>
@@ -53,6 +56,12 @@ export function SearchHeader({
         {showFilterButton ? (
           <Pressable style={styles.filterButton} onPress={onPressFilter}>
             <Feather name="sliders" size={18} color={colors.background} />
+            {/* BATCH 1: badge shown when filters are active */}
+            {activeFilterCount > 0 ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{activeFilterCount}</Text>
+              </View>
+            ) : null}
           </Pressable>
         ) : null}
       </View>
@@ -104,5 +113,24 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#E53935',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: colors.background,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });
