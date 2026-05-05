@@ -167,6 +167,40 @@ export const styles = StyleSheet.create({
     lineHeight: rs(16),
     color: REVIEW_COLORS.textSecondary,
   },
+  reviewPhotoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: rs(8),
+    marginTop: rs(10),
+  },
+  reviewPhotoTile: {
+    width: '48%',
+    aspectRatio: 1,
+    borderRadius: rs(10),
+    overflow: 'hidden',
+    backgroundColor: REVIEW_COLORS.surfaceMuted,
+  },
+  reviewPhotoImage: {
+    width: '100%',
+    height: '100%',
+  },
+  reviewTagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: rs(8),
+    marginTop: rs(8),
+  },
+  reviewTagChip: {
+    paddingHorizontal: rs(10),
+    paddingVertical: rs(4),
+    borderRadius: 999,
+    backgroundColor: REVIEW_COLORS.chip,
+  },
+  reviewTagText: {
+    fontSize: rs(12),
+    fontWeight: '700',
+    color: REVIEW_COLORS.chipText,
+  },
   statusText: {
     fontSize: rs(12),
     fontWeight: '600',

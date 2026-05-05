@@ -10,8 +10,14 @@ import { RatingStars } from '@/components/reviews/rating-stars';
 import { FadeIn } from '@/components/ui/fade-in';
 import { StatusMessage } from '@/components/ui/status-message';
 import type { PlaceRecord } from '../../../lib/reviews-api';
-import { createReviewWithTags, fetchFirstPlace, fetchPlaceById } from '../../../lib/reviews-api';
-import { DEFAULT_PLACE_IMAGE, formatPlaceRegion } from '../../../lib/reviews-utils';
+import {
+  createReviewWithTags,
+  fetchFirstPlace,
+  fetchPlaceById,
+  fetchReviewPhotosByReviewIds,
+  fetchReviewsByPlace,
+} from '../../../lib/reviews-api';
+import { formatPlaceRegion } from '../../../lib/reviews-utils';
 import { supabase } from '../../../lib/supabase';
 import { REVIEW_COLORS } from './review-theme';
 import { styles } from './write-review-screen.styles';
@@ -24,6 +30,7 @@ export function WriteReviewScreen() {
   const params = useLocalSearchParams<{ id?: string }>();
   const insets = useSafeAreaInsets();
   const [place, setPlace] = React.useState<PlaceRecord | null>(null);
+  const [headerImage, setHeaderImage] = React.useState<string | null>(null);
   const [rating, setRating] = React.useState(0);
   const [reviewText, setReviewText] = React.useState('');
   const [tagInput, setTagInput] = React.useState('');
@@ -68,14 +75,21 @@ export function WriteReviewScreen() {
           }
 
           setPlace(null);
+          setHeaderImage(null);
           return;
         }
+
+        const reviewRows = await fetchReviewsByPlace(placeRecord.id);
+        const reviewIds = reviewRows.map((review) => review.id);
+        const reviewPhotos = await fetchReviewPhotosByReviewIds(reviewIds);
+        const headerPhoto = reviewPhotos.find((photo) => photo.image_url)?.image_url ?? null;
 
         if (!isMounted) {
           return;
         }
 
         setPlace(placeRecord);
+        setHeaderImage(headerPhoto);
       } catch (error) {
         if (!isMounted) {
           return;
@@ -227,7 +241,7 @@ export function WriteReviewScreen() {
                 title={destinationTitle}
                 region={destinationRegion}
                 rating={rating > 0 ? rating : 0}
-                image={DEFAULT_PLACE_IMAGE}
+                image={headerImage}
                 size="card"
               />
             </View>

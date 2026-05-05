@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DestinationSummary } from '@/components/reviews/destination-summary';
@@ -13,11 +13,13 @@ import {
   fetchFirstPlace,
   fetchPlaceById,
   fetchProfilesByIds,
+  fetchReviewPhotosByReviewIds,
   fetchReviewsByPlace,
+  fetchTagNamesByReviewIds,
 } from '../../../lib/reviews-api';
-import { averageRating, DEFAULT_PLACE_IMAGE, formatPlaceRegion, formatRelativeTime, getInitials } from '../../../lib/reviews-utils';
+import { averageRating, formatPlaceRegion, formatRelativeTime, getInitials } from '../../../lib/reviews-utils';
 import { REVIEW_COLORS } from './review-theme';
-import { styles } from './destination-reviews-screen.styles';
+import { styles } from '@/components/reviews/destination-reviews-screen.styles';
 
 const SORT_OPTIONS = ['Newest', 'Highest', 'Lowest'] as const;
 const AVATAR_COLORS = ['#D6EEF1', '#FCE5C8', '#DDEAF9', '#E7EAF3'];
@@ -32,6 +34,13 @@ type ReviewItem = {
   body: string;
   avatarColor: string;
   createdAt: string | null;
+  tags: string[];
+  photos: string[];
+};
+
+const isValidTag = (tag: string) => {
+  const normalized = tag.replace(/^#/, '').trim();
+  return normalized.length > 0 && normalized !== '0' && normalized !== '1';
 };
 
 export function DestinationReviewsScreen() {
@@ -40,6 +49,7 @@ export function DestinationReviewsScreen() {
   const insets = useSafeAreaInsets();
   const [place, setPlace] = React.useState<PlaceRecord | null>(null);
   const [reviews, setReviews] = React.useState<ReviewItem[]>([]);
+  const [headerImage, setHeaderImage] = React.useState<string | null>(null);
   const [rating, setRating] = React.useState(0);
   const [activeSort, setActiveSort] = React.useState<SortOption>('Newest');
   const [isLoading, setIsLoading] = React.useState(true);
@@ -81,19 +91,39 @@ export function DestinationReviewsScreen() {
           setPlace(null);
           setReviews([]);
           setRating(0);
+          setHeaderImage(null);
           setErrorMessage(null);
           return;
         }
 
         const reviewRows = await fetchReviewsByPlace(placeRecord.id);
+        const reviewIds = reviewRows.map((review) => review.id);
         const userIds = Array.from(
           new Set(reviewRows.map((review) => review.user_id).filter(Boolean)),
         ) as string[];
-        const profileRows = await fetchProfilesByIds(userIds);
+
+        const [profileRows, tagMap, reviewPhotos] = await Promise.all([
+          fetchProfilesByIds(userIds),
+          fetchTagNamesByReviewIds(reviewIds),
+          fetchReviewPhotosByReviewIds(reviewIds),
+        ]);
+
         const profileMap = profileRows.reduce<Record<string, ProfileRecord>>((acc, profile) => {
           acc[profile.id] = profile;
           return acc;
         }, {});
+
+        const photoMap = reviewPhotos.reduce<Record<string, string[]>>((acc, photo) => {
+          if (!photo.review_id || !photo.image_url) {
+            return acc;
+          }
+
+          const existing = acc[photo.review_id] ?? [];
+          acc[photo.review_id] = [...existing, photo.image_url];
+          return acc;
+        }, {});
+
+        const headerPhoto = reviewPhotos.find((photo) => photo.image_url)?.image_url ?? null;
 
         const items = reviewRows.map((review, index) => {
           const profile = review.user_id ? profileMap[review.user_id] : undefined;
@@ -106,6 +136,8 @@ export function DestinationReviewsScreen() {
             body: review.review ?? '',
             avatarColor: AVATAR_COLORS[index % AVATAR_COLORS.length],
             createdAt: review.created_at ?? null,
+            tags: (tagMap[review.id] ?? []).filter(isValidTag),
+            photos: photoMap[review.id] ?? [],
           };
         });
 
@@ -116,6 +148,7 @@ export function DestinationReviewsScreen() {
         setIsEmpty(false);
         setPlace(placeRecord);
         setReviews(items);
+        setHeaderImage(headerPhoto);
         setRating(averageRating(reviewRows));
       } catch (error) {
         if (!isMounted) {
@@ -170,7 +203,7 @@ export function DestinationReviewsScreen() {
                 title={destinationTitle}
                 region={destinationRegion}
                 rating={rating}
-                image={DEFAULT_PLACE_IMAGE}
+                image={headerImage}
                 size="header"
               />
             ) : (
@@ -218,7 +251,9 @@ export function DestinationReviewsScreen() {
                   style={styles.writeReviewButton}
                   onPress={() =>
                     router.push(
-                      place?.id ? { pathname: '/write-review', params: { id: place.id } } : '/write-review',
+                      place?.id
+                        ? { pathname: '/write-review', params: { id: place.id } }
+                        : '/write-review',
                     )
                   }
                 >
@@ -258,31 +293,58 @@ export function DestinationReviewsScreen() {
                 />
               ) : null}
 
-              {sortedReviews.map((review, index) => (
-                <FadeIn key={review.id} delay={180 + index * 60}>
-                  <View style={styles.reviewCard}>
-                    <View style={styles.reviewHeader}>
-                      <View style={[styles.avatar, { backgroundColor: review.avatarColor }]}>
-                        <Text style={styles.avatarText}>{getInitials(review.reviewerName)}</Text>
-                      </View>
-                      <View style={styles.reviewMeta}>
-                        <View style={styles.titleRow}>
-                          <Text style={styles.reviewerName}>{review.reviewerName}</Text>
-                          <Text style={styles.reviewTime}>{review.timeAgo}</Text>
+              {sortedReviews.map((review, index) => {
+                const hasPhotos = review.photos.length > 0;
+                const hasTags = review.tags.length > 0;
+
+                return (
+                  <FadeIn key={review.id} delay={180 + index * 60}>
+                    <View style={styles.reviewCard}>
+                      <View style={styles.reviewHeader}>
+                        <View style={[styles.avatar, { backgroundColor: review.avatarColor }]}>
+                          <Text style={styles.avatarText}>{getInitials(review.reviewerName)}</Text>
                         </View>
-                        <View style={styles.ratingRow}>
-                          <RatingStars value={review.rating} size={14} />
+                        <View style={styles.reviewMeta}>
+                          <View style={styles.titleRow}>
+                            <Text style={styles.reviewerName}>{review.reviewerName}</Text>
+                            <Text style={styles.reviewTime}>{review.timeAgo}</Text>
+                          </View>
+                          <View style={styles.ratingRow}>
+                            <RatingStars value={review.rating} size={14} />
+                          </View>
                         </View>
                       </View>
+                      {review.body ? (
+                        <Text style={styles.reviewBody} numberOfLines={4}>
+                          {review.body}
+                        </Text>
+                      ) : null}
+                      {hasPhotos ? (
+                        <View style={styles.reviewPhotoGrid}>
+                          {review.photos.map((uri) => (
+                            <View key={`${review.id}-${uri}`} style={styles.reviewPhotoTile}>
+                              <Image
+                                source={{ uri }}
+                                style={styles.reviewPhotoImage}
+                                accessibilityLabel={`Review photo by ${review.reviewerName}`}
+                              />
+                            </View>
+                          ))}
+                        </View>
+                      ) : null}
+                      {hasTags ? (
+                        <View style={styles.reviewTagsRow}>
+                          {review.tags.map((tag) => (
+                            <View key={`${review.id}-${tag}`} style={styles.reviewTagChip}>
+                              <Text style={styles.reviewTagText}>{tag}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      ) : null}
                     </View>
-                    {review.body ? (
-                      <Text style={styles.reviewBody} numberOfLines={4}>
-                        {review.body}
-                      </Text>
-                    ) : null}
-                  </View>
-                </FadeIn>
-              ))}
+                  </FadeIn>
+                );
+              })}
             </>
           )}
         </ScrollView>
