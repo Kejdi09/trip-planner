@@ -9,7 +9,6 @@ export type DiscoverPlace = {
   visited: string;
   rating: number;
   image: string;
-  country?: string | null;
 };
 
 type PlaceRow = {
