@@ -109,13 +109,45 @@ export const styles = StyleSheet.create({
   statusText: {
     fontSize: rs(12),
     fontWeight: '600',
-    color: '#1F7A57',
+    color: REVIEW_COLORS.success,
     fontFamily: REVIEW_FONTS.body,
   },
   errorText: {
     fontSize: rs(12),
     fontWeight: '600',
-    color: '#D54545',
+    color: REVIEW_COLORS.error,
+    fontFamily: REVIEW_FONTS.body,
+  },
+  emptyState: {
+    paddingVertical: rs(32),
+    paddingHorizontal: rs(20),
+    alignItems: 'center',
+    gap: rs(10),
+  },
+  emptyTitle: {
+    fontSize: rs(18),
+    fontWeight: '700',
+    color: REVIEW_COLORS.textPrimary,
+    fontFamily: REVIEW_FONTS.heading,
+  },
+  emptyBody: {
+    fontSize: rs(13),
+    lineHeight: rs(18),
+    color: REVIEW_COLORS.textSecondary,
+    textAlign: 'center',
+    fontFamily: REVIEW_FONTS.body,
+  },
+  emptyButton: {
+    marginTop: rs(6),
+    paddingHorizontal: rs(20),
+    paddingVertical: rs(10),
+    borderRadius: 999,
+    backgroundColor: REVIEW_COLORS.accent,
+  },
+  emptyButtonText: {
+    fontSize: rs(13),
+    fontWeight: '700',
+    color: REVIEW_COLORS.buttonText,
     fontFamily: REVIEW_FONTS.body,
   },
   photoRow: {

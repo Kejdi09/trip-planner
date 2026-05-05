@@ -5,11 +5,11 @@ import { REVIEW_COLORS, REVIEW_FONTS, rs } from './review-theme';
 export const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: REVIEW_COLORS.surface,
   },
   screen: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: REVIEW_COLORS.surface,
   },
   headerRow: {
     flexDirection: 'row',
@@ -30,12 +30,12 @@ export const styles = StyleSheet.create({
   headerTitle: {
     fontSize: rs(24),
     fontWeight: '700',
-    color: '#111111',
+    color: REVIEW_COLORS.textPrimary,
     fontFamily: REVIEW_FONTS.heading,
   },
   headerDivider: {
     height: 1,
-    backgroundColor: '#E6E6E6',
+    backgroundColor: REVIEW_COLORS.border,
   },
   sortSection: {
     paddingHorizontal: rs(20),
@@ -46,7 +46,7 @@ export const styles = StyleSheet.create({
   sortLabel: {
     fontSize: rs(13),
     fontWeight: '700',
-    color: '#8A8A8A',
+    color: REVIEW_COLORS.textSecondary,
     fontFamily: REVIEW_FONTS.body,
   },
   sortRow: {
@@ -57,22 +57,22 @@ export const styles = StyleSheet.create({
     paddingHorizontal: rs(16),
     paddingVertical: rs(8),
     borderRadius: 999,
-    backgroundColor: '#EEF1F4',
+    backgroundColor: REVIEW_COLORS.surfaceMuted,
     borderWidth: 1,
     borderColor: 'transparent',
   },
   sortChipActive: {
-    backgroundColor: '#0B8F98',
-    borderColor: '#0B8F98',
+    backgroundColor: REVIEW_COLORS.accent,
+    borderColor: REVIEW_COLORS.accent,
   },
   sortChipText: {
     fontSize: rs(13),
     fontWeight: '700',
-    color: '#1B1E23',
+    color: REVIEW_COLORS.chipText,
     fontFamily: REVIEW_FONTS.body,
   },
   sortChipTextActive: {
-    color: '#FFFFFF',
+    color: REVIEW_COLORS.chipTextActive,
   },
   scrollContent: {
     paddingHorizontal: rs(20),
@@ -80,11 +80,11 @@ export const styles = StyleSheet.create({
     gap: rs(14),
   },
   reviewCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: REVIEW_COLORS.surface,
     borderRadius: rs(16),
     padding: rs(14),
     borderWidth: 1,
-    borderColor: '#E6E6E6',
+    borderColor: REVIEW_COLORS.border,
   },
   reviewHeader: {
     flexDirection: 'row',
@@ -108,7 +108,7 @@ export const styles = StyleSheet.create({
   destinationTitle: {
     fontSize: rs(15),
     fontWeight: '700',
-    color: '#111111',
+    color: REVIEW_COLORS.textPrimary,
     fontFamily: REVIEW_FONTS.heading,
   },
   ratingRow: {
@@ -119,27 +119,27 @@ export const styles = StyleSheet.create({
   reviewTime: {
     fontSize: rs(12),
     fontWeight: '600',
-    color: '#9B9B9B',
+    color: REVIEW_COLORS.textSecondary,
     fontFamily: REVIEW_FONTS.body,
   },
   reviewBody: {
     marginTop: rs(8),
     fontSize: rs(13),
     lineHeight: rs(18),
-    color: '#4F4F4F',
+    color: REVIEW_COLORS.textSecondary,
     fontFamily: REVIEW_FONTS.body,
   },
   statusText: {
     fontSize: rs(12),
     fontWeight: '600',
-    color: '#8A8A8A',
+    color: REVIEW_COLORS.textSecondary,
     fontFamily: REVIEW_FONTS.body,
     lineHeight: rs(16),
   },
   errorText: {
     fontSize: rs(12),
     fontWeight: '600',
-    color: '#D54545',
+    color: REVIEW_COLORS.error,
     fontFamily: REVIEW_FONTS.body,
     lineHeight: rs(16),
   },
@@ -151,13 +151,13 @@ export const styles = StyleSheet.create({
     paddingVertical: rs(10),
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#E6E6E6',
-    backgroundColor: '#FFFFFF',
+    borderColor: REVIEW_COLORS.border,
+    backgroundColor: REVIEW_COLORS.surface,
   },
   viewMoreText: {
     fontSize: rs(13),
     fontWeight: '700',
-    color: '#111111',
+    color: REVIEW_COLORS.textPrimary,
     fontFamily: REVIEW_FONTS.body,
   },
 });

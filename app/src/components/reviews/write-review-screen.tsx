@@ -1,5 +1,4 @@
 import { Feather } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
 import { Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
@@ -30,7 +29,6 @@ const PHOTO_THUMBNAILS = [
 
 export function WriteReviewScreen() {
   const router = useRouter();
-  const navigation = useNavigation();
   const params = useLocalSearchParams<{ id?: string }>();
   const insets = useSafeAreaInsets();
   const [place, setPlace] = React.useState<PlaceRecord | null>(null);
@@ -46,8 +44,13 @@ export function WriteReviewScreen() {
   const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
 
   const handleBack = () => {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
+    const canGoBack =
+      typeof (router as { canGoBack?: () => boolean }).canGoBack === 'function'
+        ? (router as { canGoBack?: () => boolean }).canGoBack?.() === true
+        : false;
+
+    if (canGoBack) {
+      router.back();
       return;
     }
 

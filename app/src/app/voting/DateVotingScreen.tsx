@@ -17,9 +17,9 @@ import {
   VotedLabel,
   VoteProgress,
   VoterAvatars,
-} from './components';
+} from './_components';
 import { AppBottomNav } from '@/components/ui/app-bottom-nav';
-import { DateOption, MOCK_DATES, VotingTab } from './types';
+import { DateOption, MOCK_DATES, VotingTab } from './_types';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',

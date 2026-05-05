@@ -2,8 +2,9 @@ import { Dimensions } from 'react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TYPE_SCALE = Math.min(Math.max(SCREEN_WIDTH / 390, 0.9), 1.08);
+const UI_SCALE = 1.06;
 
-export const rs = (value: number) => Math.round(value * TYPE_SCALE);
+export const rs = (value: number) => Math.round(value * TYPE_SCALE * UI_SCALE);
 
 export const REVIEW_COLORS = {
   background: '#F7F4F0',
@@ -24,6 +25,8 @@ export const REVIEW_COLORS = {
   tabMuted: '#9AA0A6',
   divider: '#E5E3DE',
   buttonText: '#FFFFFF',
+  success: '#1F7A57',
+  error: '#D54545',
 } as const;
 
 export const REVIEW_FONTS = {

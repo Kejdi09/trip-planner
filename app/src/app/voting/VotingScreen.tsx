@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { VotingTab } from './types';
+import { VotingTab } from './_types';
 
 import DestinationVotingScreen from './DestinationVotingScreen';
 import DateVotingScreen from './DateVotingScreen';

@@ -1,5 +1,4 @@
 import { Feather } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
@@ -33,7 +32,6 @@ const AVATAR_COLORS = ['#D6EEF1', '#FCE5C8', '#DDEAF9', '#E7EAF3'];
 
 export function MyReviewsScreen() {
   const router = useRouter();
-  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [activeSort, setActiveSort] = React.useState<SortOption>('Newest');
   const [reviews, setReviews] = React.useState<ReviewItem[]>([]);
@@ -41,8 +39,13 @@ export function MyReviewsScreen() {
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   const handleBack = () => {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
+    const canGoBack =
+      typeof (router as { canGoBack?: () => boolean }).canGoBack === 'function'
+        ? (router as { canGoBack?: () => boolean }).canGoBack?.() === true
+        : false;
+
+    if (canGoBack) {
+      router.back();
       return;
     }
 

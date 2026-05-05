@@ -1,5 +1,4 @@
 import { Feather } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
 import { Image, Pressable, ScrollView, Text, View } from 'react-native';
@@ -33,7 +32,6 @@ const FALLBACK_DESCRIPTION =
 
 export function DestinationOverviewScreen() {
   const router = useRouter();
-  const navigation = useNavigation();
   const params = useLocalSearchParams<{ id?: string }>();
   const insets = useSafeAreaInsets();
   const [place, setPlace] = React.useState<PlaceRecord | null>(null);
@@ -46,8 +44,13 @@ export function DestinationOverviewScreen() {
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   const handleBack = () => {
-    if (navigation.canGoBack()) {
-      navigation.goBack();
+    const canGoBack =
+      typeof (router as { canGoBack?: () => boolean }).canGoBack === 'function'
+        ? (router as { canGoBack?: () => boolean }).canGoBack?.() === true
+        : false;
+
+    if (canGoBack) {
+      router.back();
       return;
     }
 
@@ -141,6 +144,7 @@ export function DestinationOverviewScreen() {
     : '';
   const displayTags = hasDestination ? (tags.length > 0 ? tags : DEFAULT_TAGS) : [];
   const displayPhotos = hasDestination ? (photos.length > 0 ? photos : DEFAULT_PHOTOS) : [];
+  const hasFriendsVisited = friendsVisited > 0;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -197,21 +201,25 @@ export function DestinationOverviewScreen() {
               ) : null}
 
               <FadeIn style={styles.friendsRow} delay={120}>
-                <Text style={styles.friendsLabel}>{friendsVisited} friends visited</Text>
-                <View style={styles.avatarRow}>
-                  <View style={[styles.avatar, { backgroundColor: '#D6EEF1' }]}> 
-                    <Text style={styles.avatarText}>SM</Text>
+                <Text style={styles.friendsLabel}>
+                  {hasFriendsVisited ? `${friendsVisited} friends visited` : 'No friends visited yet'}
+                </Text>
+                {hasFriendsVisited ? (
+                  <View style={styles.avatarRow}>
+                    <View style={[styles.avatar, { backgroundColor: '#D6EEF1' }]}>
+                      <Text style={styles.avatarText}>SM</Text>
+                    </View>
+                    <View style={[styles.avatar, { backgroundColor: '#FCE5C8', marginLeft: -10 }]}>
+                      <Text style={styles.avatarText}>JM</Text>
+                    </View>
+                    <View style={[styles.avatar, { backgroundColor: '#DDEAF9', marginLeft: -10 }]}>
+                      <Text style={styles.avatarText}>KL</Text>
+                    </View>
+                    <View style={styles.avatarCounter}>
+                      <Text style={styles.avatarCounterText}>+1</Text>
+                    </View>
                   </View>
-                  <View style={[styles.avatar, { backgroundColor: '#FCE5C8', marginLeft: -10 }]}> 
-                    <Text style={styles.avatarText}>JM</Text>
-                  </View>
-                  <View style={[styles.avatar, { backgroundColor: '#DDEAF9', marginLeft: -10 }]}> 
-                    <Text style={styles.avatarText}>KL</Text>
-                  </View>
-                  <View style={styles.avatarCounter}>
-                    <Text style={styles.avatarCounterText}>+1</Text>
-                  </View>
-                </View>
+                ) : null}
               </FadeIn>
 
               <FadeIn style={styles.tagRow} delay={160}>
