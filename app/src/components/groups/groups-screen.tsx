@@ -1,0 +1,247 @@
+import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import React from 'react';
+import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { AppBottomNav } from '@/components/ui/app-bottom-nav';
+import {
+  CURRENT_USER,
+  fetchGroups,
+  Group,
+  GroupMember,
+  GroupStatus,
+} from '../friends/dummy-data';
+import { COLORS, groupsStyles as styles, rs } from './groups-screen.styles';
+
+// ---------------------------------------------------------------------------
+// Avatar helpers
+// ---------------------------------------------------------------------------
+
+function MemberAvatar({
+  member,
+  size = 32,
+  first = false,
+  borderColor = COLORS.activeCardBackground,
+}: {
+  member: GroupMember;
+  size?: number;
+  first?: boolean;
+  borderColor?: string;
+}) {
+  const initials = member.fullName
+    .split(' ')
+    .map((w) => w[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+  return (
+    <View
+      style={[
+        styles.memberAvatar,
+        first && styles.memberAvatarFirst,
+        { width: size, height: size, borderRadius: size / 2, borderColor },
+      ]}>
+      {member.avatarUrl ? (
+        <Image
+          source={{ uri: member.avatarUrl }}
+          style={[styles.memberAvatarImage, { width: size, height: size, borderRadius: size / 2 }]}
+        />
+      ) : (
+        <Text style={[styles.memberAvatarText, { fontSize: size * 0.34 }]}>{initials}</Text>
+      )}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Active group card
+// ---------------------------------------------------------------------------
+
+function ActiveGroupCard({ group, onInvite, onPress }: { group: Group; onInvite: () => void; onPress: () => void }) {
+  const adminMember = group.members.find((m) => m.id === group.adminId);
+  const adminLabel = adminMember
+    ? adminMember.id === CURRENT_USER.id
+      ? 'Admin: You'
+      : `Admin: ${adminMember.fullName.split(' ')[0]} ${adminMember.fullName.split(' ')[1]?.[0] ?? ''}.`
+    : '';
+
+  const visibleMembers = group.members.slice(0, 3);
+  const extraCount = group.members.length - visibleMembers.length;
+
+  return (
+    <Pressable style={styles.activeCard} onPress={onPress}>
+      <View style={styles.activeCardTopRow}>
+        <Text style={styles.activeCardName}>{group.name}</Text>
+        {group.votingOpen && (
+          <View style={styles.votingBadge}>
+            <Text style={styles.votingBadgeText}>{'Voting\nOpen'}</Text>
+          </View>
+        )}
+      </View>
+
+      <Text style={styles.adminText}>{adminLabel}</Text>
+
+      <View style={styles.memberRow}>
+        <View style={styles.avatarStack}>
+          {visibleMembers.map((m, i) => (
+            <MemberAvatar key={m.id} member={m} first={i === 0} />
+          ))}
+        </View>
+        {extraCount > 0 && (
+          <Text style={styles.moreText}>+{extraCount}</Text>
+        )}
+        <Pressable style={styles.inviteButton} onPress={onInvite}>
+          <Text style={styles.inviteButtonText}>Invite</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.pillRow}>
+        {group.places.length > 0 && (
+          <View style={styles.pill}>
+            <Ionicons name="location-outline" size={12} color={COLORS.mutedText} />
+            <Text style={styles.pillText}>{group.places.length} places</Text>
+          </View>
+        )}
+        {group.dateRange && (
+          <View style={styles.pill}>
+            <Feather name="calendar" size={12} color={COLORS.mutedText} />
+            <Text style={styles.pillText}>{group.dateRange}</Text>
+          </View>
+        )}
+        {group.budgetRange && (
+          <View style={styles.pill}>
+            <MaterialCommunityIcons name="currency-usd" size={12} color={COLORS.mutedText} />
+            <Text style={styles.pillText}>{group.budgetRange}</Text>
+          </View>
+        )}
+      </View>
+    </Pressable>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Other group row
+// ---------------------------------------------------------------------------
+
+function statusColor(status: GroupStatus): string {
+  if (status === 'upcoming') return COLORS.upcomingText;
+  if (status === 'completed') return COLORS.completedText;
+  return COLORS.primary;
+}
+
+function statusLabel(status: GroupStatus): string {
+  if (status === 'upcoming') return 'Upcoming';
+  if (status === 'completed') return 'Completed';
+  return 'Active';
+}
+
+function OtherGroupRow({ group, onPress }: { group: Group; onPress: () => void }) {
+  return (
+    <Pressable style={styles.otherCard} onPress={onPress}>
+      <View style={styles.otherCardIcon}>
+        <Ionicons name="people-outline" size={22} color={COLORS.mutedText} />
+      </View>
+      <View style={styles.otherCardInfo}>
+        <Text style={styles.otherCardName}>{group.name}</Text>
+        <View style={styles.otherCardSub}>
+          <Text style={styles.otherCardMembers}>{group.members.length} members</Text>
+          <Text style={[styles.otherCardStatus, { color: statusColor(group.status) }]}>
+            {statusLabel(group.status)}
+          </Text>
+        </View>
+      </View>
+      <Feather name="chevron-right" size={20} color={COLORS.chevron} style={styles.chevron} />
+    </Pressable>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Screen
+// ---------------------------------------------------------------------------
+
+export function GroupsScreen() {
+  const [groups, setGroups] = React.useState<Group[]>([]);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    fetchGroups().then((data) => {
+      setGroups(data);
+      setLoading(false);
+    });
+  }, []);
+
+  // Refresh when navigating back to this screen
+  const refresh = React.useCallback(() => {
+    fetchGroups().then(setGroups);
+  }, []);
+
+  const activeGroups = groups.filter((g) => g.status === 'active');
+  const otherGroups = groups.filter((g) => g.status !== 'active');
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <View style={styles.screen}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.title}>My Groups</Text>
+          <Pressable
+            style={styles.addButton}
+            accessibilityRole="button"
+            accessibilityLabel="Create new group"
+            onPress={() => router.push('../../create-group')}>
+            <Feather name="plus" size={22} color="#FFFFFF" />
+          </Pressable>
+        </View>
+
+        {loading ? (
+          <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
+        ) : (
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}>
+
+            {/* Active planning */}
+            {activeGroups.length > 0 && (
+              <>
+                <Text style={styles.sectionLabel}>ACTIVE PLANNING</Text>
+                {activeGroups.map((g) => (
+                  <ActiveGroupCard
+                    key={g.id}
+                    group={g}
+                    onInvite={() => router.push({ pathname: '../../invite-to-group', params: { groupId: g.id } })}
+                    onPress={() => router.push({ pathname: '../../group-chat', params: { groupId: g.id } })}
+                  />
+                ))}
+              </>
+            )}
+
+            {/* Other groups */}
+            {otherGroups.length > 0 && (
+              <>
+                <Text style={styles.sectionLabel}>OTHER GROUPS</Text>
+                {otherGroups.map((g) => (
+                  <OtherGroupRow
+                    key={g.id}
+                    group={g}
+                    onPress={() => router.push({ pathname: '../../group-chat', params: { groupId: g.id } })}
+                  />
+                ))}
+              </>
+            )}
+
+            {groups.length === 0 && (
+              <View style={styles.emptyState}>
+                <Ionicons name="people-outline" size={36} color={COLORS.mutedText} />
+                <Text style={styles.emptyStateText}>No groups yet. Create one!</Text>
+              </View>
+            )}
+          </ScrollView>
+        )}
+
+        <AppBottomNav activeTab="Groups" />
+      </View>
+    </SafeAreaView>
+  );
+}

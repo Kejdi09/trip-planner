@@ -8,45 +8,33 @@ import { DestinationSummary } from '@/components/reviews/destination-summary';
 import { RatingStars } from '@/components/reviews/rating-stars';
 import { FadeIn } from '@/components/ui/fade-in';
 import { StatusMessage } from '@/components/ui/status-message';
-import type { PlaceRecord, ProfileRecord, ReviewRecord } from '../../../lib/reviews-api';
+import type { PlaceRecord, ProfileRecord } from '../../../lib/reviews-api';
 import {
   fetchFirstPlace,
   fetchPlaceById,
-  fetchTagNamesByReviewIds,
   fetchProfilesByIds,
   fetchReviewPhotosByReviewIds,
   fetchReviewsByPlace,
 } from '../../../lib/reviews-api';
-import {
-  averageRating,
-  DEFAULT_PLACE_IMAGE,
-  formatPlaceRegion,
-  formatRelativeTime,
-  getInitials,
-} from '../../../lib/reviews-utils';
+import { averageRating, formatPlaceRegion, formatRelativeTime, getInitials } from '../../../lib/reviews-utils';
 import { REVIEW_COLORS } from './review-theme';
-import { styles } from './destination-reviews-screen.styles';
+import { styles } from '@/components/reviews/destination-reviews-screen.styles';
 
 const SORT_OPTIONS = ['Newest', 'Highest', 'Lowest'] as const;
-const INITIAL_VISIBLE_REVIEWS = 3;
+const AVATAR_COLORS = ['#D6EEF1', '#FCE5C8', '#DDEAF9', '#E7EAF3'];
 
 type SortOption = (typeof SORT_OPTIONS)[number];
 
 type ReviewItem = {
   id: string;
-  name: string;
-  initials: string;
+  reviewerName: string;
   rating: number;
   timeAgo: string;
   body: string;
   avatarColor: string;
+  createdAt: string | null;
   tags: string[];
   photos: string[];
-};
-
-type ReviewPhoto = {
-  url: string;
-  reviewerName: string;
 };
 
 const isValidTag = (tag: string) => {
@@ -54,26 +42,18 @@ const isValidTag = (tag: string) => {
   return normalized.length > 0 && normalized !== '0' && normalized !== '1';
 };
 
-const AVATAR_COLORS = ['#D6EEF1', '#FCE5C8', '#DDEAF9', '#E7EAF3'];
-
 export function DestinationReviewsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
   const insets = useSafeAreaInsets();
-  const [activeSort, setActiveSort] = React.useState<SortOption>('Newest');
   const [place, setPlace] = React.useState<PlaceRecord | null>(null);
-  const [reviews, setReviews] = React.useState<ReviewRecord[]>([]);
-  const [profiles, setProfiles] = React.useState<Record<string, ProfileRecord>>({});
-  const [tagsByReviewId, setTagsByReviewId] = React.useState<Record<string, string[]>>({});
-  const [photosByReviewId, setPhotosByReviewId] = React.useState<Record<string, string[]>>({});
-  const [headerImage, setHeaderImage] = React.useState(DEFAULT_PLACE_IMAGE);
+  const [reviews, setReviews] = React.useState<ReviewItem[]>([]);
+  const [headerImage, setHeaderImage] = React.useState<string | null>(null);
   const [rating, setRating] = React.useState(0);
+  const [activeSort, setActiveSort] = React.useState<SortOption>('Newest');
   const [isLoading, setIsLoading] = React.useState(true);
   const [isEmpty, setIsEmpty] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
-  const [showAllReviews, setShowAllReviews] = React.useState(false);
-  const [expandedReviews, setExpandedReviews] = React.useState<string[]>([]);
-  const [activePhoto, setActivePhoto] = React.useState<ReviewPhoto | null>(null);
 
   const handleBack = () => {
     const canGoBack =
@@ -87,7 +67,7 @@ export function DestinationReviewsScreen() {
   React.useEffect(() => {
     let isMounted = true;
 
-    const loadDestinationReviews = async () => {
+    const loadReviews = async () => {
       setIsLoading(true);
       setErrorMessage(null);
 
@@ -105,6 +85,7 @@ export function DestinationReviewsScreen() {
           setTagsByReviewId({});
           setHeaderImage(DEFAULT_PLACE_IMAGE);
           setRating(0);
+          setHeaderImage(null);
           setErrorMessage(null);
           return;
         }
@@ -126,7 +107,13 @@ export function DestinationReviewsScreen() {
         const userIds = Array.from(
           new Set(reviewRows.map((review) => review.user_id).filter(Boolean)),
         ) as string[];
-        const profileRows = await fetchProfilesByIds(userIds);
+
+        const [profileRows, tagMap, reviewPhotos] = await Promise.all([
+          fetchProfilesByIds(userIds),
+          fetchTagNamesByReviewIds(reviewIds),
+          fetchReviewPhotosByReviewIds(reviewIds),
+        ]);
+
         const profileMap = profileRows.reduce<Record<string, ProfileRecord>>((acc, profile) => {
           acc[profile.id] = profile;
           return acc;
@@ -136,11 +123,8 @@ export function DestinationReviewsScreen() {
 
         setIsEmpty(false);
         setPlace(placeRecord);
-        setReviews(reviewRows);
-        setProfiles(profileMap);
-        setTagsByReviewId(tagMap);
-        setPhotosByReviewId(photoMap);
-        setHeaderImage(headerPhoto ?? DEFAULT_PLACE_IMAGE);
+        setReviews(items);
+        setHeaderImage(headerPhoto);
         setRating(averageRating(reviewRows));
       } catch (error) {
         if (!isMounted) return;
@@ -194,36 +178,14 @@ export function DestinationReviewsScreen() {
     if (activeSort === 'Highest') return [...items].sort((a, b) => b.rating - a.rating);
     if (activeSort === 'Lowest') return [...items].sort((a, b) => a.rating - b.rating);
 
-    const reviewById = reviews.reduce<Record<string, ReviewRecord>>((acc, review) => {
-      acc[review.id] = review;
-      return acc;
-    }, {});
+    return [...reviews].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+  }, [activeSort, reviews]);
 
-    return [...items].sort((a, b) => {
-      const dateA = reviewById[a.id]?.created_at ?? '';
-      const dateB = reviewById[b.id]?.created_at ?? '';
-      return dateB.localeCompare(dateA);
-    });
-  }, [activeSort, profiles, reviews, tagsByReviewId, photosByReviewId]);
-
-  React.useEffect(() => {
-    setShowAllReviews(false);
-    setExpandedReviews([]);
-  }, [activeSort, reviews.length]);
-
-  const visibleReviews = showAllReviews
-    ? reviewItems
-    : reviewItems.slice(0, INITIAL_VISIBLE_REVIEWS);
-
-  const shouldShowToggle = reviewItems.length > INITIAL_VISIBLE_REVIEWS;
-
-  const handleToggleReview = (reviewId: string) => {
-    setExpandedReviews((current) =>
-      current.includes(reviewId)
-        ? current.filter((id) => id !== reviewId)
-        : [...current, reviewId],
-    );
-  };
+  const hasDestination = Boolean(place) && !errorMessage && !isEmpty;
+  const destinationTitle = place?.name ?? 'Destination';
+  const destinationRegion = hasDestination
+    ? formatPlaceRegion(place?.city ?? null, place?.country ?? null)
+    : '';
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -242,7 +204,7 @@ export function DestinationReviewsScreen() {
                 size="header"
               />
             ) : (
-              <Text style={styles.headerTitle}>Reviews</Text>
+              <Text style={styles.headerTitle}>Destination Reviews</Text>
             )}
           </View>
         </FadeIn>
@@ -271,12 +233,13 @@ export function DestinationReviewsScreen() {
 
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}>
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 64 }]}
+        >
           {isEmpty ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyTitle}>No destinations yet</Text>
               <Text style={styles.emptyBody}>
-                Add your first place to start collecting reviews.
+                Add your first place to start collecting reviews from your crew.
               </Text>
               <Pressable style={styles.emptyButton} onPress={() => router.replace('/explore')}>
                 <Text style={styles.emptyButtonText}>Back to Discover</Text>
@@ -284,7 +247,7 @@ export function DestinationReviewsScreen() {
             </View>
           ) : (
             <>
-              <FadeIn style={styles.tabRow} delay={80}>
+              <FadeIn style={styles.tabRow} delay={60}>
                 <Pressable
                   style={styles.tabButton}
                   onPress={() =>
@@ -293,7 +256,8 @@ export function DestinationReviewsScreen() {
                         ? { pathname: '/destination-overview', params: { id: place.id } }
                         : '/destination-overview',
                     )
-                  }>
+                  }
+                >
                   <Text style={styles.tabText}>Overview</Text>
                 </Pressable>
                 <Pressable style={[styles.tabButton, styles.tabButtonActive]}>
