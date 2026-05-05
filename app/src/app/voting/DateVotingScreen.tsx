@@ -211,7 +211,6 @@ const DateVotingScreen: React.FC<DateVotingScreenProps> = ({
           </View>
         )}
       </ScrollView>
-      <AppBottomNav activeTab="Groups" />
     </SafeAreaView>
   );
 };

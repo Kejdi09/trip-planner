@@ -51,7 +51,11 @@ const RangeSlider: React.FC<RangeSliderProps> = ({ min, max, onChange }) => {
       if (!trackWidth) return;
       const pct = (thumb === 'min' ? leftPct : rightPct) / 100;
       const newVal = toValue(pct * trackWidth + gs.dx);
-      thumb === 'min' ? onChange(Math.min(newVal, max - 100), max) : onChange(min, Math.max(newVal, min + 100));
+      if (thumb === 'min') {
+        onChange(Math.min(newVal, max - 100), max);
+      } else {
+        onChange(min, Math.max(newVal, min + 100));
+      }
     },
   });
 

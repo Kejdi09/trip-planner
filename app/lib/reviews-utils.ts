@@ -40,7 +40,7 @@ export function getInitials(name?: string | null): string {
   return initials.slice(0, 2) || 'U';
 }
 
-export function averageRating(items: Array<{ rating?: number | null }>): number {
+export function averageRating(items: { rating?: number | null }[]): number {
   const ratings = items
     .map((item) => (typeof item.rating === 'number' ? item.rating : null))
     .filter((value): value is number => value !== null);

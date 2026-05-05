@@ -7,7 +7,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { RatingStars } from '@/components/reviews/rating-stars';
 import { FadeIn } from '@/components/ui/fade-in';
 import { StatusMessage } from '@/components/ui/status-message';
-import type { PlaceRecord, ReviewRecord } from '../../../lib/reviews-api';
+import type { PlaceRecord } from '../../../lib/reviews-api';
 import {
   deleteReviewById,
   fetchPlacesByIds,
