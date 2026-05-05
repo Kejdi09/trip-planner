@@ -1,7 +1,8 @@
 import { Feather } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
-import { Image, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DestinationSummary } from '@/components/reviews/destination-summary';
@@ -16,28 +17,27 @@ import {
   fetchReviewPhotosByReviewIds,
   fetchReviewsByPlace,
 } from '../../../lib/reviews-api';
+import { formatPlaceRegion } from '../../../lib/reviews-utils';
 import { supabase } from '../../../lib/supabase';
-import { averageRating, DEFAULT_PLACE_IMAGE, formatPlaceRegion } from '../../../lib/reviews-utils';
 import { REVIEW_COLORS } from './review-theme';
 import { styles } from './write-review-screen.styles';
 
-const TAGS = ['#food', '#culture', '#nightlife', '#nature', '#adventure', '#relaxation'];
+const MAX_REVIEW_LENGTH = 500;
+const MAX_PHOTOS = 6;
 
 export function WriteReviewScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
   const insets = useSafeAreaInsets();
   const [place, setPlace] = React.useState<PlaceRecord | null>(null);
-  const [destinationRating, setDestinationRating] = React.useState(0);
-  const [destinationImage, setDestinationImage] = React.useState(DEFAULT_PLACE_IMAGE);
-  const [userRating, setUserRating] = React.useState(0);
+  const [headerImage, setHeaderImage] = React.useState<string | null>(null);
+  const [rating, setRating] = React.useState(0);
   const [reviewText, setReviewText] = React.useState('');
-  const [selectedTags, setSelectedTags] = React.useState<string[]>([]);
-  const [customTagInput, setCustomTagInput] = React.useState('');
-  const [selectedPhotos, setSelectedPhotos] = React.useState<string[]>([]);
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [tagInput, setTagInput] = React.useState('');
+  const [tags, setTags] = React.useState<string[]>([]);
+  const [photoUris, setPhotoUris] = React.useState<string[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
-  const [isEmpty, setIsEmpty] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
 
@@ -52,13 +52,15 @@ export function WriteReviewScreen() {
       return;
     }
 
-    router.replace('/explore');
+    router.replace(
+      place?.id ? { pathname: '/destination-reviews', params: { id: place.id } } : '/explore',
+    );
   };
 
   React.useEffect(() => {
     let isMounted = true;
 
-    const loadDestination = async () => {
+    const loadPlace = async () => {
       setIsLoading(true);
       setErrorMessage(null);
 
@@ -72,27 +74,22 @@ export function WriteReviewScreen() {
             return;
           }
 
-          setIsEmpty(true);
           setPlace(null);
-          setDestinationRating(0);
-          setDestinationImage(DEFAULT_PLACE_IMAGE);
-          setErrorMessage(null);
+          setHeaderImage(null);
           return;
         }
 
-        const reviews = await fetchReviewsByPlace(placeRecord.id);
-        const reviewIds = reviews.map((review) => review.id);
-        const photos = await fetchReviewPhotosByReviewIds(reviewIds);
-        const headerPhoto = photos.find((photo) => Boolean(photo.image_url))?.image_url;
+        const reviewRows = await fetchReviewsByPlace(placeRecord.id);
+        const reviewIds = reviewRows.map((review) => review.id);
+        const reviewPhotos = await fetchReviewPhotosByReviewIds(reviewIds);
+        const headerPhoto = reviewPhotos.find((photo) => photo.image_url)?.image_url ?? null;
 
         if (!isMounted) {
           return;
         }
 
-        setIsEmpty(false);
         setPlace(placeRecord);
-        setDestinationRating(averageRating(reviews));
-        setDestinationImage(headerPhoto ?? DEFAULT_PLACE_IMAGE);
+        setHeaderImage(headerPhoto);
       } catch (error) {
         if (!isMounted) {
           return;
@@ -100,7 +97,6 @@ export function WriteReviewScreen() {
 
         const message = error instanceof Error ? error.message : 'Unable to load destination.';
         setErrorMessage(message);
-        setIsEmpty(false);
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -108,138 +104,113 @@ export function WriteReviewScreen() {
       }
     };
 
-    void loadDestination();
+    void loadPlace();
 
     return () => {
       isMounted = false;
     };
   }, [params.id]);
 
-  const toggleTag = (tag: string) => {
-    setSelectedTags((current) =>
-      current.includes(tag) ? current.filter((item) => item !== tag) : [...current, tag]
-    );
-  };
-
-  const displayTags = React.useMemo(
-    () => Array.from(new Set([...TAGS, ...selectedTags])),
-    [selectedTags],
-  );
-
-  const handleAddCustomTag = () => {
-    const trimmed = customTagInput.trim();
-    if (!trimmed) {
-      setErrorMessage('Enter a hashtag to add.');
-      return;
-    }
-
-    const normalized = trimmed.replace(/^#+/, '');
+  const handleAddTag = () => {
+    const normalized = tagInput.replace(/^#/, '').trim();
     if (!normalized) {
-      setErrorMessage('Enter a hashtag to add.');
       return;
     }
 
     const label = `#${normalized}`;
-    if (selectedTags.includes(label)) {
-      setErrorMessage('That hashtag is already selected.');
-      return;
-    }
-
-    setSelectedTags((current) => [...current, label]);
-    setCustomTagInput('');
+    setTags((current) => (current.includes(label) ? current : [...current, label]));
+    setTagInput('');
   };
 
-  const handleAddPhoto = async () => {
+  const handleRemoveTag = (tag: string) => {
+    setTags((current) => current.filter((item) => item !== tag));
+  };
+
+  const handlePickPhotos = async () => {
     setErrorMessage(null);
 
-    if (Platform.OS === 'web') {
-      setErrorMessage('Photo picker is not available on web. Use the mobile app.');
-      return;
-    }
-
-    const ImagePicker = await import('expo-image-picker');
-
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      setErrorMessage('Photo access is required to add images.');
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (permission.status !== 'granted') {
+      setErrorMessage('Allow photo access to add images.');
       return;
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
+      allowsMultipleSelection: true,
+      quality: 0.7,
     });
 
     if (result.canceled) {
       return;
     }
 
-    const uris = result.assets
-      .map((asset) => asset.uri)
-      .filter(Boolean) as string[];
+    const newUris = result.assets.map((asset) => asset.uri).filter(Boolean);
 
-    if (uris.length > 0) {
-      setSelectedPhotos((current) => [...current, ...uris]);
-    }
+    setPhotoUris((current) => {
+      const merged = [...current, ...newUris];
+      return merged.slice(0, MAX_PHOTOS);
+    });
   };
 
   const handleRemovePhoto = (uri: string) => {
-    setSelectedPhotos((current) => current.filter((item) => item !== uri));
+    setPhotoUris((current) => current.filter((item) => item !== uri));
   };
 
   const handleSubmit = async () => {
-    if (isSubmitting) return;
-
-    setErrorMessage(null);
-    setStatusMessage(null);
-
     if (!place) {
-      setErrorMessage('Pick a destination before posting a review.');
+      setErrorMessage('Select a destination before posting.');
       return;
     }
 
-    if (userRating < 1) {
-      setErrorMessage('Select a rating before posting.');
-      return;
-    }
+    const trimmedReview = reviewText.trim();
 
-    if (!reviewText.trim()) {
+    if (!trimmedReview) {
       setErrorMessage('Write a review before posting.');
       return;
     }
 
-    const { data } = await supabase.auth.getUser();
-    const user = data.user;
-
-    if (!user) {
-      setErrorMessage('Log in to post a review.');
+    if (rating <= 0) {
+      setErrorMessage('Add a rating to post.');
       return;
     }
 
     setIsSubmitting(true);
+    setErrorMessage(null);
+    setStatusMessage(null);
 
     try {
+      const { data } = await supabase.auth.getUser();
+      const user = data.user;
+
+      if (!user) {
+        throw new Error('Log in to post a review.');
+      }
+
       await createReviewWithTags({
         userId: user.id,
         placeId: place.id,
-        rating: userRating,
-        review: reviewText.trim(),
-        tagNames: selectedTags,
-        photoUris: selectedPhotos,
+        rating,
+        review: trimmedReview,
+        tagNames: tags,
+        photoUris,
       });
 
-      setStatusMessage('Review posted successfully.');
+      setStatusMessage('Review posted!');
       router.replace({ pathname: '/destination-reviews', params: { id: place.id } });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to post review right now.';
+      const message = error instanceof Error ? error.message : 'Unable to post review.';
       setErrorMessage(message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const canPost = Boolean(place) && rating > 0 && reviewText.trim().length > 0 && !isSubmitting;
   const destinationTitle = place?.name ?? 'Destination';
-  const destinationRegion = formatPlaceRegion(place?.city ?? null, place?.country ?? null);
+  const destinationRegion = place
+    ? formatPlaceRegion(place.city ?? null, place.country ?? null)
+    : '';
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -248,131 +219,121 @@ export function WriteReviewScreen() {
           <Pressable style={styles.backButton} onPress={handleBack}>
             <Feather name="arrow-left" size={20} color={REVIEW_COLORS.textPrimary} />
           </Pressable>
-          <Text style={styles.headerTitle}>Write Review</Text>
+          <Text style={styles.headerTitle}>Write a review</Text>
           <Pressable
-            style={[styles.postButton, isSubmitting && styles.postButtonDisabled]}
+            style={[styles.postButton, !canPost && styles.postButtonDisabled]}
+            disabled={!canPost}
             onPress={handleSubmit}
-            disabled={isSubmitting}
           >
-            <Text style={styles.postButtonText}>Post</Text>
+            <Text style={styles.postButtonText}>{isSubmitting ? 'Posting...' : 'Post'}</Text>
           </Pressable>
         </FadeIn>
 
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}>
-          {isEmpty ? (
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 64 }]}
+        >
+          {isLoading ? (
+            <StatusMessage message="Loading destination..." style={styles.statusText} />
+          ) : place ? (
+            <View style={styles.summaryWrapper}>
+              <DestinationSummary
+                title={destinationTitle}
+                region={destinationRegion}
+                rating={rating > 0 ? rating : 0}
+                image={headerImage}
+                size="card"
+              />
+            </View>
+          ) : (
             <View style={styles.emptyState}>
-              <Text style={styles.emptyTitle}>No destinations yet</Text>
-              <Text style={styles.emptyBody}>
-                Add your first place before writing a review.
-              </Text>
+              <Text style={styles.emptyTitle}>No destination yet</Text>
+              <Text style={styles.emptyBody}>Head to Discover to pick where you want to review.</Text>
               <Pressable style={styles.emptyButton} onPress={() => router.replace('/explore')}>
                 <Text style={styles.emptyButtonText}>Back to Discover</Text>
               </Pressable>
             </View>
-          ) : (
+          )}
+
+          {errorMessage ? <StatusMessage message={errorMessage} style={styles.errorText} /> : null}
+          {statusMessage ? <StatusMessage message={statusMessage} style={styles.statusText} /> : null}
+
+          {place ? (
             <>
-              {errorMessage ? (
-                <StatusMessage message={errorMessage} style={styles.errorText} />
-              ) : statusMessage ? (
-                <StatusMessage message={statusMessage} style={styles.statusText} />
-              ) : isLoading ? (
-                <StatusMessage message="Loading destination..." style={styles.statusText} />
-              ) : null}
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Rating</Text>
+                <RatingStars value={rating} size={22} onChange={setRating} />
+              </View>
 
-              <FadeIn style={styles.summaryWrapper} delay={90}>
-                <DestinationSummary
-                  title={destinationTitle}
-                  region={destinationRegion}
-                  rating={destinationRating}
-                  image={destinationImage}
-                  size="card"
-                />
-              </FadeIn>
-
-              <FadeIn style={styles.section} delay={130}>
-                <Text style={styles.sectionLabel}>Your Rating</Text>
-                <RatingStars value={userRating} size={24} onChange={setUserRating} />
-              </FadeIn>
-
-              <FadeIn style={styles.section} delay={170}>
-                <Text style={styles.sectionLabel}>Your Review</Text>
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Your review</Text>
                 <TextInput
+                  value={reviewText}
+                  onChangeText={(text) => {
+                    setReviewText(text);
+                    setStatusMessage(null);
+                  }}
                   style={styles.reviewInput}
-                  placeholder="Share your experience..."
+                  placeholder="Share the highlights, tips, and anything to know before visiting."
                   placeholderTextColor={REVIEW_COLORS.textSecondary}
                   multiline
-                  textAlignVertical="top"
-                  value={reviewText}
-                  onChangeText={setReviewText}
+                  maxLength={MAX_REVIEW_LENGTH}
+                  editable={!isSubmitting}
                 />
-                <Text style={styles.charCount}>{reviewText.length}/1400 characters</Text>
-              </FadeIn>
+                <Text style={styles.charCount}>{reviewText.length}/{MAX_REVIEW_LENGTH}</Text>
+              </View>
 
-              {place ? (
-                <FadeIn style={styles.section} delay={210}>
-                  <Text style={styles.sectionLabel}>Add Photos</Text>
-                  <View style={styles.photoRow}>
-                    <Pressable style={styles.addPhotoButton} onPress={handleAddPhoto}>
-                      <Feather name="plus" size={20} color={REVIEW_COLORS.accent} />
-                      <Text style={styles.addPhotoText}>Add Photos</Text>
-                    </Pressable>
-                    <View style={styles.photoThumbRow}>
-                      {selectedPhotos.map((uri) => (
-                        <View key={uri} style={styles.photoThumb}>
-                          <Image
-                            source={{ uri }}
-                            style={styles.photoImage}
-                            accessibilityLabel="Review photo"
-                          />
-                          <Pressable
-                            style={styles.removeBadge}
-                            onPress={() => handleRemovePhoto(uri)}
-                          >
-                            <Feather name="x" size={12} color="#FFFFFF" />
-                          </Pressable>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                </FadeIn>
-              ) : null}
-
-              <FadeIn style={styles.section} delay={250}>
-                <Text style={styles.sectionLabel}>Add Tags</Text>
-                <View style={styles.tagRow}>
-                  {displayTags.map((tag) => {
-                    const isActive = selectedTags.includes(tag);
-                    return (
-                      <Pressable
-                        key={tag}
-                        style={[styles.tagChip, isActive && styles.tagChipActive]}
-                        onPress={() => toggleTag(tag)}>
-                        <Text style={[styles.tagText, isActive && styles.tagTextActive]}>
-                          {tag}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Tags</Text>
                 <View style={styles.customTagRow}>
                   <TextInput
+                    value={tagInput}
+                    onChangeText={setTagInput}
                     style={styles.customTagInput}
-                    placeholder="Add custom hashtag"
+                    placeholder="Add a tag"
                     placeholderTextColor={REVIEW_COLORS.textSecondary}
-                    value={customTagInput}
-                    onChangeText={setCustomTagInput}
-                    autoCapitalize="none"
-                    autoCorrect={false}
+                    onSubmitEditing={handleAddTag}
+                    editable={!isSubmitting}
                   />
-                  <Pressable style={styles.customTagButton} onPress={handleAddCustomTag}>
+                  <Pressable style={styles.customTagButton} onPress={handleAddTag}>
                     <Text style={styles.customTagButtonText}>Add</Text>
                   </Pressable>
                 </View>
-              </FadeIn>
+                <View style={styles.tagRow}>
+                  {tags.map((tag) => (
+                    <Pressable
+                      key={tag}
+                      style={[styles.tagChip, styles.tagChipActive]}
+                      onPress={() => handleRemoveTag(tag)}
+                    >
+                      <Text style={[styles.tagText, styles.tagTextActive]}>{tag}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>Photos</Text>
+                <View style={styles.photoRow}>
+                  <Pressable style={styles.addPhotoButton} onPress={handlePickPhotos}>
+                    <Feather name="image" size={16} color={REVIEW_COLORS.accent} />
+                    <Text style={styles.addPhotoText}>Add photos</Text>
+                  </Pressable>
+
+                  <View style={styles.photoThumbRow}>
+                    {photoUris.map((uri) => (
+                      <View key={uri} style={styles.photoThumb}>
+                        <Image source={{ uri }} style={styles.photoImage} />
+                        <Pressable style={styles.removeBadge} onPress={() => handleRemovePhoto(uri)}>
+                          <Feather name="x" size={12} color={REVIEW_COLORS.buttonText} />
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              </View>
             </>
-          )}
+          ) : null}
         </ScrollView>
       </View>
     </SafeAreaView>

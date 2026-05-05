@@ -28,7 +28,7 @@ export const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   headerTitle: {
-    fontSize: rs(19),
+    fontSize: rs(18),
     fontWeight: '700',
     color: REVIEW_COLORS.textPrimary,
   },
@@ -61,7 +61,7 @@ export const styles = StyleSheet.create({
     width: '100%',
   },
   writeReviewText: {
-    fontSize: rs(15),
+    fontSize: rs(14),
     fontWeight: '700',
     color: REVIEW_COLORS.buttonText,
   },
@@ -74,7 +74,7 @@ export const styles = StyleSheet.create({
     borderBottomColor: REVIEW_COLORS.accent,
   },
   tabText: {
-    fontSize: rs(15),
+    fontSize: rs(14),
     fontWeight: '700',
     color: REVIEW_COLORS.tabMuted,
   },
@@ -85,7 +85,7 @@ export const styles = StyleSheet.create({
     gap: rs(8),
   },
   sortLabel: {
-    fontSize: rs(14),
+    fontSize: rs(13),
     fontWeight: '700',
     color: REVIEW_COLORS.textSecondary,
   },
@@ -106,7 +106,7 @@ export const styles = StyleSheet.create({
     borderColor: REVIEW_COLORS.accent,
   },
   sortChipText: {
-    fontSize: rs(14),
+    fontSize: rs(13),
     fontWeight: '700',
     color: REVIEW_COLORS.chipText,
   },
@@ -119,10 +119,6 @@ export const styles = StyleSheet.create({
     padding: rs(14),
     borderWidth: 1,
     borderColor: REVIEW_COLORS.border,
-    cursor: 'pointer',
-  },
-  reviewCardExpanded: {
-    borderColor: REVIEW_COLORS.accent,
   },
   reviewHeader: {
     flexDirection: 'row',
@@ -150,27 +146,8 @@ export const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: rs(8),
   },
-  reviewMetaRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: rs(8),
-  },
-  photoBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: rs(4),
-    paddingHorizontal: rs(8),
-    paddingVertical: rs(3),
-    borderRadius: 999,
-    backgroundColor: REVIEW_COLORS.accent,
-  },
-  photoBadgeText: {
-    fontSize: rs(12),
-    fontWeight: '700',
-    color: REVIEW_COLORS.buttonText,
-  },
   reviewerName: {
-    fontSize: rs(15),
+    fontSize: rs(14),
     fontWeight: '700',
     color: REVIEW_COLORS.textPrimary,
   },
@@ -180,14 +157,14 @@ export const styles = StyleSheet.create({
     marginTop: rs(6),
   },
   reviewTime: {
-    fontSize: rs(13),
+    fontSize: rs(12),
     fontWeight: '600',
     color: REVIEW_COLORS.textSecondary,
   },
   reviewBody: {
     marginTop: rs(8),
-    fontSize: rs(13.5),
-    lineHeight: rs(18),
+    fontSize: rs(12.5),
+    lineHeight: rs(16),
     color: REVIEW_COLORS.textSecondary,
   },
   reviewPhotoGrid: {
@@ -225,16 +202,16 @@ export const styles = StyleSheet.create({
     color: REVIEW_COLORS.chipText,
   },
   statusText: {
-    fontSize: rs(13),
+    fontSize: rs(12),
     fontWeight: '600',
     color: REVIEW_COLORS.textSecondary,
-    lineHeight: rs(18),
+    lineHeight: rs(16),
   },
   errorText: {
-    fontSize: rs(13),
+    fontSize: rs(12),
     fontWeight: '600',
     color: REVIEW_COLORS.error,
-    lineHeight: rs(18),
+    lineHeight: rs(16),
   },
   emptyState: {
     paddingVertical: rs(32),
@@ -243,13 +220,13 @@ export const styles = StyleSheet.create({
     gap: rs(10),
   },
   emptyTitle: {
-    fontSize: rs(19),
+    fontSize: rs(18),
     fontWeight: '700',
     color: REVIEW_COLORS.textPrimary,
   },
   emptyBody: {
-    fontSize: rs(14),
-    lineHeight: rs(20),
+    fontSize: rs(13),
+    lineHeight: rs(18),
     color: REVIEW_COLORS.textSecondary,
     textAlign: 'center',
   },
@@ -261,7 +238,7 @@ export const styles = StyleSheet.create({
     backgroundColor: REVIEW_COLORS.accent,
   },
   emptyButtonText: {
-    fontSize: rs(14),
+    fontSize: rs(13),
     fontWeight: '700',
     color: REVIEW_COLORS.buttonText,
   },
@@ -276,41 +253,7 @@ export const styles = StyleSheet.create({
     backgroundColor: REVIEW_COLORS.surface,
   },
   viewMoreText: {
-    fontSize: rs(14),
-    fontWeight: '700',
-    color: REVIEW_COLORS.textPrimary,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: rs(20),
-  },
-  modalCard: {
-    width: '100%',
-    borderRadius: rs(18),
-    backgroundColor: REVIEW_COLORS.surface,
-    padding: rs(16),
-    gap: rs(12),
-  },
-  modalClose: {
-    alignSelf: 'flex-end',
-    height: rs(28),
-    width: rs(28),
-    borderRadius: rs(14),
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: REVIEW_COLORS.surfaceMuted,
-  },
-  modalImage: {
-    width: '100%',
-    height: rs(320),
-    borderRadius: rs(16),
-    backgroundColor: REVIEW_COLORS.surfaceMuted,
-  },
-  modalName: {
-    fontSize: rs(15),
+    fontSize: rs(13),
     fontWeight: '700',
     color: REVIEW_COLORS.textPrimary,
   },

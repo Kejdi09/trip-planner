@@ -5,6 +5,7 @@ export type DiscoverPlace = {
   id: string;
   title: string;
   region: string;
+  country?: string | null;
   visited: string;
   rating: number;
   image: string;
@@ -105,6 +106,7 @@ export async function fetchDiscoverPlaces(): Promise<DiscoverPlace[]> {
       id: place.id,
       title: place.name?.trim() || 'Untitled destination',
       region: formatPlaceRegion(place.city, place.country),
+      country: place.country?.trim() || null,
       visited: formatVisitedLabel(uniqueUsers.size),
       rating: averageRating(placeReviews),
       image: imageByPlaceId.get(place.id) ?? DEFAULT_PLACE_IMAGE,

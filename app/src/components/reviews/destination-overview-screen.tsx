@@ -16,7 +16,7 @@ import {
   fetchReviewPhotosByReviewIds,
   fetchReviewsByPlace,
 } from '../../../lib/reviews-api';
-import { averageRating, DEFAULT_PLACE_IMAGE, formatPlaceRegion } from '../../../lib/reviews-utils';
+import { averageRating, formatPlaceRegion } from '../../../lib/reviews-utils';
 import { REVIEW_COLORS } from './review-theme';
 import { styles } from './destination-overview-screen.styles';
 
@@ -135,6 +135,7 @@ export function DestinationOverviewScreen() {
             });
             return acc;
           },
+          {},
         );
 
         const topTags = Object.entries(tagCounts)
@@ -184,7 +185,7 @@ export function DestinationOverviewScreen() {
   const destinationRegion = hasDestination
     ? formatPlaceRegion(place?.city ?? null, place?.country ?? null)
     : '';
-  const summaryImage = hasDestination ? photos[0]?.url ?? DEFAULT_PLACE_IMAGE : DEFAULT_PLACE_IMAGE;
+  const summaryImage = hasDestination ? photos[0]?.url ?? null : null;
   const summaryDescription = hasDestination
     ? place?.description?.trim() || FALLBACK_DESCRIPTION
     : '';
@@ -219,7 +220,7 @@ export function DestinationOverviewScreen() {
 
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}>
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 124 }]}>
           {isEmpty ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyTitle}>No destinations yet</Text>

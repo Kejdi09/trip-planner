@@ -178,7 +178,10 @@ export async function fetchTagNamesByReviewIds(
     const name = tagMap[link.tag_id];
     if (!name) return acc;
     const label = `#${name}`;
-    acc[link.review_id] = acc[link.review_id] ? [...acc[link.review_id], label] : [label];
+    const existing = acc[link.review_id] ?? [];
+    if (!existing.includes(label)) {
+      acc[link.review_id] = [...existing, label];
+    }
     return acc;
   }, {});
 }
@@ -328,14 +331,4 @@ export async function createReviewWithTags({
   if (reviewTagError) throw reviewTagError;
 
   return reviewId;
-}
-
-export async function deleteReviewById(reviewId: string, userId: string): Promise<void> {
-  const { error } = await supabase
-    .from('reviews')
-    .delete()
-    .eq('id', reviewId)
-    .eq('user_id', userId);
-
-  if (error) throw error;
 }
