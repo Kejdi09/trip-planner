@@ -231,7 +231,7 @@ export function WriteReviewScreen() {
 
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 64 }]}
         >
           {isLoading ? (
             <StatusMessage message="Loading destination..." style={styles.statusText} />

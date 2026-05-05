@@ -135,6 +135,7 @@ export function DestinationOverviewScreen() {
             });
             return acc;
           },
+          {},
         );
 
         const topTags = Object.entries(tagCounts)
@@ -219,7 +220,7 @@ export function DestinationOverviewScreen() {
 
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}>
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 124 }]}>
           {isEmpty ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyTitle}>No destinations yet</Text>

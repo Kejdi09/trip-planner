@@ -214,7 +214,7 @@ export function DestinationReviewsScreen() {
 
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 64 }]}
         >
           {isEmpty ? (
             <View style={styles.emptyState}>
