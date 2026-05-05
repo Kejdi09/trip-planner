@@ -133,6 +133,11 @@ export const styles = StyleSheet.create({
     lineHeight: rs(18),
     color: REVIEW_COLORS.textSecondary,
   },
+  sectionHint: {
+    fontSize: rs(13),
+    lineHeight: rs(18),
+    color: REVIEW_COLORS.textSecondary,
+  },
   statusText: {
     fontSize: rs(12),
     fontWeight: '600',
@@ -194,8 +199,59 @@ export const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: REVIEW_COLORS.surfaceMuted,
   },
+  photoTilePressable: {
+    flex: 1,
+  },
   photoImage: {
     width: '100%',
     height: '100%',
+  },
+  photoOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: rs(10),
+    paddingVertical: rs(8),
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  },
+  photoName: {
+    fontSize: rs(11),
+    fontWeight: '700',
+    color: REVIEW_COLORS.buttonText,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: rs(20),
+  },
+  modalCard: {
+    width: '100%',
+    borderRadius: rs(18),
+    backgroundColor: REVIEW_COLORS.surface,
+    padding: rs(16),
+    gap: rs(12),
+  },
+  modalClose: {
+    alignSelf: 'flex-end',
+    height: rs(28),
+    width: rs(28),
+    borderRadius: rs(14),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: REVIEW_COLORS.surfaceMuted,
+  },
+  modalImage: {
+    width: '100%',
+    height: rs(320),
+    borderRadius: rs(16),
+    backgroundColor: REVIEW_COLORS.surfaceMuted,
+  },
+  modalName: {
+    fontSize: rs(15),
+    fontWeight: '700',
+    color: REVIEW_COLORS.textPrimary,
   },
 });

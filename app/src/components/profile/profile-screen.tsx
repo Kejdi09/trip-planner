@@ -12,7 +12,7 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
-import { AppBottomNav, AppTab } from "@/components/ui/app-bottom-nav";
+import { supabase } from "../../../lib/supabase";
 import { styles } from "./profile-screen.styles";
 
 type ProfileActionCardProps = {
@@ -41,11 +41,12 @@ function ProfileActionCard({ icon, title, subtitle, onPress }: ProfileActionCard
 type SettingsRowProps = {
   icon: React.ReactNode;
   label: string;
+  onPress?: () => void;
 };
 
-function SettingsRow({ icon, label }: SettingsRowProps) {
+function SettingsRow({ icon, label, onPress }: SettingsRowProps) {
   return (
-    <Pressable style={styles.settingsRow}>
+    <Pressable style={styles.settingsRow} onPress={onPress}>
       <View style={styles.settingsLeft}>
         {icon}
         <Text style={styles.settingsText}>{label}</Text>
@@ -59,8 +60,47 @@ function SettingsRow({ icon, label }: SettingsRowProps) {
 export function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [activeTab, setActiveTab] = React.useState<AppTab>("Profile");
+  const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
+  const [reviewCount, setReviewCount] = React.useState<number | null>(null);
 
+  React.useEffect(() => {
+    let isMounted = true;
+
+    const loadReviewCount = async () => {
+      const { data } = await supabase.auth.getUser();
+      const user = data.user;
+
+      if (!user || !isMounted) {
+        return;
+      }
+
+      const { count } = await supabase
+        .from('reviews')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
+      if (!isMounted) return;
+      setReviewCount(typeof count === 'number' ? count : 0);
+    };
+
+    void loadReviewCount();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleLogout = async () => {
+    setStatusMessage(null);
+
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      setStatusMessage("Unable to log out. Try again.");
+      return;
+    }
+
+    router.replace("/");
+  };
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <View style={styles.screen}>
@@ -118,7 +158,11 @@ export function ProfileScreen() {
             <ProfileActionCard
               icon={<Feather name="star" size={20} color="#51C98C" />}
               title="My Reviews"
-              subtitle="24 reviews written"
+              subtitle={
+                reviewCount === null
+                  ? 'Loading reviews...'
+                  : `${reviewCount} review${reviewCount === 1 ? '' : 's'} written`
+              }
               onPress={() => router.push("/my-reviews")}
             />
 
@@ -147,7 +191,7 @@ export function ProfileScreen() {
 
             <SettingsRow
               icon={
-                <AntDesign name="question-circle" size={18} color="#222222" />
+                <AntDesign name="questioncircleo" size={18} color="#222222" />
               }
               label="Help & Support"
             />
@@ -161,11 +205,13 @@ export function ProfileScreen() {
                 />
               }
               label="Log out"
+              onPress={handleLogout}
             />
+            {statusMessage ? (
+              <Text style={styles.logoutMessage}>{statusMessage}</Text>
+            ) : null}
           </View>
         </ScrollView>
-
-        <AppBottomNav activeTab={activeTab} onPressTab={setActiveTab} />
       </View>
     </SafeAreaView>
   );
