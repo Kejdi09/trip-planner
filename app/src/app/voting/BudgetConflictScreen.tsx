@@ -19,9 +19,8 @@ import {
   VotedLabel,
   VoteProgress,
   VoterAvatars,
-} from './components';
-import { AppBottomNav } from '@/components/ui/app-bottom-nav';
-import { BudgetOption, MOCK_CONFLICT_BUDGETS, VotingTab } from './types';
+} from './_components';
+import { BudgetOption, MOCK_CONFLICT_BUDGETS, VotingTab } from './_types';
 
 const ConflictBanner = () => (
   <View style={cb.banner}>
@@ -52,7 +51,11 @@ const RangeSlider: React.FC<RangeSliderProps> = ({ min, max, onChange }) => {
       if (!trackWidth) return;
       const pct = (thumb === 'min' ? leftPct : rightPct) / 100;
       const newVal = toValue(pct * trackWidth + gs.dx);
-      thumb === 'min' ? onChange(Math.min(newVal, max - 100), max) : onChange(min, Math.max(newVal, min + 100));
+      if (thumb === 'min') {
+        onChange(Math.min(newVal, max - 100), max);
+      } else {
+        onChange(min, Math.max(newVal, min + 100));
+      }
     },
   });
 
@@ -137,7 +140,6 @@ const BudgetConflictScreen: React.FC<BudgetConflictScreenProps> = ({
           <Text style={styles.btnText}>End Voting</Text>
         </TouchableOpacity>
       </ScrollView>
-      <AppBottomNav activeTab="Groups" />
     </SafeAreaView>
   );
 };

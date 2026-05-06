@@ -4,6 +4,7 @@ import {
   MaterialCommunityIcons,
   AntDesign,
 } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React from "react";
 import { Image, Pressable, ScrollView, Text, View } from "react-native";
 import {
@@ -11,18 +12,19 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
-import { AppBottomNav, AppTab } from "@/components/ui/app-bottom-nav";
+import { supabase } from "../../../lib/supabase";
 import { styles } from "./profile-screen.styles";
 
 type ProfileActionCardProps = {
   icon: React.ReactNode;
   title: string;
   subtitle: string;
+  onPress?: () => void;
 };
 
-function ProfileActionCard({ icon, title, subtitle }: ProfileActionCardProps) {
+function ProfileActionCard({ icon, title, subtitle, onPress }: ProfileActionCardProps) {
   return (
-    <Pressable style={styles.actionCard}>
+    <Pressable style={styles.actionCard} onPress={onPress}>
       <View style={styles.actionLeft}>
         <View style={styles.actionIconWrap}>{icon}</View>
         <View>
@@ -39,11 +41,12 @@ function ProfileActionCard({ icon, title, subtitle }: ProfileActionCardProps) {
 type SettingsRowProps = {
   icon: React.ReactNode;
   label: string;
+  onPress?: () => void;
 };
 
-function SettingsRow({ icon, label }: SettingsRowProps) {
+function SettingsRow({ icon, label, onPress }: SettingsRowProps) {
   return (
-    <Pressable style={styles.settingsRow}>
+    <Pressable style={styles.settingsRow} onPress={onPress}>
       <View style={styles.settingsLeft}>
         {icon}
         <Text style={styles.settingsText}>{label}</Text>
@@ -56,8 +59,48 @@ function SettingsRow({ icon, label }: SettingsRowProps) {
 
 export function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = React.useState<AppTab>("Profile");
+  const router = useRouter();
+  const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
+  const [reviewCount, setReviewCount] = React.useState<number | null>(null);
 
+  React.useEffect(() => {
+    let isMounted = true;
+
+    const loadReviewCount = async () => {
+      const { data } = await supabase.auth.getUser();
+      const user = data.user;
+
+      if (!user || !isMounted) {
+        return;
+      }
+
+      const { count } = await supabase
+        .from('reviews')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
+      if (!isMounted) return;
+      setReviewCount(typeof count === 'number' ? count : 0);
+    };
+
+    void loadReviewCount();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleLogout = async () => {
+    setStatusMessage(null);
+
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      setStatusMessage("Unable to log out. Try again.");
+      return;
+    }
+
+    router.replace("/");
+  };
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <View style={styles.screen}>
@@ -110,12 +153,18 @@ export function ProfileScreen() {
               icon={<Feather name="bookmark" size={20} color="#D66BC7" />}
               title="My Wishlist"
               subtitle="12 saved places"
+              onPress={() => router.push("/my-wishlist")}
             />
 
             <ProfileActionCard
               icon={<Feather name="star" size={20} color="#51C98C" />}
               title="My Reviews"
-              subtitle="24 reviews written"
+              subtitle={
+                reviewCount === null
+                  ? 'Loading reviews...'
+                  : `${reviewCount} review${reviewCount === 1 ? '' : 's'} written`
+              }
+              onPress={() => router.push("/my-reviews")}
             />
 
             <ProfileActionCard
@@ -143,7 +192,7 @@ export function ProfileScreen() {
 
             <SettingsRow
               icon={
-                <AntDesign name="question-circle" size={18} color="#222222" />
+                <AntDesign name="questioncircleo" size={18} color="#222222" />
               }
               label="Help & Support"
             />
@@ -157,11 +206,13 @@ export function ProfileScreen() {
                 />
               }
               label="Log out"
+              onPress={handleLogout}
             />
+            {statusMessage ? (
+              <Text style={styles.logoutMessage}>{statusMessage}</Text>
+            ) : null}
           </View>
         </ScrollView>
-
-        <AppBottomNav activeTab={activeTab} onPressTab={setActiveTab} />
       </View>
     </SafeAreaView>
   );

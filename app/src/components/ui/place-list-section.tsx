@@ -21,6 +21,8 @@ type PlaceListSectionProps = {
   savedPlaceIds: string[];
   searchQuery: string;
   onToggleSavedPlace: (placeId: string) => void;
+  onPressPlaceDetails?: (place: Place) => void;
+  onPressAddPlace?: (place: Place) => void;
   emptyStatePrefix?: string;
 };
 
@@ -30,8 +32,15 @@ export function PlaceListSection({
   savedPlaceIds,
   searchQuery,
   onToggleSavedPlace,
-  emptyStatePrefix = 'No places found for',
+  onPressPlaceDetails,
+  onPressAddPlace,
+  emptyStatePrefix = 'No places found',
 }: PlaceListSectionProps) {
+  const trimmedQuery = searchQuery.trim();
+  const emptyMessage = trimmedQuery
+    ? `${emptyStatePrefix} for "${trimmedQuery}".`
+    : `${emptyStatePrefix}.`;
+
   return (
     <>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -44,11 +53,13 @@ export function PlaceListSection({
               place={place}
               isSaved={savedPlaceIds.includes(place.id)}
               onToggleSaved={() => onToggleSavedPlace(place.id)}
+              onPressDetails={() => onPressPlaceDetails?.(place)}
+              onPressAdd={() => onPressAddPlace?.(place)}
             />
           ))
         ) : (
           <StatusMessage
-            message={`${emptyStatePrefix} "${searchQuery.trim()}".`}
+            message={emptyMessage}
             style={styles.noResultsText}
           />
         )}

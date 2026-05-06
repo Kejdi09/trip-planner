@@ -19,9 +19,8 @@ import {
   VotedLabel,
   VoteProgress,
   VoterAvatars,
-} from './components';
-import { AppBottomNav } from '@/components/ui/app-bottom-nav';
-import { BudgetOption, MOCK_BUDGETS, VotingTab } from './types';
+} from './_components';
+import { BudgetOption, MOCK_BUDGETS, VotingTab } from './_types';
 
 const SLIDER_MIN = 0;
 const SLIDER_MAX = 20000;
@@ -42,7 +41,11 @@ const RangeSlider: React.FC<RangeSliderProps> = ({ min, max, onChange }) => {
       if (!trackWidth) return;
       const pct = (thumb === 'min' ? leftPct : rightPct) / 100;
       const newVal = toValue(pct * trackWidth + gs.dx);
-      thumb === 'min' ? onChange(Math.min(newVal, max - 100), max) : onChange(min, Math.max(newVal, min + 100));
+      if (thumb === 'min') {
+        onChange(Math.min(newVal, max - 100), max);
+      } else {
+        onChange(min, Math.max(newVal, min + 100));
+      }
     },
   });
 
@@ -126,7 +129,6 @@ const BudgetVotingScreen: React.FC<BudgetVotingScreenProps> = ({
           <Text style={styles.btnText}>Finish Voting</Text>
         </TouchableOpacity>
       </ScrollView>
-      <AppBottomNav activeTab="Groups" />
     </SafeAreaView>
   );
 };

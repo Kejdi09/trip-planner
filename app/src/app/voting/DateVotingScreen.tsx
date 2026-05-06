@@ -17,9 +17,8 @@ import {
   VotedLabel,
   VoteProgress,
   VoterAvatars,
-} from './components';
-import { AppBottomNav } from '@/components/ui/app-bottom-nav';
-import { DateOption, MOCK_DATES, VotingTab } from './types';
+} from './_components';
+import { DateOption, MOCK_DATES, VotingTab } from './_types';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -212,7 +211,6 @@ const DateVotingScreen: React.FC<DateVotingScreenProps> = ({
           </View>
         )}
       </ScrollView>
-      <AppBottomNav activeTab="Groups" />
     </SafeAreaView>
   );
 };

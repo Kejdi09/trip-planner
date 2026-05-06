@@ -9,6 +9,19 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
+  headerRow: {
+    paddingTop: 8,
+    paddingHorizontal: 24,
+    paddingBottom: 4,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E3E8EC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   contentArea: {
     flex: 1,
     position: 'relative',

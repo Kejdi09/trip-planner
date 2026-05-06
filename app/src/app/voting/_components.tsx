@@ -6,7 +6,7 @@ import {
   StyleSheet,
   ViewStyle,
 } from 'react-native';
-import { Member } from './types';
+import { Member } from './_types';
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 export const COLORS = {
