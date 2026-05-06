@@ -5,7 +5,13 @@ import { View } from 'react-native';
 import { AppBottomNav, AppTab } from '@/components/ui/app-bottom-nav';
 
 const getActiveTab = (pathname: string): AppTab => {
-  if (pathname.startsWith('/profile') || pathname.startsWith('/my-reviews')) return 'Profile';
+  if (
+    pathname.startsWith('/profile') ||
+    pathname.startsWith('/my-reviews') ||
+    pathname.startsWith('/my-wishlist')
+  ) {
+    return 'Profile';
+  }
   if (pathname.startsWith('/voting')) return 'Groups';
   if (
     pathname.startsWith('/explore') ||
