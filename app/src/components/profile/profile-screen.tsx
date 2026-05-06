@@ -153,6 +153,7 @@ export function ProfileScreen() {
               icon={<Feather name="bookmark" size={20} color="#D66BC7" />}
               title="My Wishlist"
               subtitle="12 saved places"
+              onPress={() => router.push("/my-wishlist")}
             />
 
             <ProfileActionCard
