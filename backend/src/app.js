@@ -20,6 +20,8 @@ const supabaseAdmin = createClient(
 
 const USERNAME_REGEX = /^[a-z0-9_]{3,24}$/
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const PROD_ALIASES = new Set(['prod', 'production', 'main'])
 
 function normalizeAppEnv(value) {
@@ -54,6 +56,12 @@ function ensureClientEnvMatches(req, res, next) {
   }
 
   return next()
+}
+
+function parseBoolean(value) {
+  if (value === undefined || value === null) return false
+  const normalized = String(value).trim().toLowerCase()
+  return normalized === 'true' || normalized === '1' || normalized === 'yes'
 }
 
 app.get('/health', (req, res) => res.json({
@@ -174,6 +182,121 @@ app.get('/auth/email-available', ensureClientEnvMatches, async (req, res, next) 
     }
 
     return res.json({ available: true, canResetPassword: false })
+  } catch (error) {
+    return next(error)
+  }
+})
+
+app.get('/wishlists', ensureClientEnvMatches, async (req, res, next) => {
+  try {
+    const userId = String(req.query.userId || '').trim()
+
+    if (!UUID_REGEX.test(userId)) {
+      return res.status(400).json({ error: 'userId must be a valid UUID.' })
+    }
+
+    const includePlace = parseBoolean(req.query.includePlace ?? req.query.include)
+    const selectFields = includePlace
+      ? 'id, user_id, place_id, created_at, places (id, name, description, city, country, created_at)'
+      : 'id, user_id, place_id, created_at'
+
+    const { data, error } = await supabaseAdmin
+      .from('wishlists')
+      .select(selectFields)
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      const wrappedError = new Error(error.message || 'Failed to load wishlist items.')
+      wrappedError.status = 502
+      throw wrappedError
+    }
+
+    return res.json({ items: data ?? [] })
+  } catch (error) {
+    return next(error)
+  }
+})
+
+app.post('/wishlists', ensureClientEnvMatches, async (req, res, next) => {
+  try {
+    const userId = String(req.body?.userId || req.body?.user_id || '').trim()
+    const placeId = String(req.body?.placeId || req.body?.place_id || '').trim()
+
+    if (!UUID_REGEX.test(userId)) {
+      return res.status(400).json({ error: 'userId must be a valid UUID.' })
+    }
+
+    if (!UUID_REGEX.test(placeId)) {
+      return res.status(400).json({ error: 'placeId must be a valid UUID.' })
+    }
+
+    const { data: existing, error: existingError } = await supabaseAdmin
+      .from('wishlists')
+      .select('id, user_id, place_id, created_at')
+      .eq('user_id', userId)
+      .eq('place_id', placeId)
+      .maybeSingle()
+
+    if (existingError) {
+      const wrappedError = new Error(existingError.message || 'Failed to check wishlist status.')
+      wrappedError.status = 502
+      throw wrappedError
+    }
+
+    if (existing) {
+      return res.status(200).json(existing)
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('wishlists')
+      .insert({ user_id: userId, place_id: placeId })
+      .select('id, user_id, place_id, created_at')
+      .single()
+
+    if (error) {
+      const wrappedError = new Error(error.message || 'Failed to create wishlist entry.')
+      wrappedError.status = 502
+      throw wrappedError
+    }
+
+    return res.status(201).json(data)
+  } catch (error) {
+    return next(error)
+  }
+})
+
+app.delete('/wishlists', ensureClientEnvMatches, async (req, res, next) => {
+  try {
+    const userId = String(req.query.userId || req.body?.userId || req.body?.user_id || '').trim()
+    const placeId = String(req.query.placeId || req.body?.placeId || req.body?.place_id || '').trim()
+
+    if (!UUID_REGEX.test(userId)) {
+      return res.status(400).json({ error: 'userId must be a valid UUID.' })
+    }
+
+    if (!UUID_REGEX.test(placeId)) {
+      return res.status(400).json({ error: 'placeId must be a valid UUID.' })
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('wishlists')
+      .delete()
+      .eq('user_id', userId)
+      .eq('place_id', placeId)
+      .select('id, user_id, place_id, created_at')
+
+    if (error) {
+      const wrappedError = new Error(error.message || 'Failed to remove wishlist entry.')
+      wrappedError.status = 502
+      throw wrappedError
+    }
+
+    if (!data || data.length === 0) {
+      return res.status(404).json({ error: 'Wishlist entry not found.' })
+    }
+
+    return res.status(200).json({ items: data })
   } catch (error) {
     return next(error)
   }
