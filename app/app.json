@@ -9,28 +9,32 @@
     "ios": {
       "bundleIdentifier": "com.tripsync.app",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "Allow TripSync to access your photos to attach them to reviews.",
+        "NSCameraUsageDescription": "Allow TripSync to access your camera to add photos to reviews."
       }
     },
     "android": {
       "predictiveBackGestureEnabled": false,
-      "package": "com.tripsync.app"
+      "package": "com.tripsync.app",
+      "permissions": ["READ_MEDIA_IMAGES", "READ_EXTERNAL_STORAGE", "CAMERA"]
     },
     "web": {
       "output": "static"
     },
     "plugins": [
       "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "backgroundColor": "#208AEF"
-        }
-      ]
+     [
+  "expo-splash-screen",
+  {
+    "backgroundColor": "#208AEF",
+    "image": "./assets/splash-icon.png",
+    "imageWidth": 200
+  }
+]
     ],
     "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
+      "typedRoutes": true
     },
     "extra": {
       "router": {},

@@ -21,4 +21,9 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 128,
   },
+  statusMessage: {
+    color: '#A19D9D',
+    fontSize: 15,
+    fontWeight: '500',
+  },
 });

@@ -17,4 +17,5 @@ export type Place = {
   visited: string;
   rating: number;
   image: string;
+  country?: string | null;
 };

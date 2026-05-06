@@ -2,6 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { PlaceCard } from '@/components/ui/place-card';
+import { StatusMessage } from '@/components/ui/status-message';
 import type { Place } from '@/components/ui/types';
 
 const SECTION_THEME = {
@@ -20,6 +21,8 @@ type PlaceListSectionProps = {
   savedPlaceIds: string[];
   searchQuery: string;
   onToggleSavedPlace: (placeId: string) => void;
+  onPressPlaceDetails?: (place: Place) => void;
+  onPressAddPlace?: (place: Place) => void;
   emptyStatePrefix?: string;
 };
 
@@ -29,8 +32,15 @@ export function PlaceListSection({
   savedPlaceIds,
   searchQuery,
   onToggleSavedPlace,
-  emptyStatePrefix = 'No places found for',
+  onPressPlaceDetails,
+  onPressAddPlace,
+  emptyStatePrefix = 'No places found',
 }: PlaceListSectionProps) {
+  const trimmedQuery = searchQuery.trim();
+  const emptyMessage = trimmedQuery
+    ? `${emptyStatePrefix} for "${trimmedQuery}".`
+    : `${emptyStatePrefix}.`;
+
   return (
     <>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -43,12 +53,15 @@ export function PlaceListSection({
               place={place}
               isSaved={savedPlaceIds.includes(place.id)}
               onToggleSaved={() => onToggleSavedPlace(place.id)}
+              onPressDetails={() => onPressPlaceDetails?.(place)}
+              onPressAdd={() => onPressAddPlace?.(place)}
             />
           ))
         ) : (
-          <Text style={styles.noResultsText}>
-            {emptyStatePrefix} &quot;{searchQuery.trim()}&quot;.
-          </Text>
+          <StatusMessage
+            message={emptyMessage}
+            style={styles.noResultsText}
+          />
         )}
       </View>
     </>

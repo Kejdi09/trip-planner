@@ -82,6 +82,7 @@ export const styles = StyleSheet.create({
   inputLabel: {
     marginBottom: rs(8),
     fontSize: rs(15),
+    lineHeight: rs(18),
     fontWeight: '700',
     color: COLORS.label,
     letterSpacing: -0.2,
@@ -92,12 +93,32 @@ export const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: COLORS.border,
     paddingHorizontal: rs(14),
+    paddingVertical: 0,
     fontSize: rs(16),
+    lineHeight: rs(20),
     color: COLORS.inputText,
     backgroundColor: COLORS.inputBackground,
   },
   emailInput: {
     marginBottom: rs(16),
+  },
+  usernameInput: {
+    marginBottom: rs(6),
+  },
+  usernameFeedback: {
+    marginBottom: rs(10),
+    fontSize: rs(13),
+    fontWeight: '600',
+    letterSpacing: -0.1,
+  },
+  usernameFeedbackInfo: {
+    color: '#6B7180',
+  },
+  usernameFeedbackSuccess: {
+    color: COLORS.success,
+  },
+  usernameFeedbackError: {
+    color: COLORS.error,
   },
   passwordInputContainer: {
     position: 'relative',
@@ -105,11 +126,9 @@ export const styles = StyleSheet.create({
   },
   passwordInput: {
     paddingRight: rs(46),
-    borderColor: COLORS.primary,
-    backgroundColor: '#FFFFFF',
   },
   confirmPasswordInput: {
-    marginBottom: rs(14),
+    marginBottom: rs(16),
   },
   errorMessage: {
     marginBottom: rs(8),
