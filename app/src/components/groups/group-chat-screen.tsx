@@ -18,12 +18,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   ChatMessage,
-  CURRENT_USER,
-  fetchGroupById,
-  fetchMessages,
   Group,
-  sendMessage,
 } from '../friends/dummy-data';
+import { fetchGroupMembers, fetchGroupMessages, fetchMyGroups, getActiveUserId, postGroupMessage } from '@/lib/groups-api';
+
+const ACTIVE_USER_ID = getActiveUserId();
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TYPE_SCALE = Math.min(Math.max(SCREEN_WIDTH / 390, 0.9), 1.08);
@@ -228,11 +227,49 @@ export function GroupChatScreen() {
 
   React.useEffect(() => {
     if (!groupId) return;
-    Promise.all([fetchGroupById(groupId), fetchMessages(groupId)]).then(([g, msgs]) => {
-      setGroup(g);
-      setMessages(msgs);
+    const load = async () => {
+      const [{ groups }, { members }, { messages: rows }] = await Promise.all([
+        fetchMyGroups(),
+        fetchGroupMembers(groupId),
+        fetchGroupMessages(groupId),
+      ]);
+      const groupRow = groups.find((g) => g.id === groupId) ?? null;
+      setGroup(
+        groupRow
+          ? {
+              id: groupRow.id,
+              name: groupRow.name ?? 'Group',
+              adminId: groupRow.created_by ?? '',
+              members: members.map((m) => ({
+                id: m.user_id,
+                fullName: `Member ${m.user_id.slice(0, 4)}`,
+                username: m.user_id.slice(0, 8),
+                avatarUrl: null,
+                tripCount: 0,
+                role: m.user_id === groupRow.created_by ? 'admin' : 'member',
+              })),
+              status: groupRow.status === 'completed' ? 'completed' : groupRow.status === 'active' ? 'active' : 'upcoming',
+              votingOpen: groupRow.status === 'planning',
+              places: [],
+              dateRange: groupRow.start_date && groupRow.end_date ? `${groupRow.start_date} - ${groupRow.end_date}` : null,
+              budgetRange: null,
+              destination: null,
+            }
+          : null,
+      );
+      setMessages(
+        rows.map((msg) => ({
+          id: msg.id,
+          groupId: msg.group_id,
+          senderId: msg.sender_id,
+          text: msg.content,
+          timestamp: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          dateLabel: null,
+        })),
+      );
       setLoading(false);
-    });
+    };
+    void load();
   }, [groupId]);
 
   const handleSend = async () => {
@@ -241,8 +278,15 @@ export function GroupChatScreen() {
     setInputText('');
     setSending(true);
     try {
-      const msg = await sendMessage(groupId, text);
-      setMessages((prev) => [...prev, msg]);
+      const msg = await postGroupMessage(groupId, text, ACTIVE_USER_ID);
+      setMessages((prev) => [...prev, {
+        id: msg.id,
+        groupId: msg.group_id,
+        senderId: msg.sender_id,
+        text: msg.content,
+        timestamp: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        dateLabel: null,
+      }]);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
     } finally {
       setSending(false);
@@ -316,7 +360,7 @@ export function GroupChatScreen() {
             keyExtractor={(item) => item.id}
             onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
             renderItem={({ item }) => {
-              const isMe = item.senderId === CURRENT_USER.id;
+              const isMe = item.senderId === ACTIVE_USER_ID;
               return (
                 <>
                   {item.dateLabel && (

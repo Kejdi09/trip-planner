@@ -5,14 +5,31 @@ import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppBottomNav } from '@/components/ui/app-bottom-nav';
-import {
-  CURRENT_USER,
-  fetchGroups,
-  Group,
-  GroupMember,
-  GroupStatus,
-} from '../friends/dummy-data';
+import { fetchGroupMembers, fetchMyGroups, getActiveUserId, GroupRow } from '@/lib/groups-api';
 import { COLORS, groupsStyles as styles, rs } from './groups-screen.styles';
+
+type GroupMember = { id: string; fullName: string; avatarUrl: string | null; role: 'admin' | 'member' };
+type GroupStatus = 'active' | 'upcoming' | 'completed';
+type Group = {
+  id: string;
+  name: string;
+  adminId: string;
+  members: GroupMember[];
+  status: GroupStatus;
+  votingOpen: boolean;
+  places: { name: string }[];
+  dateRange: string | null;
+  budgetRange: string | null;
+  destination: string | null;
+};
+
+const CURRENT_USER = { id: getActiveUserId() };
+
+function mapStatus(row: GroupRow): GroupStatus {
+  if (row.status === 'active') return 'active';
+  if (row.status === 'completed') return 'completed';
+  return 'upcoming';
+}
 
 // ---------------------------------------------------------------------------
 // Avatar helpers
@@ -166,15 +183,32 @@ export function GroupsScreen() {
   const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
-    fetchGroups().then((data) => {
-      setGroups(data);
-      setLoading(false);
-    });
-  }, []);
-
-  // Refresh when navigating back to this screen
-  const refresh = React.useCallback(() => {
-    fetchGroups().then(setGroups);
+    const load = async () => {
+      try {
+        const { groups: rows } = await fetchMyGroups();
+        const mapped = await Promise.all(
+          rows.map(async (row) => {
+            const { members } = await fetchGroupMembers(row.id);
+            return {
+              id: row.id,
+              name: row.name ?? 'Untitled Group',
+              adminId: row.created_by ?? '',
+              members: members.map((m) => ({ id: m.user_id, fullName: `Member ${m.user_id.slice(0, 4)}`, avatarUrl: null, role: m.user_id === row.created_by ? 'admin' : 'member' })),
+              status: mapStatus(row),
+              votingOpen: row.status === 'planning',
+              places: [],
+              dateRange: row.start_date && row.end_date ? `${row.start_date} - ${row.end_date}` : null,
+              budgetRange: row.min_budget != null && row.max_budget != null ? `$${row.min_budget}-$${row.max_budget}` : null,
+              destination: null,
+            } as Group;
+          }),
+        );
+        setGroups(mapped);
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
   }, []);
 
   const activeGroups = groups.filter((g) => g.status === 'active');

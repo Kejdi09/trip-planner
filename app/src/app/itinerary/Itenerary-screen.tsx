@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -19,6 +19,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppBottomNav } from "@/components/ui/app-bottom-nav";
 import { BrandHeader } from "@/components/ui/brand-header";
+import { createItineraryItem, deleteItineraryItem, fetchItinerary, getActiveUserId } from "@/lib/groups-api";
 
 const AI_API_BASE_URL =
   process.env.EXPO_PUBLIC_AI_API_URL ?? "http://localhost:3000";
@@ -73,6 +74,8 @@ function getDayDateLabel(startDate: string, dayNumber: number) {
 
 export default function TripDetailScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ groupId?: string }>();
+  const groupId = params.groupId ? String(params.groupId) : null;
 
   const { width } = useWindowDimensions();
 
@@ -106,6 +109,28 @@ export default function TripDetailScreen() {
   const [placeName, setPlaceName] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
 
+  React.useEffect(() => {
+    if (!groupId) return;
+    const load = async () => {
+      try {
+        const { items } = await fetchItinerary(groupId, getActiveUserId());
+        setPlaces(items.map((item) => ({
+          id: item.id,
+          name: item.title,
+          city: trip.city,
+          country: trip.country,
+          day: Math.max(1, Math.floor((new Date(item.date).getTime() - new Date(trip.startDate).getTime()) / 86400000) + 1),
+          timeBlock: 'unscheduled',
+          startTime: item.time ?? undefined,
+          description: undefined,
+        })));
+      } catch {
+        // ignore for local fallback mode
+      }
+    };
+    void load();
+  }, [groupId]);
+
   const selectedDayPlaces = useMemo(() => {
     return places.filter((place) => place.day === selectedDay);
   }, [places, selectedDay]);
@@ -133,6 +158,13 @@ export default function TripDetailScreen() {
 
       setPlaces((current) => [...current, newPlace]);
 
+      if (groupId) {
+        const dayDate = new Date(trip.startDate);
+        dayDate.setDate(dayDate.getDate() + (newPlace.day - 1));
+        const date = dayDate.toISOString().slice(0, 10);
+        void createItineraryItem(groupId, newPlace.name, date, newPlace.startTime ?? null, getActiveUserId());
+      }
+
       return newPlace.id;
     },
     [selectedDay],
@@ -140,7 +172,10 @@ export default function TripDetailScreen() {
 
   const removePlaceFromItinerary = useCallback((placeId: string) => {
     setPlaces((current) => current.filter((place) => place.id !== placeId));
-  }, []);
+    if (groupId) {
+      void deleteItineraryItem(groupId, placeId, getActiveUserId());
+    }
+  }, [groupId]);
 
   const addPlacesFromAI = useCallback(
     (aiPlaces: AddPlaceInput[]) => {

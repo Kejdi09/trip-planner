@@ -15,13 +15,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppBottomNav } from '@/components/ui/app-bottom-nav';
+import { addGroupMember, fetchGroupMembers, fetchMyGroups, getActiveUserId } from '@/lib/groups-api';
 import {
   DUMMY_FRIENDS,
-  fetchGroupById,
   Friend,
   Group,
-  inviteFriendToGroup,
 } from '../friends/dummy-data';
+
+const ACTIVE_USER_ID = getActiveUserId();
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TYPE_SCALE = Math.min(Math.max(SCREEN_WIDTH / 390, 0.9), 1.08);
@@ -212,7 +213,30 @@ export function InviteToGroupScreen() {
   // Load group to know who's already a member
   React.useEffect(() => {
     if (groupId) {
-      fetchGroupById(groupId).then(setGroup);
+      void (async () => {
+        const [{ groups }, { members }] = await Promise.all([
+          fetchMyGroups(),
+          fetchGroupMembers(groupId),
+        ]);
+        const row = groups.find((g) => g.id === groupId) ?? null;
+        if (!row) {
+          setGroup(null);
+          return;
+        }
+
+        setGroup({
+          id: row.id,
+          name: row.name ?? 'Group',
+          adminId: row.created_by ?? '',
+          members: members.map((m) => ({ id: m.user_id, fullName: `Member ${m.user_id.slice(0, 4)}`, username: m.user_id.slice(0, 8), avatarUrl: null, tripCount: 0, role: m.user_id === row.created_by ? 'admin' : 'member' })),
+          status: row.status === 'completed' ? 'completed' : row.status === 'active' ? 'active' : 'upcoming',
+          votingOpen: row.status === 'planning',
+          places: [],
+          dateRange: null,
+          budgetRange: null,
+          destination: null,
+        });
+      })();
     }
   }, [groupId]);
 
@@ -240,7 +264,7 @@ export function InviteToGroupScreen() {
     if (!groupId || invitedIds.has(friend.id)) return;
     setSendingIds((prev) => new Set(prev).add(friend.id));
     try {
-      await inviteFriendToGroup(groupId, friend.id);
+      await addGroupMember(groupId, ACTIVE_USER_ID, ACTIVE_USER_ID);
       setInvitedIds((prev) => new Set(prev).add(friend.id));
     } finally {
       setSendingIds((prev) => { const n = new Set(prev); n.delete(friend.id); return n; });

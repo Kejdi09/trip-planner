@@ -4,6 +4,7 @@ const { createClient } = require("@supabase/supabase-js");
 const { version: backendVersion } = require("../package.json");
 const aiRoutes = require("./routes/ai.routes");
 const votingRoutes = require("./routes/voting.routes");
+const groupsRoutes = require("./routes/groups.routes");
 require("dotenv").config();
 
 const required = ["SUPABASE_URL", "SUPABASE_SERVICE_KEY"];
@@ -362,6 +363,7 @@ app.delete("/wishlists", ensureClientEnvMatches, async (req, res, next) => {
 
 app.use("/api", aiRoutes);
 app.use("/voting", ensureClientEnvMatches, votingRoutes(supabaseAdmin));
+app.use("/groups", ensureClientEnvMatches, groupsRoutes(supabaseAdmin));
 app.use((err, req, res, next) => {
   void next;
   console.error(err);
