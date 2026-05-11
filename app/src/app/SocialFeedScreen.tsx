@@ -9,7 +9,6 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { AppBottomNav } from '@/components/ui/app-bottom-nav';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface TrendingDestination {
@@ -245,7 +244,6 @@ const SocialFeedScreen: React.FC = () => {
         </View>
       </ScrollView>
 
-      <AppBottomNav activeTab="Feed" />
     </SafeAreaView>
   );
 };

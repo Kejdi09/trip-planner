@@ -106,7 +106,7 @@ export function ProfileScreen() {
       <View style={styles.screen}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Profile</Text>
-          <Pressable style={styles.headerIconButton}>
+          <Pressable style={styles.headerIconButton} onPress={() => router.push('/add-friends')}>
             <Feather name="settings" size={22} color="#222222" />
           </Pressable>
         </View>
@@ -173,6 +173,7 @@ export function ProfileScreen() {
               }
               title="My Friends"
               subtitle="Top: Eden"
+              onPress={() => router.push('/my-friends')}
             />
           </View>
 
