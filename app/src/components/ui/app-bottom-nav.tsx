@@ -23,7 +23,7 @@ export function AppBottomNav({ activeTab = 'Discover', onPressTab }: AppBottomNa
   const handleTabPress = (tab: AppTab) => {
     onPressTab?.(tab);
 
-    if (tab === 'Feed') router.push('/');
+    if (tab === 'Feed') router.push('/feed');
     if (tab === 'Discover') router.push('/explore');
     if (tab === 'Groups') router.push('/groups');
     if (tab === 'History') router.push('/my-travels');

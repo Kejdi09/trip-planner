@@ -5,7 +5,7 @@ import { View } from 'react-native';
 import { AppBottomNav, AppTab } from '@/components/ui/app-bottom-nav';
 
 const getActiveTab = (pathname: string): AppTab => {
-  if (pathname === '/' || pathname.startsWith('/index')) {
+  if (pathname.startsWith('/feed')) {
     return 'Feed';
   }
 
@@ -51,7 +51,7 @@ const getActiveTab = (pathname: string): AppTab => {
 export default function TabLayout() {
   const pathname = usePathname();
   const activeTab = getActiveTab(pathname ?? '/');
-  const hideBottomNav = !pathname || pathname.startsWith('/reset-password');
+  const hideBottomNav = !pathname || pathname === '/' || pathname.startsWith('/index') || pathname.startsWith('/reset-password');
 
   return (
     <View style={{ flex: 1 }}>
