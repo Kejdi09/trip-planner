@@ -1,4 +1,5 @@
 const express = require('express');
+const { assertUuid, makeError } = require('../utils/http');
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -15,6 +16,14 @@ function parseLimit(value, fallback = 30, max = 100) {
 
 module.exports = function groupsRoutes(supabaseAdmin) {
   const router = express.Router();
+
+  async function createNotification(userId, type, content) {
+    const { error } = await supabaseAdmin.from('notifications').insert({ user_id: userId, type, content });
+    if (error) {
+      const wrapped = makeError(error.message || 'Failed to create notification.', 502, 'UPSTREAM_ERROR');
+      throw wrapped;
+    }
+  }
 
   async function getGroup(groupId) {
     const { data, error } = await supabaseAdmin
@@ -76,9 +85,7 @@ module.exports = function groupsRoutes(supabaseAdmin) {
   router.get('/', async (req, res, next) => {
     try {
       const userId = String(req.query.userId || '').trim();
-      if (!isValidUuid(userId)) {
-        return res.status(400).json({ error: 'userId must be a valid UUID.' });
-      }
+      assertUuid(userId, 'userId');
 
       const { data: memberships, error: membershipError } = await supabaseAdmin
         .from('group_members')
@@ -121,9 +128,7 @@ module.exports = function groupsRoutes(supabaseAdmin) {
       if (!name || name.length < 3) {
         return res.status(400).json({ error: 'Group name must be at least 3 characters.' });
       }
-      if (!isValidUuid(createdBy)) {
-        return res.status(400).json({ error: 'createdBy must be a valid UUID.' });
-      }
+      assertUuid(createdBy, 'createdBy');
 
       const { data: group, error: groupError } = await supabaseAdmin
         .from('groups')
@@ -162,9 +167,8 @@ module.exports = function groupsRoutes(supabaseAdmin) {
     try {
       const groupId = String(req.params.groupId || '').trim();
       const userId = String(req.body?.userId || '').trim();
-      if (!isValidUuid(groupId) || !isValidUuid(userId)) {
-        return res.status(400).json({ error: 'groupId and userId must be valid UUIDs.' });
-      }
+      assertUuid(groupId, 'groupId');
+      assertUuid(userId, 'userId');
 
       const group = await requireCreator(groupId, userId);
 
@@ -215,9 +219,8 @@ module.exports = function groupsRoutes(supabaseAdmin) {
     try {
       const groupId = String(req.params.groupId || '').trim();
       const userId = String(req.query.userId || '').trim();
-      if (!isValidUuid(groupId) || !isValidUuid(userId)) {
-        return res.status(400).json({ error: 'groupId and userId must be valid UUIDs.' });
-      }
+      assertUuid(groupId, 'groupId');
+      assertUuid(userId, 'userId');
 
       await requireMember(groupId, userId);
 
@@ -245,9 +248,9 @@ module.exports = function groupsRoutes(supabaseAdmin) {
       const actorId = String(req.body?.actorId || '').trim();
       const newUserId = String(req.body?.userId || '').trim();
 
-      if (!isValidUuid(groupId) || !isValidUuid(actorId) || !isValidUuid(newUserId)) {
-        return res.status(400).json({ error: 'groupId, actorId, and userId must be valid UUIDs.' });
-      }
+      assertUuid(groupId, 'groupId');
+      assertUuid(actorId, 'actorId');
+      assertUuid(newUserId, 'userId');
 
       await requireCreator(groupId, actorId);
 
@@ -280,6 +283,9 @@ module.exports = function groupsRoutes(supabaseAdmin) {
         throw wrapped;
       }
 
+      await createNotification(newUserId, 'group_invite', JSON.stringify({ deepLink: `/group-chat?groupId=${groupId}`, groupId, actorId }));
+      await createNotification(actorId, 'group_join', JSON.stringify({ deepLink: `/group-chat?groupId=${groupId}`, groupId, userId: newUserId }));
+
       return res.status(201).json(data);
     } catch (error) {
       return next(error);
@@ -292,9 +298,9 @@ module.exports = function groupsRoutes(supabaseAdmin) {
       const memberUserId = String(req.params.memberUserId || '').trim();
       const actorId = String(req.query.actorId || req.body?.actorId || '').trim();
 
-      if (!isValidUuid(groupId) || !isValidUuid(actorId) || !isValidUuid(memberUserId)) {
-        return res.status(400).json({ error: 'groupId, actorId, and memberUserId must be valid UUIDs.' });
-      }
+      assertUuid(groupId, 'groupId');
+      assertUuid(actorId, 'actorId');
+      assertUuid(memberUserId, 'memberUserId');
 
       const group = await requireGroup(groupId);
       const isSelfLeave = actorId === memberUserId;
@@ -332,9 +338,8 @@ module.exports = function groupsRoutes(supabaseAdmin) {
       const limit = parseLimit(req.query.limit, 50, 200);
       const offset = Math.max(0, Number(req.query.offset) || 0);
 
-      if (!isValidUuid(groupId) || !isValidUuid(userId)) {
-        return res.status(400).json({ error: 'groupId and userId must be valid UUIDs.' });
-      }
+      assertUuid(groupId, 'groupId');
+      assertUuid(userId, 'userId');
 
       await requireMember(groupId, userId);
 
@@ -363,9 +368,8 @@ module.exports = function groupsRoutes(supabaseAdmin) {
       const userId = String(req.body?.userId || '').trim();
       const content = String(req.body?.content || '').trim();
 
-      if (!isValidUuid(groupId) || !isValidUuid(userId)) {
-        return res.status(400).json({ error: 'groupId and userId must be valid UUIDs.' });
-      }
+      assertUuid(groupId, 'groupId');
+      assertUuid(userId, 'userId');
 
       if (!content) {
         return res.status(400).json({ error: 'Message content is required.' });
@@ -396,9 +400,8 @@ module.exports = function groupsRoutes(supabaseAdmin) {
       const groupId = String(req.params.groupId || '').trim();
       const userId = String(req.query.userId || '').trim();
 
-      if (!isValidUuid(groupId) || !isValidUuid(userId)) {
-        return res.status(400).json({ error: 'groupId and userId must be valid UUIDs.' });
-      }
+      assertUuid(groupId, 'groupId');
+      assertUuid(userId, 'userId');
 
       await requireMember(groupId, userId);
 
@@ -429,9 +432,8 @@ module.exports = function groupsRoutes(supabaseAdmin) {
       const date = String(req.body?.date || '').trim();
       const time = String(req.body?.time || '').trim() || null;
 
-      if (!isValidUuid(groupId) || !isValidUuid(userId)) {
-        return res.status(400).json({ error: 'groupId and userId must be valid UUIDs.' });
-      }
+      assertUuid(groupId, 'groupId');
+      assertUuid(userId, 'userId');
       if (!title || !date) {
         return res.status(400).json({ error: 'title and date are required.' });
       }
@@ -457,6 +459,15 @@ module.exports = function groupsRoutes(supabaseAdmin) {
         wrapped.status = 502;
         throw wrapped;
       }
+
+      const { data: members } = await supabaseAdmin
+        .from('group_members')
+        .select('user_id')
+        .eq('group_id', groupId);
+      const recipients = (members || []).map((m) => m.user_id).filter(Boolean);
+      await Promise.all(recipients.map((recipientId) =>
+        createNotification(recipientId, 'itinerary_update', JSON.stringify({ deepLink: `/itinerary?groupId=${groupId}`, groupId, itemId: data.id })),
+      ));
 
       return res.status(201).json(data);
     } catch (error) {

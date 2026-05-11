@@ -1,4 +1,5 @@
 const express = require('express');
+const { assertUuid, makeError } = require('../utils/http');
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -16,6 +17,11 @@ function isVotingLocked(group) {
 
 module.exports = function votingRoutes(supabaseAdmin) {
   const router = express.Router();
+
+  async function createNotification(userId, type, content) {
+    const { error } = await supabaseAdmin.from('notifications').insert({ user_id: userId, type, content });
+    if (error) throw makeError(error.message || 'Failed to create notification.', 502, 'UPSTREAM_ERROR');
+  }
 
   async function getGroupOrThrow(groupId) {
     const { data, error } = await supabaseAdmin
@@ -94,9 +100,8 @@ module.exports = function votingRoutes(supabaseAdmin) {
       const groupId = String(req.query.groupId || '').trim();
       const userId = String(req.query.userId || '').trim();
 
-      if (!isValidUuid(groupId) || !isValidUuid(userId)) {
-        return res.status(400).json({ error: 'groupId and userId must be valid UUIDs.' });
-      }
+      assertUuid(groupId, 'groupId');
+      assertUuid(userId, 'userId');
 
       const group = await getGroupOrThrow(groupId);
       await assertMemberOrThrow(groupId, userId);
@@ -235,9 +240,8 @@ module.exports = function votingRoutes(supabaseAdmin) {
       const groupId = String(req.body?.groupId || '').trim();
       const userId = String(req.body?.userId || '').trim();
 
-      if (!isValidUuid(groupId) || !isValidUuid(userId)) {
-        return res.status(400).json({ error: 'groupId and userId must be valid UUIDs.' });
-      }
+      assertUuid(groupId, 'groupId');
+      assertUuid(userId, 'userId');
 
       const group = await getGroupOrThrow(groupId);
       await assertMemberOrThrow(groupId, userId);
@@ -322,9 +326,9 @@ module.exports = function votingRoutes(supabaseAdmin) {
       const groupId = String(req.body?.groupId || '').trim();
       const userId = String(req.body?.userId || '').trim();
 
-      if (!isValidUuid(groupId) || !isValidUuid(userId) || !isValidUuid(optionId)) {
-        return res.status(400).json({ error: 'groupId, userId, and optionId must be valid UUIDs.' });
-      }
+      assertUuid(groupId, 'groupId');
+      assertUuid(userId, 'userId');
+      assertUuid(optionId, 'optionId');
 
       const group = await getGroupOrThrow(groupId);
       await assertMemberOrThrow(groupId, userId);
@@ -434,9 +438,8 @@ module.exports = function votingRoutes(supabaseAdmin) {
       const groupId = String(req.body?.groupId || '').trim();
       const userId = String(req.body?.userId || '').trim();
 
-      if (!isValidUuid(groupId) || !isValidUuid(userId)) {
-        return res.status(400).json({ error: 'groupId and userId must be valid UUIDs.' });
-      }
+      assertUuid(groupId, 'groupId');
+      assertUuid(userId, 'userId');
 
       const group = await getGroupOrThrow(groupId);
       await assertMemberOrThrow(groupId, userId);
@@ -519,6 +522,22 @@ module.exports = function votingRoutes(supabaseAdmin) {
         const wrapped = new Error(error.message || 'Failed to finalize voting.');
         wrapped.status = 502;
         throw wrapped;
+      }
+
+      const { data: members } = await supabaseAdmin
+        .from('group_members')
+        .select('user_id')
+        .eq('group_id', groupId);
+      const recipients = (members || []).map((m) => m.user_id).filter(Boolean);
+
+      await Promise.all(recipients.map((recipientId) =>
+        createNotification(recipientId, 'voting_finalized', JSON.stringify({ deepLink: `/group-chat?groupId=${groupId}`, groupId })),
+      ));
+
+      if (group.voting_deadline) {
+        await Promise.all(recipients.map((recipientId) =>
+          createNotification(recipientId, 'voting_deadline', JSON.stringify({ deepLink: `/voting?groupId=${groupId}`, groupId, votingDeadline: group.voting_deadline })),
+        ));
       }
 
       return res.json({ group: data });

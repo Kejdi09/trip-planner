@@ -6,6 +6,7 @@ const aiRoutes = require("./routes/ai.routes");
 const votingRoutes = require("./routes/voting.routes");
 const groupsRoutes = require("./routes/groups.routes");
 const reviewsRoutes = require("./routes/reviews.routes");
+const notificationsRoutes = require("./routes/notifications.routes");
 require("dotenv").config();
 
 const required = ["SUPABASE_URL", "SUPABASE_SERVICE_KEY"];
@@ -366,12 +367,18 @@ app.use("/api", aiRoutes);
 app.use("/voting", ensureClientEnvMatches, votingRoutes(supabaseAdmin));
 app.use("/groups", ensureClientEnvMatches, groupsRoutes(supabaseAdmin));
 app.use("/reviews-api", ensureClientEnvMatches, reviewsRoutes(supabaseAdmin));
+app.use("/notifications", ensureClientEnvMatches, notificationsRoutes(supabaseAdmin));
 app.use((err, req, res, next) => {
   void next;
   console.error(err);
-  res
-    .status(err.status || 500)
-    .json({ error: err.message || "Internal server error" });
+  const status = err.status || 500;
+  const code = err.code || (status >= 500 ? "INTERNAL_ERROR" : "REQUEST_ERROR");
+  res.status(status).json({
+    error: {
+      code,
+      message: err.message || "Internal server error",
+    },
+  });
 });
 
 module.exports = { app, supabaseAdmin };
