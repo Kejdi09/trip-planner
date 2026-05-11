@@ -14,7 +14,7 @@ import {
   fetchVotingState,
   finalizeVoting,
   VotingStatePayload,
-} from '@/lib/voting-api';
+} from '../../../lib/voting-api';
 
 interface VotingScreenProps {
   tripName?: string;

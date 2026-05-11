@@ -19,7 +19,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppBottomNav } from "@/components/ui/app-bottom-nav";
 import { BrandHeader } from "@/components/ui/brand-header";
-import { createItineraryItem, deleteItineraryItem, fetchItinerary, getActiveUserId } from "@/lib/groups-api";
+import { createItineraryItem, deleteItineraryItem, fetchItinerary, getActiveUserId } from "../../../lib/groups-api";
 
 const AI_API_BASE_URL =
   process.env.EXPO_PUBLIC_AI_API_URL ?? "http://localhost:3000";
@@ -77,7 +77,7 @@ export default function TripDetailScreen() {
   const params = useLocalSearchParams<{ groupId?: string }>();
   const groupId = params.groupId ? String(params.groupId) : null;
 
-  const { width } = useWindowDimensions();
+  useWindowDimensions();
 
   const goToPreviousDay = useCallback(() => {
     setSelectedDay((current) => Math.max(1, current - 1));
@@ -167,7 +167,7 @@ export default function TripDetailScreen() {
 
       return newPlace.id;
     },
-    [selectedDay],
+    [groupId, selectedDay],
   );
 
   const removePlaceFromItinerary = useCallback((placeId: string) => {
@@ -279,7 +279,7 @@ export default function TripDetailScreen() {
       console.log("AI places parsed:", aiPlaces);
       addPlacesFromAI(aiPlaces);
       setSelectedDay(aiPlaces[0].day ?? 1);
-    } catch (error) {
+    } catch {
       Alert.alert("AI error", "Could not generate itinerary.");
     } finally {
       setIsGenerating(false);

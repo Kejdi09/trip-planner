@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { createGroupApi } from '@/lib/groups-api';
+import { createGroupApi } from '../../../lib/groups-api';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TYPE_SCALE = Math.min(Math.max(SCREEN_WIDTH / 390, 0.9), 1.08);

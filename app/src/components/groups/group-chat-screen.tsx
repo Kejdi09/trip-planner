@@ -20,7 +20,7 @@ import {
   ChatMessage,
   Group,
 } from '../friends/dummy-data';
-import { fetchGroupMembers, fetchGroupMessages, fetchMyGroups, getActiveUserId, postGroupMessage } from '@/lib/groups-api';
+import { fetchGroupMembers, fetchGroupMessages, fetchMyGroups, getActiveUserId, postGroupMessage } from '../../../lib/groups-api';
 
 const ACTIVE_USER_ID = getActiveUserId();
 

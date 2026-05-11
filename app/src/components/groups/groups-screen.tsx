@@ -5,8 +5,8 @@ import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppBottomNav } from '@/components/ui/app-bottom-nav';
-import { fetchGroupMembers, fetchMyGroups, getActiveUserId, GroupRow } from '@/lib/groups-api';
-import { COLORS, groupsStyles as styles, rs } from './groups-screen.styles';
+import { fetchGroupMembers, fetchMyGroups, getActiveUserId, GroupRow } from '../../../lib/groups-api';
+import { COLORS, groupsStyles as styles } from './groups-screen.styles';
 
 type GroupMember = { id: string; fullName: string; avatarUrl: string | null; role: 'admin' | 'member' };
 type GroupStatus = 'active' | 'upcoming' | 'completed';

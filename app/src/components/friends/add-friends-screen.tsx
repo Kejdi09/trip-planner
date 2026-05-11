@@ -187,7 +187,7 @@ export function AddFriendsScreen() {
         if (!cancelled) {
           setRequests(data);
         }
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setRequestsError('Could not load friend requests.');
         }

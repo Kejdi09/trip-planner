@@ -15,7 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppBottomNav } from '@/components/ui/app-bottom-nav';
-import { addGroupMember, fetchGroupMembers, fetchMyGroups, getActiveUserId } from '@/lib/groups-api';
+import { addGroupMember, fetchGroupMembers, fetchMyGroups, getActiveUserId } from '../../../lib/groups-api';
 import {
   DUMMY_FRIENDS,
   Friend,
