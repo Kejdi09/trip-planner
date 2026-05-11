@@ -20,7 +20,7 @@ import {
   VoteProgress,
   VoterAvatars,
 } from './_components';
-import { BudgetOption, MOCK_CONFLICT_BUDGETS, VotingTab } from './_types';
+import { BudgetOption, VotingTab } from './_types';
 
 const ConflictBanner = () => (
   <View style={cb.banner}>
@@ -112,20 +112,21 @@ const bc = StyleSheet.create({
 });
 
 interface BudgetConflictScreenProps {
-  tripName?: string; timeLeft?: string; budgetOptions?: BudgetOption[];
+  tripName?: string; timeLeft?: string; budgetOptions: BudgetOption[];
   onTabChange?: (tab: VotingTab) => void; onBack?: () => void; onEndVoting?: () => void;
+  onVote?: (id: string) => void;
+  onCreateBudgetOption?: (min: number, max: number) => void;
 }
 
 const BudgetConflictScreen: React.FC<BudgetConflictScreenProps> = ({
   tripName = 'Summer Europe Trip', timeLeft = '2d left',
-  budgetOptions: initialOptions = MOCK_CONFLICT_BUDGETS, onTabChange, onBack, onEndVoting,
+  budgetOptions, onTabChange, onBack, onEndVoting, onVote, onCreateBudgetOption,
 }) => {
-  const [options, setOptions] = useState<BudgetOption[]>(initialOptions);
   const [customMin, setCustomMin] = useState(0);
   const [customMax, setCustomMax] = useState(20000);
 
   const handleVote = (id: string) =>
-    setOptions((prev) => prev.map((o) => ({ ...o, selected: o.id === id })));
+    onVote?.(id);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -133,11 +134,18 @@ const BudgetConflictScreen: React.FC<BudgetConflictScreenProps> = ({
       <TabBar tabs={['Destinations', 'Dates', 'Budget']} activeTab="Budget" onTabPress={(t) => onTabChange?.(t as VotingTab)} />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <ConflictBanner />
-        {options.map((o) => <BudgetCard key={o.id} option={o} onVote={handleVote} />)}
+        {budgetOptions.map((o) => <BudgetCard key={o.id} option={o} onVote={handleVote} />)}
         <Text style={styles.sectionLabel}>Select another budget range</Text>
         <RangeSlider min={customMin} max={customMax} onChange={(mn, mx) => { setCustomMin(mn); setCustomMax(mx); }} />
         <TouchableOpacity style={styles.btn} onPress={onEndVoting} activeOpacity={0.85}>
           <Text style={styles.btnText}>End Voting</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.btn}
+          onPress={() => onCreateBudgetOption?.(customMin, customMax)}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.btnText}>Add Budget Option</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

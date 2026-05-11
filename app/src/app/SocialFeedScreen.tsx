@@ -233,7 +233,7 @@ const SocialFeedScreen: React.FC = () => {
         {/* Friends' Activity */}
         <View style={styles.section}>
           <View style={styles.activityHeader}>
-            <Text style={styles.sectionTitle}>Friends' Activity</Text>
+            <Text style={styles.sectionTitle}>Friends&apos; Activity</Text>
             <TouchableOpacity accessibilityLabel="Add friend">
               <Ionicons name="person-add-outline" size={22} color={C.textSecondary} />
             </TouchableOpacity>

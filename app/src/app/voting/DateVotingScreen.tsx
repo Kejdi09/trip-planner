@@ -18,7 +18,7 @@ import {
   VoteProgress,
   VoterAvatars,
 } from './_components';
-import { DateOption, MOCK_DATES, VotingTab } from './_types';
+import { DateOption, VotingTab } from './_types';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -165,24 +165,27 @@ const dcStyles = StyleSheet.create({
 interface DateVotingScreenProps {
   tripName?: string;
   timeLeft?: string;
-  dateOptions?: DateOption[];
+  dateOptions: DateOption[];
   onTabChange?: (tab: VotingTab) => void;
   onBack?: () => void;
+  onVote?: (id: string) => void;
+  onCreateDateOption?: (start: Date, end: Date) => void;
 }
 
 const DateVotingScreen: React.FC<DateVotingScreenProps> = ({
   tripName = 'Summer Europe Trip',
   timeLeft = '2d left',
-  dateOptions: initialOptions = MOCK_DATES,
+  dateOptions,
   onTabChange,
   onBack,
+  onVote,
+  onCreateDateOption,
 }) => {
-  const [options, setOptions] = useState<DateOption[]>(initialOptions);
   const [customStart, setCustomStart] = useState<Date | null>(null);
   const [customEnd, setCustomEnd] = useState<Date | null>(null);
 
   const handleVote = (id: string) =>
-    setOptions((prev) => prev.map((o) => ({ ...o, selected: o.id === id })));
+    onVote?.(id);
 
   const formatDate = (d: Date) =>
     d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -196,12 +199,16 @@ const DateVotingScreen: React.FC<DateVotingScreenProps> = ({
         onTabPress={(t) => onTabChange?.(t as VotingTab)}
       />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {options.map((o) => <DateCard key={o.id} option={o} onVote={handleVote} />)}
+        {dateOptions.map((o) => <DateCard key={o.id} option={o} onVote={handleVote} />)}
         <Text style={styles.sectionLabel}>Select another date range</Text>
         <Calendar
           selectedStart={customStart}
           selectedEnd={customEnd}
-          onRangeSelect={(s, e) => { setCustomStart(s); setCustomEnd(e); }}
+          onRangeSelect={(s, e) => {
+            setCustomStart(s);
+            setCustomEnd(e);
+            onCreateDateOption?.(s, e);
+          }}
         />
         {customStart && customEnd && (
           <View style={styles.selectedRangeRow}>
