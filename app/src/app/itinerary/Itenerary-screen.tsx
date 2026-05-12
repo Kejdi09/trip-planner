@@ -19,9 +19,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { BrandHeader } from "@/components/ui/brand-header";
 import { createItineraryItem, deleteItineraryItem, fetchItinerary, getActiveUserId } from "../../../lib/groups-api";
+import { API_BASE_URL, APP_ENV } from "../../../lib/app-config";
 
-const AI_API_BASE_URL =
-  process.env.EXPO_PUBLIC_AI_API_URL ?? "http://localhost:3000";
 
 type TimeBlock = "morning" | "afternoon" | "evening" | "unscheduled";
 
@@ -48,14 +47,6 @@ type AddPlaceInput = {
   description?: string;
 };
 
-const trip = {
-  title: "Summer Europe Trip",
-  city: "Barcelona",
-  country: "Spain",
-  startDate: "2026-06-15",
-  endDate: "2026-06-25",
-  totalDays: 5,
-};
 
 function createId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -77,6 +68,19 @@ export default function TripDetailScreen() {
   const groupId = params.groupId ? String(params.groupId) : null;
 
   useWindowDimensions();
+
+  const currentUserId = React.useMemo(() => getActiveUserId(), []);
+  const [tripContext, setTripContext] = useState<any>(null);
+  const [contextLoading, setContextLoading] = useState(true);
+  const [contextError, setContextError] = useState<string | null>(null);
+  const trip = {
+    title: tripContext?.groupName ?? '',
+    city: tripContext?.destination?.city ?? '',
+    country: tripContext?.destination?.country ?? '',
+    startDate: tripContext?.dates?.startDate ?? '',
+    endDate: tripContext?.dates?.endDate ?? '',
+    totalDays: tripContext?.dates?.totalDays ?? 1,
+  };
 
   const goToPreviousDay = useCallback(() => {
     setSelectedDay((current) => Math.max(1, current - 1));
@@ -109,10 +113,28 @@ export default function TripDetailScreen() {
   const [isGenerating, setIsGenerating] = useState(false);
 
   React.useEffect(() => {
+    if (!groupId || !currentUserId) { setContextLoading(false); return; }
+    const loadContext = async () => {
+      try {
+        setContextLoading(true); setContextError(null);
+        const params = new URLSearchParams({ groupId, userId: currentUserId });
+        const response = await fetch(`${API_BASE_URL}/api/itinerary-context?${params.toString()}`, { headers: { 'x-app-env': APP_ENV } });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload?.error || 'Unable to load itinerary context');
+        setTripContext(payload);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Unable to load itinerary context';
+        setContextError(msg.includes('date range') ? 'Select trip dates in voting before generating an itinerary.' : msg);
+      } finally { setContextLoading(false); }
+    };
+    void loadContext();
+  }, [groupId, currentUserId]);
+
+  React.useEffect(() => {
     if (!groupId) return;
     const load = async () => {
       try {
-        const { items } = await fetchItinerary(groupId, getActiveUserId());
+        const { items } = await fetchItinerary(groupId, currentUserId);
         setPlaces(items.map((item) => ({
           id: item.id,
           name: item.title,
@@ -161,7 +183,7 @@ export default function TripDetailScreen() {
         const dayDate = new Date(trip.startDate);
         dayDate.setDate(dayDate.getDate() + (newPlace.day - 1));
         const date = dayDate.toISOString().slice(0, 10);
-        void createItineraryItem(groupId, newPlace.name, date, newPlace.startTime ?? null, getActiveUserId());
+        void createItineraryItem(groupId, newPlace.name, date, newPlace.startTime ?? null, currentUserId);
       }
 
       return newPlace.id;
@@ -172,7 +194,7 @@ export default function TripDetailScreen() {
   const removePlaceFromItinerary = useCallback((placeId: string) => {
     setPlaces((current) => current.filter((place) => place.id !== placeId));
     if (groupId) {
-      void deleteItineraryItem(groupId, placeId, getActiveUserId());
+      void deleteItineraryItem(groupId, placeId, currentUserId);
     }
   }, [groupId]);
 
@@ -208,7 +230,7 @@ export default function TripDetailScreen() {
       setIsGenerating(true);
 
       const response = await fetch(
-        `${AI_API_BASE_URL}/api/generate-itinerary`,
+        `${API_BASE_URL}/api/generate-itinerary`,
         {
           method: "POST",
           headers: {
@@ -216,6 +238,7 @@ export default function TripDetailScreen() {
           },
           body: JSON.stringify({
             groupId,
+            userId: currentUserId,
           }),
         },
       );
@@ -280,6 +303,10 @@ export default function TripDetailScreen() {
       setIsGenerating(false);
     }
   };
+
+  if (contextLoading) { return <SafeAreaView style={styles.safeArea}><View style={styles.screen}><Text style={{ padding: 24 }}>Loading trip context...</Text></View></SafeAreaView>; }
+
+  if (contextError) { return <SafeAreaView style={styles.safeArea}><View style={styles.screen}><Text style={{ padding: 24, color: "#BE123C" }}>{contextError}</Text></View></SafeAreaView>; }
 
   const renderDayTabs = () => {
     return (
