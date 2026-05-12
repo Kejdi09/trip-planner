@@ -363,7 +363,7 @@ app.delete("/wishlists", ensureClientEnvMatches, async (req, res, next) => {
   }
 });
 
-app.use("/api", aiRoutes);
+app.use("/api", aiRoutes(supabaseAdmin));
 app.use("/voting", ensureClientEnvMatches, votingRoutes(supabaseAdmin));
 app.use("/groups", ensureClientEnvMatches, groupsRoutes(supabaseAdmin));
 app.use("/api/groups", ensureClientEnvMatches, groupsRoutes(supabaseAdmin));

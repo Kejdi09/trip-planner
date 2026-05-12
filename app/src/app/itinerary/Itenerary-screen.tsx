@@ -215,13 +215,7 @@ export default function TripDetailScreen() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            city: trip.city,
-            country: trip.country,
-            days: trip.totalDays,
-            startDate: trip.startDate,
-            endDate: trip.endDate,
-            interests: ["food", "history", "landmarks", "walking"],
-            pace: "balanced",
+            groupId,
           }),
         },
       );
@@ -234,6 +228,8 @@ export default function TripDetailScreen() {
       console.log("AI itinerary:", itinerary);
 
       const aiPlaces: AddPlaceInput[] = [];
+      const destinationText = String(itinerary.destination || "");
+      const [destCity, destCountry] = destinationText.split(",").map((part: string) => part.trim());
 
       console.log("AI itinerary response:", JSON.stringify(itinerary, null, 2));
 
@@ -254,8 +250,8 @@ export default function TripDetailScreen() {
 
           aiPlaces.push({
             name,
-            city: trip.city,
-            country: trip.country,
+            city: destCity || trip.city,
+            country: destCountry || trip.country,
             day: dayNumber,
             timeBlock: place.timeBlock ?? place.period ?? "unscheduled",
             startTime: place.startTime ?? place.time,
