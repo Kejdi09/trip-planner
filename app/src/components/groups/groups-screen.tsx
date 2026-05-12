@@ -76,7 +76,7 @@ function MemberAvatar({
 // Active group card
 // ---------------------------------------------------------------------------
 
-function ActiveGroupCard({ group, onInvite, onPress }: { group: Group; onInvite: () => void; onPress: () => void }) {
+function ActiveGroupCard({ group, onInvite, onPress, onPressVoting }: { group: Group; onInvite: () => void; onPress: () => void; onPressVoting: () => void }) {
   const adminMember = group.members.find((m) => m.id === group.adminId);
   const adminLabel = adminMember
     ? adminMember.id === CURRENT_USER.id
@@ -92,9 +92,9 @@ function ActiveGroupCard({ group, onInvite, onPress }: { group: Group; onInvite:
       <View style={styles.activeCardTopRow}>
         <Text style={styles.activeCardName}>{group.name}</Text>
         {group.votingOpen && (
-          <View style={styles.votingBadge}>
+          <Pressable style={styles.votingBadge} onPress={onPressVoting}>
             <Text style={styles.votingBadgeText}>{'Voting\nOpen'}</Text>
-          </View>
+          </Pressable>
         )}
       </View>
 

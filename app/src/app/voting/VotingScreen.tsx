@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { supabase } from '../../../lib/supabase';
 import { VotingTab } from './_types';
 
 import DestinationVotingScreen from './DestinationVotingScreen';
@@ -35,8 +36,8 @@ const VotingScreen: React.FC<VotingScreenProps> = ({
 }) => {
   const params = useLocalSearchParams<{ groupId?: string; userId?: string }>();
   const router = useRouter();
-  const groupId = String(params.groupId || '00000000-0000-4000-8000-000000000001');
-  const userId = String(params.userId || '00000000-0000-4000-8000-000000000002');
+  const groupId = String(params.groupId || '');
+  const [userId, setUserId] = useState(String(params.userId || ''));
   const [activeTab, setActiveTab] = useState<VotingTab>(initialTab);
   const [state, setState] = useState<VotingStatePayload | null>(null);
 
@@ -50,8 +51,18 @@ const VotingScreen: React.FC<VotingScreenProps> = ({
   }, [groupId, userId]);
 
   React.useEffect(() => {
+    const loadUser = async () => {
+      if (userId) return;
+      const { data } = await supabase.auth.getUser();
+      setUserId(data.user?.id ?? '');
+    };
+    void loadUser();
+  }, [userId]);
+
+  React.useEffect(() => {
+    if (!groupId || !userId) return;
     void loadState();
-  }, [loadState]);
+  }, [groupId, userId, loadState]);
 
   const handleVote = React.useCallback(async (type: 'destination' | 'date' | 'budget', optionId: string) => {
     try {
@@ -87,7 +98,11 @@ const VotingScreen: React.FC<VotingScreenProps> = ({
       await finalizeVoting(groupId, userId);
       onFinishVoting?.();
       onEndVoting?.();
-      router.replace('/group-chat');
+      if (groupId) {
+        router.replace({ pathname: '/itinerary', params: { groupId } });
+      } else {
+        router.replace('/groups');
+      }
     } catch (error) {
       Alert.alert('Finalize voting', error instanceof Error ? error.message : 'Unable to finalize voting.');
     }
@@ -97,7 +112,7 @@ const VotingScreen: React.FC<VotingScreenProps> = ({
     tripName,
     timeLeft,
     onTabChange: setActiveTab,
-    onBack,
+    onBack: onBack ?? (() => router.back()),
   };
 
   const destinationOptions = state?.destinations.options.map((o) => ({

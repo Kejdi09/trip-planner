@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { router } from 'expo-router';
 import {
   View,
   Text,
@@ -96,8 +97,8 @@ const C = {
 };
 
 // ─── Trending Card ────────────────────────────────────────────────────────────
-const TrendingCard: React.FC<{ item: TrendingDestination }> = ({ item }) => (
-  <TouchableOpacity style={tStyles.card} activeOpacity={0.85}>
+const TrendingCard: React.FC<{ item: TrendingDestination; onPress: () => void }> = ({ item, onPress }) => (
+  <TouchableOpacity style={tStyles.card} activeOpacity={0.85} onPress={onPress}>
     <View style={tStyles.imageWrapper}>
       <Image source={{ uri: item.image }} style={tStyles.image} resizeMode="cover" />
     </View>
@@ -132,8 +133,8 @@ const tStyles = StyleSheet.create({
 });
 
 // ─── Activity Card ────────────────────────────────────────────────────────────
-const ActivityCard: React.FC<{ post: ActivityPost }> = ({ post }) => (
-  <View style={aStyles.card}>
+const ActivityCard: React.FC<{ post: ActivityPost; onPress: () => void }> = ({ post, onPress }) => (
+  <TouchableOpacity style={aStyles.card} activeOpacity={0.9} onPress={onPress}>
     <View style={aStyles.header}>
       <View style={[aStyles.avatar, { backgroundColor: post.userColor }]}>
         <Text style={aStyles.initials}>{post.userInitials}</Text>
@@ -148,7 +149,7 @@ const ActivityCard: React.FC<{ post: ActivityPost }> = ({ post }) => (
       <Text style={aStyles.time}>{post.timeAgo}</Text>
     </View>
     <Image source={{ uri: post.image }} style={aStyles.image} resizeMode="cover" />
-  </View>
+  </TouchableOpacity>
 );
 
 const aStyles = StyleSheet.create({
@@ -222,7 +223,7 @@ const SocialFeedScreen: React.FC = () => {
             contentContainerStyle={styles.trendingRow}
           >
             {TRENDING.map((item) => (
-              <TrendingCard key={item.id} item={item} />
+              <TrendingCard key={item.id} item={item} onPress={() => router.push('/destination-overview')} />
             ))}
           </ScrollView>
         </View>
@@ -234,12 +235,12 @@ const SocialFeedScreen: React.FC = () => {
         <View style={styles.section}>
           <View style={styles.activityHeader}>
             <Text style={styles.sectionTitle}>Friends&apos; Activity</Text>
-            <TouchableOpacity accessibilityLabel="Add friend">
+            <TouchableOpacity accessibilityLabel="Add friend" onPress={() => router.push('/add-friends')}>
               <Ionicons name="person-add-outline" size={22} color={C.textSecondary} />
             </TouchableOpacity>
           </View>
           {ACTIVITY.map((post) => (
-            <ActivityCard key={post.id} post={post} />
+            <ActivityCard key={post.id} post={post} onPress={() => router.push('/profile')} />
           ))}
         </View>
       </ScrollView>
