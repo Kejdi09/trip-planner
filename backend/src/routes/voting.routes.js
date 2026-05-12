@@ -18,11 +18,6 @@ function isVotingLocked(group) {
 module.exports = function votingRoutes(supabaseAdmin) {
   const router = express.Router();
 
-  async function createNotification(userId, type, content) {
-    const { error } = await supabaseAdmin.from('notifications').insert({ user_id: userId, type, content });
-    if (error) throw makeError(error.message || 'Failed to create notification.', 502, 'UPSTREAM_ERROR');
-  }
-
   async function getGroupOrThrow(groupId) {
     const { data, error } = await supabaseAdmin
       .from('groups')
