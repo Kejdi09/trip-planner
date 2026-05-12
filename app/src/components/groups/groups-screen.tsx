@@ -88,15 +88,6 @@ function ActiveGroupCard({ group, onInvite, onPress, onPressVoting, onDelete, ca
 
   return (
     <View style={{ position: 'relative' }}>
-      {canDelete ? (
-        <Pressable
-          onPress={onDelete}
-          style={{ position: 'absolute', top: 10, right: 10, zIndex: 3 }}
-          accessibilityRole='button'
-          accessibilityLabel='Delete group'>
-          <Feather name='x-circle' size={20} color={COLORS.upcomingText} />
-        </Pressable>
-      ) : null}
     <Pressable style={styles.activeCard} onPress={onPress}>
       <View style={styles.activeCardTopRow}>
         <Text style={styles.activeCardName}>{group.name}</Text>
@@ -144,6 +135,15 @@ function ActiveGroupCard({ group, onInvite, onPress, onPressVoting, onDelete, ca
         )}
       </View>
     </Pressable>
+      {canDelete ? (
+        <Pressable
+          onPress={onDelete}
+          style={{ position: 'absolute', top: 10, right: 10, zIndex: 5, elevation: 5 }}
+          accessibilityRole='button'
+          accessibilityLabel='Delete group'>
+          <Feather name='x-circle' size={20} color={COLORS.upcomingText} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -167,7 +167,6 @@ function statusLabel(status: GroupStatus): string {
 function OtherGroupRow({ group, onPress, canDelete, onDelete }: { group: Group; onPress: () => void; canDelete: boolean; onDelete: () => void }) {
   return (
     <View style={{ position: 'relative' }}>
-      {canDelete ? <Pressable onPress={onDelete} style={{ position: 'absolute', top: 10, right: 10, zIndex: 3 }} accessibilityRole='button' accessibilityLabel='Delete group'><Feather name='x-circle' size={18} color={COLORS.upcomingText} /></Pressable> : null}
     <Pressable style={styles.otherCard} onPress={onPress}>
       <View style={styles.otherCardIcon}>
         <Ionicons name="people-outline" size={22} color={COLORS.mutedText} />
@@ -183,6 +182,7 @@ function OtherGroupRow({ group, onPress, canDelete, onDelete }: { group: Group; 
       </View>
       <Feather name="chevron-right" size={20} color={COLORS.chevron} style={styles.chevron} />
     </Pressable>
+      {canDelete ? <Pressable onPress={onDelete} style={{ position: 'absolute', top: 10, right: 10, zIndex: 5, elevation: 5 }} accessibilityRole='button' accessibilityLabel='Delete group'><Feather name='x-circle' size={18} color={COLORS.upcomingText} /></Pressable> : null}
     </View>
   );
 }

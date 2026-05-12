@@ -224,7 +224,9 @@ function formatChatTime(createdAt: string | Date) {
 // ---------------------------------------------------------------------------
 
 export function GroupChatScreen() {
-  const { groupId } = useLocalSearchParams<{ groupId: string }>();
+  const params = useLocalSearchParams<{ groupId?: string | string[] }>();
+  const rawGroupId = params.groupId;
+  const groupId = Array.isArray(rawGroupId) ? rawGroupId[0] : rawGroupId;
   const [group, setGroup] = React.useState<Group | null>(null);
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [loading, setLoading] = React.useState(true);
