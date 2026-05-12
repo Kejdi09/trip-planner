@@ -1,5 +1,6 @@
 const express = require('express');
 const { assertUuid, makeError } = require('../utils/http');
+const { geocodeCityFromQuery } = require('../services/mapbox');
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -70,6 +71,41 @@ module.exports = function groupsRoutes(supabaseAdmin) {
       wrapped.status = 403;
       throw wrapped;
     }
+  }
+
+
+  async function resolveDestinationPlaceIdFromGroupName(groupName) {
+    const cityCountry = await geocodeCityFromQuery(groupName);
+    if (!cityCountry) return null;
+
+    const city = cityCountry.city;
+    const country = cityCountry.country;
+
+    const { data: existing, error: existingError } = await supabaseAdmin
+      .from('places')
+      .select('id, city, country')
+      .ilike('city', city)
+      .ilike('country', country)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingError) {
+      throw makeError(existingError.message || 'Failed to find destination place.', 502, 'UPSTREAM_ERROR');
+    }
+
+    if (existing?.id) return existing.id;
+
+    const { data: created, error: createdError } = await supabaseAdmin
+      .from('places')
+      .insert({ name: city, city, country, description: null })
+      .select('id')
+      .single();
+
+    if (createdError) {
+      throw makeError(createdError.message || 'Failed to create destination place.', 502, 'UPSTREAM_ERROR');
+    }
+
+    return created.id;
   }
 
   async function requireCreator(groupId, userId) {
@@ -158,6 +194,13 @@ module.exports = function groupsRoutes(supabaseAdmin) {
         });
       }
 
+      let destinationPlaceId = null;
+      try {
+        destinationPlaceId = await resolveDestinationPlaceIdFromGroupName(name);
+      } catch (error) {
+        console.warn('Mapbox destination lookup failed:', error?.message || error);
+      }
+
       const { data: group, error: groupError } = await supabaseAdmin
         .from('groups')
         .insert({
@@ -165,6 +208,7 @@ module.exports = function groupsRoutes(supabaseAdmin) {
           description,
           created_by: createdBy,
           status: 'planning',
+          destination_place_id: destinationPlaceId,
         })
         .select('*')
         .single();
