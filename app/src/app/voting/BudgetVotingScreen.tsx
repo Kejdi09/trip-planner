@@ -82,7 +82,7 @@ const sl = StyleSheet.create({
 
 interface BudgetCardProps { option: BudgetOption; onVote: (id: string) => void; }
 const BudgetCard: React.FC<BudgetCardProps> = ({ option, onVote }) => (
-  <OptionCard selected={option.selected} onPress={() => onVote(option.id)}>
+  <OptionCard selected={option.selected} onPress={() => !votingFinished && onVote(option.id)}>
     <View style={bc.row}>
       <View style={bc.info}>
         <Text style={bc.label}>{option.label}</Text>
@@ -102,15 +102,14 @@ const bc = StyleSheet.create({
 });
 
 interface BudgetVotingScreenProps {
-  tripName?: string; timeLeft?: string; budgetOptions: BudgetOption[];
-  onTabChange?: (tab: VotingTab) => void; onBack?: () => void; onFinishVoting?: () => void;
-  onVote?: (id: string) => void;
-  onCreateBudgetOption?: (min: number, max: number) => void;
+  tripName?: string; timeLeft?: string; votingFinished?: boolean; budgetOptions: BudgetOption[];
+  onTabChange?: (tab: VotingTab) => void; onBack?: () => void;   onVote?: (id: string) => void;
+  onCreateBudgetOption?: (min: number, max: number) => void; totalBudgetMin?: number; totalBudgetMax?: number;
 }
 
 const BudgetVotingScreen: React.FC<BudgetVotingScreenProps> = ({
   tripName = 'Summer Europe Trip', timeLeft = '2d left',
-  budgetOptions, onTabChange, onBack, onFinishVoting, onVote, onCreateBudgetOption,
+  budgetOptions, onTabChange, onBack, onVote, onCreateBudgetOption, totalBudgetMin = 0, totalBudgetMax = 0, votingFinished,
 }) => {
   const [customMin, setCustomMin] = useState(0);
   const [customMax, setCustomMax] = useState(20000);
@@ -121,17 +120,15 @@ const BudgetVotingScreen: React.FC<BudgetVotingScreenProps> = ({
   return (
     <SafeAreaView style={styles.safe}>
       <Header title={tripName} timeLeft={timeLeft} onBack={onBack} />
-      <TabBar tabs={['Destinations', 'Dates', 'Budget']} activeTab="Budget" onTabPress={(t) => onTabChange?.(t as VotingTab)} />
+      <TabBar tabs={['Dates', 'Budget']} activeTab="Budget" onTabPress={(t) => onTabChange?.(t as VotingTab)} />
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {budgetOptions.map((o) => <BudgetCard key={o.id} option={o} onVote={handleVote} />)}
+        <Text style={styles.sectionLabel}>{`Total budget range: €${totalBudgetMin} - €${totalBudgetMax}`}</Text>
         <Text style={styles.sectionLabel}>Select another budget range</Text>
         <RangeSlider min={customMin} max={customMax} onChange={(mn, mx) => { setCustomMin(mn); setCustomMax(mx); }} />
-        <TouchableOpacity style={styles.btn} onPress={onFinishVoting} activeOpacity={0.85}>
-          <Text style={styles.btnText}>Finish Voting</Text>
-        </TouchableOpacity>
         <TouchableOpacity
           style={styles.btn}
-          onPress={() => onCreateBudgetOption?.(customMin, customMax)}
+          onPress={() => !votingFinished && onCreateBudgetOption?.(customMin, customMax)}
           activeOpacity={0.85}
         >
           <Text style={styles.btnText}>Add Budget Option</Text>

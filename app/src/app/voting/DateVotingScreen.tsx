@@ -141,7 +141,7 @@ const calStyles = StyleSheet.create({
 
 interface DateCardProps { option: DateOption; onVote: (id: string) => void; }
 const DateCard: React.FC<DateCardProps> = ({ option, onVote }) => (
-  <OptionCard selected={option.selected} onPress={() => onVote(option.id)}>
+  <OptionCard selected={option.selected} onPress={() => !votingFinished && onVote(option.id)}>
     <View style={dcStyles.row}>
       <View style={dcStyles.info}>
         <Text style={dcStyles.label}>{option.label}</Text>
@@ -164,7 +164,7 @@ const dcStyles = StyleSheet.create({
 
 interface DateVotingScreenProps {
   tripName?: string;
-  timeLeft?: string;
+  timeLeft?: string; votingFinished?: boolean;
   dateOptions: DateOption[];
   onTabChange?: (tab: VotingTab) => void;
   onBack?: () => void;
@@ -179,7 +179,7 @@ const DateVotingScreen: React.FC<DateVotingScreenProps> = ({
   onTabChange,
   onBack,
   onVote,
-  onCreateDateOption,
+  onCreateDateOption, votingFinished,
 }) => {
   const [customStart, setCustomStart] = useState<Date | null>(null);
   const [customEnd, setCustomEnd] = useState<Date | null>(null);
@@ -194,7 +194,7 @@ const DateVotingScreen: React.FC<DateVotingScreenProps> = ({
     <SafeAreaView style={styles.safe}>
       <Header title={tripName} timeLeft={timeLeft} onBack={onBack} />
       <TabBar
-        tabs={['Destinations', 'Dates', 'Budget']}
+        tabs={['Dates', 'Budget']}
         activeTab="Dates"
         onTabPress={(t) => onTabChange?.(t as VotingTab)}
       />
@@ -207,7 +207,7 @@ const DateVotingScreen: React.FC<DateVotingScreenProps> = ({
           onRangeSelect={(s, e) => {
             setCustomStart(s);
             setCustomEnd(e);
-            onCreateDateOption?.(s, e);
+            if (!votingFinished) onCreateDateOption?.(s, e);
           }}
         />
         {customStart && customEnd && (
