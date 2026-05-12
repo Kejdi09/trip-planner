@@ -395,7 +395,7 @@ export default function TripDetailScreen() {
     <SafeAreaView style={styles.screen}>
       <View style={styles.phoneFrame}>
         <View style={styles.header}>
-          <Pressable style={styles.iconButton} onPress={() => router.back()}>
+          <Pressable style={styles.iconButton} onPress={() => router.replace({ pathname: '/group-hub', params: groupId ? { groupId } : undefined })}>
             <Feather name="arrow-left" size={23} color="#111827" />
           </Pressable>
 

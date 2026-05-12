@@ -154,9 +154,10 @@ function statusLabel(status: GroupStatus): string {
   return 'Active';
 }
 
-function OtherGroupRow({ group, onPress }: { group: Group; onPress: () => void }) {
+function OtherGroupRow({ group, onPress, canDelete, onDelete }: { group: Group; onPress: () => void; canDelete: boolean; onDelete: () => void }) {
   return (
     <Pressable style={styles.otherCard} onPress={onPress}>
+      {canDelete ? <Pressable onPress={onDelete} style={{ position: 'absolute', top: 10, right: 10, zIndex: 2 }}><Feather name='x-circle' size={18} color={COLORS.upcomingText} /></Pressable> : null}
       <View style={styles.otherCardIcon}>
         <Ionicons name="people-outline" size={22} color={COLORS.mutedText} />
       </View>
@@ -309,9 +310,7 @@ export function GroupsScreen() {
                     key={g.id}
                     group={g}
                     onPress={() => router.push({ pathname: '../../group-hub', params: { groupId: g.id } })}
-                    onPressVoting={() => router.push({ pathname: '../../voting', params: { groupId: g.id } })}
                     canDelete={g.adminId === currentUserId}
-                    currentUserId={currentUserId}
                     onDelete={() => handleDeleteGroup(g.id)}
                   />
                 ))}

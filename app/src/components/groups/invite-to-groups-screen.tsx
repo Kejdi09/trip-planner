@@ -292,7 +292,7 @@ export function InviteToGroupScreen() {
       <View style={styles.screen}>
         {/* Header */}
         <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={() => router.back()} accessibilityRole="button">
+          <Pressable style={styles.backButton} onPress={() => router.replace({ pathname: '/group-hub', params: groupId ? { groupId } : undefined })} accessibilityRole="button">
             <Feather name="arrow-left" size={18} color="#111318" />
           </Pressable>
           <Text style={styles.title}>Add to Group</Text>

@@ -298,6 +298,17 @@ export function GroupChatScreen() {
     }
   };
 
+  if (!groupId) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={[styles.screen, { alignItems: 'center', justifyContent: 'center', padding: 24 }]}>
+          <Text style={{ color: C.text, fontSize: 16, fontWeight: '600' }}>Missing group context.</Text>
+          <Pressable onPress={() => router.replace('/groups')} style={{ marginTop: 14 }}><Text style={{ color: C.primary, fontWeight: '700' }}>Back to Groups</Text></Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   // Header avatar stack
   const visibleMembers = group?.members.slice(0, 3) ?? [];
   const extraCount = (group?.members.length ?? 0) - visibleMembers.length;
@@ -396,7 +407,7 @@ export function GroupChatScreen() {
         )}
 
         {/* Input bar */}
-        <View style={[styles.inputBar, { paddingBottom: Math.max(10, insets.bottom + 4) }]}>
+        <View style={[styles.inputBar, { paddingBottom: Math.max(10, insets.bottom + 78) }]}>
           <View style={styles.inputWrapper}>
             <TextInput
               value={inputText}

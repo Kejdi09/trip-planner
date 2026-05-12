@@ -1,22 +1,29 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { fetchMyGroups } from '../../../lib/groups-api';
+import { deleteGroupApi, fetchMyGroups, getActiveUserId } from '../../../lib/groups-api';
+import { supabase } from '../../../lib/supabase';
 
 export function GroupHubScreen() {
   const { groupId } = useLocalSearchParams<{ groupId?: string }>();
   const [groupName, setGroupName] = React.useState('Your Group');
+  const [isCreator, setIsCreator] = React.useState(false);
+  const [currentUserId, setCurrentUserId] = React.useState(getActiveUserId());
 
   React.useEffect(() => {
     if (!groupId) return;
     (async () => {
       try {
         const { groups } = await fetchMyGroups();
+        const { data } = await supabase.auth.getUser();
+        const uid = data.user?.id ?? getActiveUserId();
+        setCurrentUserId(uid);
         const match = groups.find((g) => g.id === groupId);
         if (match?.name) setGroupName(match.name);
+        setIsCreator(Boolean(match?.created_by && match.created_by === uid));
       } catch {}
     })();
   }, [groupId]);
@@ -25,10 +32,13 @@ export function GroupHubScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <Pressable style={styles.backBtn} onPress={() => router.back()}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Pressable style={styles.backBtn} onPress={() => router.replace('/groups')}>
           <Feather name="arrow-left" size={20} color="#0F172A" />
         </Pressable>
+        {isCreator ? <Pressable style={styles.backBtn} onPress={() => Alert.alert('Delete group?', 'Are you sure you want to delete this group? This will remove its members, chat, votes, and itinerary.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Delete', style: 'destructive', onPress: async () => { if (!groupId) return; await deleteGroupApi(groupId, currentUserId); router.replace('/groups'); } }])}><Feather name='x-circle' size={20} color='#BE123C' /></Pressable> : <View style={{ width: 38 }} />}
+        </View>
         <Text style={styles.title}>{groupName}</Text>
         <Text style={styles.subtitle}>Choose what your group wants to do</Text>
 
@@ -57,14 +67,14 @@ export function GroupHubScreen() {
             <Text style={styles.cardSub}>Invite friends to this trip</Text>
           </Pressable>
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#F4FBFC' },
-  container: { flex: 1, padding: 20 },
+  container: { padding: 20, paddingBottom: 120 },
   backBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   title: { marginTop: 18, fontSize: 28, fontWeight: '800', color: '#0F172A' },
   subtitle: { marginTop: 6, color: '#5B6B77', fontSize: 14 },
