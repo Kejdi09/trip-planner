@@ -191,6 +191,29 @@ module.exports = function groupsRoutes(supabaseAdmin) {
     }
   });
 
+
+  router.delete('/:groupId', async (req, res, next) => {
+    try {
+      const groupId = String(req.params.groupId || '').trim();
+      const userId = String(req.body?.userId || req.query.userId || '').trim();
+      assertUuid(groupId, 'groupId');
+      assertUuid(userId, 'userId');
+
+      await requireCreator(groupId, userId);
+
+      const { error } = await supabaseAdmin.from('groups').delete().eq('id', groupId);
+      if (error) {
+        const wrapped = new Error(error.message || 'Failed to delete group.');
+        wrapped.status = 502;
+        throw wrapped;
+      }
+
+      return res.json({ success: true });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
   router.patch('/:groupId', async (req, res, next) => {
     try {
       const groupId = String(req.params.groupId || '').trim();

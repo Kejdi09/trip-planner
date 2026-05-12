@@ -15,13 +15,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { addGroupMember, fetchGroupMembers, fetchMyGroups, getActiveUserId } from '../../../lib/groups-api';
-import {
-  DUMMY_FRIENDS,
-  Friend,
-  Group,
-} from '../friends/dummy-data';
+import { supabase } from '../../../lib/supabase';
 
-const ACTIVE_USER_ID = getActiveUserId();
+type Friend = { id: string; fullName: string; username: string; avatarUrl: string | null; tripCount: number };
+type Group = { id: string; name: string; adminId: string; members: { id: string; fullName: string; username: string; avatarUrl: string | null; tripCount: number; role: 'admin' | 'member' }[]; status: string; votingOpen: boolean; places: { name: string }[]; dateRange: string | null; budgetRange: string | null; destination: string | null };
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TYPE_SCALE = Math.min(Math.max(SCREEN_WIDTH / 390, 0.9), 1.08);
@@ -208,6 +205,8 @@ export function InviteToGroupScreen() {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [invitedIds, setInvitedIds] = React.useState<Set<string>>(new Set());
   const [sendingIds, setSendingIds] = React.useState<Set<string>>(new Set());
+  const [friends, setFriends] = React.useState<Friend[]>([]);
+  const [activeUserId, setActiveUserId] = React.useState(getActiveUserId());
 
   // Load group to know who's already a member
   React.useEffect(() => {
@@ -239,13 +238,31 @@ export function InviteToGroupScreen() {
     }
   }, [groupId]);
 
+  React.useEffect(() => {
+    (async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      const me = auth.user?.id ?? getActiveUserId();
+      setActiveUserId(me);
+      if (!me) return;
+      const { data: rows } = await supabase
+        .from('friendships')
+        .select('requester_id, receiver_id')
+        .eq('status', 'accepted')
+        .or(`requester_id.eq.${me},receiver_id.eq.${me}`);
+      const ids = (rows ?? []).map((r) => (r.requester_id === me ? r.receiver_id : r.requester_id));
+      if (ids.length === 0) { setFriends([]); return; }
+      const { data: profiles } = await supabase.from('profiles').select('id, full_name, username, avatar_url').in('id', ids);
+      setFriends((profiles ?? []).map((p) => ({ id: p.id, fullName: p.full_name ?? p.username ?? 'Friend', username: p.username ?? 'friend', avatarUrl: p.avatar_url ?? null, tripCount: 0 })));
+    })();
+  }, []);
+
   const alreadyMemberIds = React.useMemo(
     () => new Set(group?.members.map((m) => m.id) ?? []),
     [group],
   );
 
   const eligibleFriends = React.useMemo(
-    () => DUMMY_FRIENDS.filter((f) => !alreadyMemberIds.has(f.id)),
+    () => friends.filter((f) => !alreadyMemberIds.has(f.id) && f.id !== activeUserId),
     [alreadyMemberIds],
   );
 
@@ -263,7 +280,7 @@ export function InviteToGroupScreen() {
     if (!groupId || invitedIds.has(friend.id)) return;
     setSendingIds((prev) => new Set(prev).add(friend.id));
     try {
-      await addGroupMember(groupId, ACTIVE_USER_ID, ACTIVE_USER_ID);
+      await addGroupMember(groupId, friend.id, activeUserId);
       setInvitedIds((prev) => new Set(prev).add(friend.id));
     } finally {
       setSendingIds((prev) => { const n = new Set(prev); n.delete(friend.id); return n; });

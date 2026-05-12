@@ -1,7 +1,7 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { fetchGroupMembers, fetchMyGroups, getActiveUserId, GroupRow } from '../../../lib/groups-api';
@@ -22,7 +22,6 @@ type Group = {
   destination: string | null;
 };
 
-const CURRENT_USER = { id: getActiveUserId() };
 
 function mapStatus(row: GroupRow): GroupStatus {
   if (row.status === 'active') return 'active';
@@ -75,10 +74,10 @@ function MemberAvatar({
 // Active group card
 // ---------------------------------------------------------------------------
 
-function ActiveGroupCard({ group, onInvite, onPress, onPressVoting }: { group: Group; onInvite: () => void; onPress: () => void; onPressVoting: () => void }) {
+function ActiveGroupCard({ group, onInvite, onPress, onPressVoting, onDelete, canDelete, currentUserId }: { group: Group; onInvite: () => void; onPress: () => void; onPressVoting: () => void; onDelete: () => void; canDelete: boolean; currentUserId: string }) {
   const adminMember = group.members.find((m) => m.id === group.adminId);
   const adminLabel = adminMember
-    ? adminMember.id === CURRENT_USER.id
+    ? adminMember.id === currentUserId
       ? 'Admin: You'
       : `Admin: ${adminMember.fullName.split(' ')[0]} ${adminMember.fullName.split(' ')[1]?.[0] ?? ''}.`
     : '';
@@ -90,6 +89,7 @@ function ActiveGroupCard({ group, onInvite, onPress, onPressVoting }: { group: G
     <Pressable style={styles.activeCard} onPress={onPress}>
       <View style={styles.activeCardTopRow}>
         <Text style={styles.activeCardName}>{group.name}</Text>
+        {canDelete && <Pressable onPress={onDelete}><Feather name='x-circle' size={20} color={COLORS.upcomingText} /></Pressable>}
         {group.votingOpen && (
           <Pressable style={styles.votingBadge} onPress={onPressVoting}>
             <Text style={styles.votingBadgeText}>{'Voting\nOpen'}</Text>
@@ -180,8 +180,10 @@ function OtherGroupRow({ group, onPress }: { group: Group; onPress: () => void }
 export function GroupsScreen() {
   const [groups, setGroups] = React.useState<Group[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [currentUserId, setCurrentUserId] = React.useState(getActiveUserId());
 
   React.useEffect(() => {
+    void (async () => { const { data } = await (await import('../../../lib/supabase')).supabase.auth.getUser(); setCurrentUserId(data.user?.id ?? getActiveUserId()); })();
     const load = async () => {
       try {
         const { groups: rows } = await fetchMyGroups();

@@ -50,6 +50,12 @@ export function GroupHubScreen() {
             <Text style={styles.cardTitle}>Itinerary</Text>
             <Text style={styles.cardSub}>Plan daily activities</Text>
           </Pressable>
+
+          <Pressable style={styles.card} onPress={() => router.push({ pathname: '/invite-to-group', params: routeParams })}>
+            <Ionicons name="person-add-outline" size={30} color="#008D9B" />
+            <Text style={styles.cardTitle}>Add Friends</Text>
+            <Text style={styles.cardSub}>Invite friends to this trip</Text>
+          </Pressable>
         </View>
       </View>
     </SafeAreaView>

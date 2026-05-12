@@ -148,3 +148,11 @@ export async function deleteItineraryItem(groupId: string, itemId: string, userI
     if (!response.ok) throw new Error(payload.error ?? 'Delete failed');
   });
 }
+
+export async function deleteGroupApi(groupId: string, userId?: string) {
+  const resolvedUserId = await resolveActiveUserId(userId);
+  return request<{ success: true }>(`/api/groups/${groupId}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ userId: resolvedUserId }),
+  });
+}
