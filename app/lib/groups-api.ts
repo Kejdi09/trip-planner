@@ -2,7 +2,10 @@ import { API_BASE_URL, APP_ENV } from './app-config';
 
 const DEMO_USER_ID = '00000000-0000-4000-8000-000000000002';
 
-const base = () => (API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL);
+const base = () => {
+  const trimmed = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+  return trimmed.endsWith('/api') ? trimmed.slice(0, -4) : trimmed;
+};
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${base()}${path}`, {
@@ -14,8 +17,31 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
 
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.error ?? 'Groups API request failed');
+  const rawBody = await response.text();
+  const payload = rawBody
+    ? ((() => {
+        try {
+          return JSON.parse(rawBody);
+        } catch {
+          return {};
+        }
+      })() as Record<string, unknown>)
+    : {};
+
+  if (!response.ok) {
+    const errorValue = payload.error as unknown;
+    const apiMessage =
+      typeof errorValue === 'string'
+        ? errorValue
+        : typeof errorValue === 'object' && errorValue !== null && 'message' in errorValue && typeof (errorValue as { message?: unknown }).message === 'string'
+          ? (errorValue as { message: string }).message
+          : rawBody || 'Unknown error response';
+
+    const message = `Groups API request failed (${response.status} ${response.statusText}) for ${path}: ${apiMessage}`;
+    console.error(message, { url: `${base()}${path}`, status: response.status, body: rawBody });
+    throw new Error(message);
+  }
+
   return payload as T;
 }
 
