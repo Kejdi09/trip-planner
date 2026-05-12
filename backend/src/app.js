@@ -365,7 +365,7 @@ app.delete("/wishlists", ensureClientEnvMatches, async (req, res, next) => {
 
 app.use("/api", aiRoutes);
 app.use("/voting", ensureClientEnvMatches, votingRoutes(supabaseAdmin));
-app.use("/groups", ensureClientEnvMatches, groupsRoutes(supabaseAdmin));
+app.use("/api/groups", ensureClientEnvMatches, groupsRoutes(supabaseAdmin));
 app.use("/reviews-api", ensureClientEnvMatches, reviewsRoutes(supabaseAdmin));
 app.use("/notifications", ensureClientEnvMatches, notificationsRoutes(supabaseAdmin));
 app.use((err, req, res, next) => {

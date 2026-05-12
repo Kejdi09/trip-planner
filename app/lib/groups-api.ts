@@ -2,10 +2,7 @@ import { API_BASE_URL, APP_ENV } from './app-config';
 
 const DEMO_USER_ID = '00000000-0000-4000-8000-000000000002';
 
-const base = () => {
-  const trimmed = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
-  return trimmed.endsWith('/api') ? trimmed.slice(0, -4) : trimmed;
-};
+const base = () => (API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL);
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${base()}${path}`, {
@@ -91,11 +88,11 @@ export type ItineraryItemRow = {
 
 export function fetchMyGroups(userId = DEMO_USER_ID) {
   const params = new URLSearchParams({ userId });
-  return request<{ groups: GroupRow[] }>(`/groups?${params.toString()}`, { method: 'GET' });
+  return request<{ groups: GroupRow[] }>(`/api/groups?${params.toString()}`, { method: 'GET' });
 }
 
 export function createGroupApi(name: string, createdBy = DEMO_USER_ID, description?: string) {
-  return request<GroupRow>('/groups', {
+  return request<GroupRow>('/api/groups', {
     method: 'POST',
     body: JSON.stringify({ name, createdBy, description: description ?? null }),
   });
@@ -103,11 +100,11 @@ export function createGroupApi(name: string, createdBy = DEMO_USER_ID, descripti
 
 export function fetchGroupMembers(groupId: string, userId = DEMO_USER_ID) {
   const params = new URLSearchParams({ userId });
-  return request<{ members: GroupMemberRow[] }>(`/groups/${groupId}/members?${params.toString()}`, { method: 'GET' });
+  return request<{ members: GroupMemberRow[] }>(`/api/groups/${groupId}/members?${params.toString()}`, { method: 'GET' });
 }
 
 export function addGroupMember(groupId: string, newUserId: string, actorId = DEMO_USER_ID) {
-  return request<GroupMemberRow>(`/groups/${groupId}/members`, {
+  return request<GroupMemberRow>(`/api/groups/${groupId}/members`, {
     method: 'POST',
     body: JSON.stringify({ actorId, userId: newUserId }),
   });
@@ -115,11 +112,11 @@ export function addGroupMember(groupId: string, newUserId: string, actorId = DEM
 
 export function fetchGroupMessages(groupId: string, userId = DEMO_USER_ID, offset = 0, limit = 50) {
   const params = new URLSearchParams({ userId, offset: String(offset), limit: String(limit) });
-  return request<{ messages: GroupMessageRow[] }>(`/groups/${groupId}/messages?${params.toString()}`, { method: 'GET' });
+  return request<{ messages: GroupMessageRow[] }>(`/api/groups/${groupId}/messages?${params.toString()}`, { method: 'GET' });
 }
 
 export function postGroupMessage(groupId: string, content: string, userId = DEMO_USER_ID) {
-  return request<GroupMessageRow>(`/groups/${groupId}/messages`, {
+  return request<GroupMessageRow>(`/api/groups/${groupId}/messages`, {
     method: 'POST',
     body: JSON.stringify({ userId, content }),
   });
@@ -127,11 +124,11 @@ export function postGroupMessage(groupId: string, content: string, userId = DEMO
 
 export function fetchItinerary(groupId: string, userId = DEMO_USER_ID) {
   const params = new URLSearchParams({ userId });
-  return request<{ items: ItineraryItemRow[] }>(`/groups/${groupId}/itinerary?${params.toString()}`, { method: 'GET' });
+  return request<{ items: ItineraryItemRow[] }>(`/api/groups/${groupId}/itinerary?${params.toString()}`, { method: 'GET' });
 }
 
 export function createItineraryItem(groupId: string, title: string, date: string, time?: string | null, userId = DEMO_USER_ID) {
-  return request<ItineraryItemRow>(`/groups/${groupId}/itinerary`, {
+  return request<ItineraryItemRow>(`/api/groups/${groupId}/itinerary`, {
     method: 'POST',
     body: JSON.stringify({ userId, title, date, time: time ?? null }),
   });
@@ -139,7 +136,7 @@ export function createItineraryItem(groupId: string, title: string, date: string
 
 export function deleteItineraryItem(groupId: string, itemId: string, userId = DEMO_USER_ID) {
   const params = new URLSearchParams({ userId });
-  return fetch(`${base()}/groups/${groupId}/itinerary/${itemId}?${params.toString()}`, {
+  return fetch(`${base()}/api/groups/${groupId}/itinerary/${itemId}?${params.toString()}`, {
     method: 'DELETE',
     headers: {
       'content-type': 'application/json',
