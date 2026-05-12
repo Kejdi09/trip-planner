@@ -112,7 +112,7 @@ const VotingScreen: React.FC<VotingScreenProps> = ({
     tripName,
     timeLeft,
     onTabChange: setActiveTab,
-    onBack: onBack ?? (() => router.back()),
+    onBack: onBack ?? (() => router.push({ pathname: '/group-hub', params: groupId ? { groupId } : undefined })),
   };
 
   const destinationOptions = state?.destinations.options.map((o) => ({

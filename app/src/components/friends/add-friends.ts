@@ -1,6 +1,4 @@
-// ---------------------------------------------------------------------------
-// Dummy data
-// ---------------------------------------------------------------------------
+import { supabase } from '../../../lib/supabase';
 
 export type FriendRequest = {
   id: string;
@@ -18,132 +16,90 @@ export type UserSearchResult = {
   requestSent: boolean;
 };
 
-const DUMMY_FRIEND_REQUESTS: FriendRequest[] = [
-  {
-    id: 'req-1',
-    senderId: 'user-2',
-    senderName: 'Kejdi Muci',
-    senderUsername: 'kejdim',
-    senderAvatarUrl: null,
-  },
-  {
-    id: 'req-2',
-    senderId: 'user-3',
-    senderName: 'Eden Pajo',
-    senderUsername: 'eden',
-    senderAvatarUrl: null,
-  },
-];
+async function currentUserId() {
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user?.id) throw new Error('No authenticated user.');
+  return data.user.id;
+}
 
-const DUMMY_USER_POOL: UserSearchResult[] = [
-  {
-    id: 'user-4',
-    fullName: 'Sabrina Alushi',
-    username: 'sabc',
-    avatarUrl: 'https://images.unsplash.com/photo-1490750967868-88df5691cc72?auto=format&fit=crop&w=200&q=80',
-    requestSent: false,
-  },
-  {
-    id: 'user-5',
-    fullName: 'Sara Bektashi',
-    username: 'sarabek',
-    avatarUrl: null,
-    requestSent: false,
-  },
-  {
-    id: 'user-6',
-    fullName: 'Andi Marku',
-    username: 'andimark',
-    avatarUrl: 'https://images.unsplash.com/photo-1527980965255-d3b416303d12?auto=format&fit=crop&w=200&q=80',
-    requestSent: false,
-  },
-  {
-    id: 'user-7',
-    fullName: 'Lena Duka',
-    username: 'lenaduka',
-    avatarUrl: null,
-    requestSent: false,
-  },
-  {
-    id: 'user-8',
-    fullName: 'Blendi Hoxha',
-    username: 'blendih',
-    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
-    requestSent: false,
-  },
-];
-
-// ---------------------------------------------------------------------------
-// In-memory state (persists for the lifetime of the JS session)
-// ---------------------------------------------------------------------------
-
-let _pendingRequests: FriendRequest[] = [...DUMMY_FRIEND_REQUESTS];
-let _userPool: UserSearchResult[] = [...DUMMY_USER_POOL];
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-// ---------------------------------------------------------------------------
-// API functions
-// ---------------------------------------------------------------------------
-
-/**
- * Returns all pending incoming friend requests for the current user.
- */
 export async function fetchIncomingFriendRequests(): Promise<FriendRequest[]> {
-  await delay(600);
-  return [..._pendingRequests];
+  const userId = await currentUserId();
+  const { data, error } = await supabase
+    .from('friendships')
+    .select('id, requester_id')
+    .eq('receiver_id', userId)
+    .eq('status', 'pending');
+  if (error) throw error;
+
+  const requesterIds = (data ?? []).map((r) => r.requester_id);
+  if (requesterIds.length === 0) return [];
+
+  const { data: profiles, error: pErr } = await supabase
+    .from('profiles')
+    .select('id, full_name, username, avatar_url')
+    .in('id', requesterIds);
+  if (pErr) throw pErr;
+
+  const profileById = new Map((profiles ?? []).map((p) => [p.id, p]));
+  return (data ?? []).map((r) => {
+    const p = profileById.get(r.requester_id);
+    return {
+      id: r.id,
+      senderId: r.requester_id,
+      senderName: p?.full_name ?? p?.username ?? 'User',
+      senderUsername: p?.username ?? 'user',
+      senderAvatarUrl: p?.avatar_url ?? null,
+    };
+  });
 }
 
-/**
- * Searches the user pool by name or username (case-insensitive).
- */
 export async function searchUsers(query: string): Promise<UserSearchResult[]> {
-  await delay(400);
+  const userId = await currentUserId();
+  const term = query.trim();
+  if (!term) return [];
 
-  const term = query.trim().toLowerCase();
+  const { data: users, error } = await supabase
+    .from('profiles')
+    .select('id, full_name, username, avatar_url')
+    .or(`username.ilike.%${term}%,full_name.ilike.%${term}%`)
+    .limit(30);
+  if (error) throw error;
 
-  if (!term) {
-    return [];
-  }
+  const { data: relationships, error: relErr } = await supabase
+    .from('friendships')
+    .select('requester_id, receiver_id, status')
+    .or(`requester_id.eq.${userId},receiver_id.eq.${userId}`);
+  if (relErr) throw relErr;
 
-  return _userPool
-    .filter(
-      (u) =>
-        u.fullName.toLowerCase().includes(term) ||
-        u.username.toLowerCase().includes(term),
-    )
-    .map((u) => ({ ...u })); // return copies so mutations don't leak
+  const sentOrConnected = new Set<string>();
+  (relationships ?? []).forEach((f) => {
+    const other = f.requester_id === userId ? f.receiver_id : f.requester_id;
+    if (other) sentOrConnected.add(other);
+  });
+
+  return (users ?? [])
+    .filter((u) => u.id !== userId)
+    .map((u) => ({
+      id: u.id,
+      fullName: u.full_name ?? u.username ?? 'User',
+      username: u.username ?? 'user',
+      avatarUrl: u.avatar_url ?? null,
+      requestSent: sentOrConnected.has(u.id),
+    }));
 }
 
-/**
- * Sends a friend request to the given user.
- * Marks the user as `requestSent: true` in the pool so subsequent searches reflect it.
- */
 export async function sendFriendRequest(receiverId: string): Promise<void> {
-  await delay(500);
-
-  _userPool = _userPool.map((u) =>
-    u.id === receiverId ? { ...u, requestSent: true } : u,
-  );
+  const userId = await currentUserId();
+  const { error } = await supabase.from('friendships').insert({ requester_id: userId, receiver_id: receiverId, status: 'pending' });
+  if (error) throw error;
 }
 
-/**
- * Accepts an incoming friend request and removes it from the pending list.
- */
-export async function acceptFriendRequest(
-  requestId: string,
-  _senderId: string,
-): Promise<void> {
-  await delay(500);
-
-  _pendingRequests = _pendingRequests.filter((r) => r.id !== requestId);
+export async function acceptFriendRequest(requestId: string): Promise<void> {
+  const { error } = await supabase.from('friendships').update({ status: 'accepted' }).eq('id', requestId);
+  if (error) throw error;
 }
 
-/**
- * Declines an incoming friend request and removes it from the pending list.
- */
 export async function declineFriendRequest(requestId: string): Promise<void> {
-  await delay(400);
-
-  _pendingRequests = _pendingRequests.filter((r) => r.id !== requestId);
+  const { error } = await supabase.from('friendships').delete().eq('id', requestId);
+  if (error) throw error;
 }

@@ -15,7 +15,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppBottomNav } from '@/components/ui/app-bottom-nav';
 import { fetchTravelStats, TravelStats } from './history.dummy';
 import { C, rs } from './theme';
 import { styles } from './my-travels-screen.styles';
@@ -152,7 +151,6 @@ export function MyTravelsScreen() {
           </ScrollView>
         )}
 
-        <AppBottomNav activeTab="History" />
       </View>
     </SafeAreaView>
   );

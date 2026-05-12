@@ -4,7 +4,6 @@ import React from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppBottomNav } from '@/components/ui/app-bottom-nav';
 import { fetchGroupMembers, fetchMyGroups, getActiveUserId, GroupRow } from '../../../lib/groups-api';
 import { COLORS, groupsStyles as styles } from './groups-screen.styles';
 
@@ -248,7 +247,7 @@ export function GroupsScreen() {
                     key={g.id}
                     group={g}
                     onInvite={() => router.push({ pathname: '../../invite-to-group', params: { groupId: g.id } })}
-                    onPress={() => router.push({ pathname: '../../group-chat', params: { groupId: g.id } })}
+                    onPress={() => router.push({ pathname: '../../group-hub', params: { groupId: g.id } })}
                   />
                 ))}
               </>
@@ -262,7 +261,7 @@ export function GroupsScreen() {
                   <OtherGroupRow
                     key={g.id}
                     group={g}
-                    onPress={() => router.push({ pathname: '../../group-chat', params: { groupId: g.id } })}
+                    onPress={() => router.push({ pathname: '../../group-hub', params: { groupId: g.id } })}
                   />
                 ))}
               </>
@@ -277,7 +276,6 @@ export function GroupsScreen() {
           </ScrollView>
         )}
 
-        <AppBottomNav activeTab="Groups" />
       </View>
     </SafeAreaView>
   );

@@ -17,7 +17,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AppBottomNav } from "@/components/ui/app-bottom-nav";
 import { BrandHeader } from "@/components/ui/brand-header";
 import { createItineraryItem, deleteItineraryItem, fetchItinerary, getActiveUserId } from "../../../lib/groups-api";
 
@@ -508,7 +507,6 @@ export default function TripDetailScreen() {
           </Pressable>
         </View>
 
-        <AppBottomNav activeTab="Discover" />
       </View>
 
       <Modal

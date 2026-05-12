@@ -15,8 +15,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppBottomNav } from '@/components/ui/app-bottom-nav';
-import { fetchFriends, Friend, removeFriend } from './dummy-data';
+import { supabase } from '../../../lib/supabase';
+
+type Friend = { id: string; fullName: string; username: string; avatarUrl: string | null; tripCount: number };
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TYPE_SCALE = Math.min(Math.max(SCREEN_WIDTH / 390, 0.9), 1.08);
@@ -189,10 +190,40 @@ export function MyFriendsScreen() {
   const [removingIds, setRemovingIds] = React.useState<Set<string>>(new Set());
 
   React.useEffect(() => {
-    fetchFriends().then((data) => {
-      setFriends(data);
-      setLoading(false);
-    });
+    (async () => {
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const me = auth.user?.id;
+        if (!me) return;
+
+        const { data: rows } = await supabase
+          .from('friendships')
+          .select('id, requester_id, receiver_id')
+          .eq('status', 'accepted')
+          .or(`requester_id.eq.${me},receiver_id.eq.${me}`);
+
+        const friendIds = (rows ?? []).map((r) => (r.requester_id === me ? r.receiver_id : r.requester_id));
+        if (friendIds.length === 0) {
+          setFriends([]);
+          return;
+        }
+
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, username, avatar_url')
+          .in('id', friendIds);
+
+        setFriends((profiles ?? []).map((p) => ({
+          id: p.id,
+          fullName: p.full_name ?? p.username ?? 'User',
+          username: p.username ?? 'user',
+          avatarUrl: p.avatar_url ?? null,
+          tripCount: 0,
+        })));
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
   const filtered = React.useMemo(() => {
@@ -217,7 +248,14 @@ export function MyFriendsScreen() {
           style: 'destructive',
           onPress: async () => {
             setRemovingIds((prev) => new Set(prev).add(friend.id));
-            await removeFriend(friend.id);
+            const { data: auth } = await supabase.auth.getUser();
+            const me = auth.user?.id;
+            if (!me) return;
+            await supabase
+              .from('friendships')
+              .delete()
+              .eq('status', 'accepted')
+              .or(`and(requester_id.eq.${me},receiver_id.eq.${friend.id}),and(requester_id.eq.${friend.id},receiver_id.eq.${me})`);
             setFriends((prev) => prev.filter((f) => f.id !== friend.id));
             setRemovingIds((prev) => { const n = new Set(prev); n.delete(friend.id); return n; });
           },
@@ -316,7 +354,6 @@ export function MyFriendsScreen() {
           </ScrollView>
         )}
 
-        <AppBottomNav activeTab="Profile" />
       </View>
     </SafeAreaView>
   );

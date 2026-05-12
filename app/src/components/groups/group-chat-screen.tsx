@@ -14,15 +14,12 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-
-import {
-  ChatMessage,
-  Group,
-} from '../friends/dummy-data';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchGroupMembers, fetchGroupMessages, fetchMyGroups, getActiveUserId, postGroupMessage } from '../../../lib/groups-api';
 
-const ACTIVE_USER_ID = getActiveUserId();
+type ChatMessage = { id: string; groupId: string; senderId: string; text: string; timestamp: string; dateLabel: string | null };
+type Group = { id: string; name: string; adminId: string; members: { id: string; fullName: string; username: string; avatarUrl: string | null; tripCount: number; role: 'admin' | 'member' }[]; status: string; votingOpen: boolean; places: { name: string }[]; dateRange: string | null; budgetRange: string | null; destination: string | null };
+
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TYPE_SCALE = Math.min(Math.max(SCREEN_WIDTH / 390, 0.9), 1.08);
@@ -223,9 +220,16 @@ export function GroupChatScreen() {
   const [loading, setLoading] = React.useState(true);
   const [inputText, setInputText] = React.useState('');
   const [sending, setSending] = React.useState(false);
+  const [currentUserId, setCurrentUserId] = React.useState(getActiveUserId());
+  const insets = useSafeAreaInsets();
   const listRef = React.useRef<FlatList>(null);
 
   React.useEffect(() => {
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      setCurrentUserId(data.user?.id ?? getActiveUserId());
+    })();
+
     if (!groupId) return;
     const load = async () => {
       const [{ groups }, { members }, { messages: rows }] = await Promise.all([
@@ -278,7 +282,7 @@ export function GroupChatScreen() {
     setInputText('');
     setSending(true);
     try {
-      const msg = await postGroupMessage(groupId, text, ACTIVE_USER_ID);
+      const msg = await postGroupMessage(groupId, text, currentUserId);
       setMessages((prev) => [...prev, {
         id: msg.id,
         groupId: msg.group_id,
@@ -307,7 +311,7 @@ export function GroupChatScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerTopRow}>
-            <Pressable style={styles.backButton} onPress={() => router.back()} accessibilityRole="button">
+            <Pressable style={styles.backButton} onPress={() => router.push({ pathname: '/group-hub', params: { groupId } })} accessibilityRole="button">
               <Feather name="arrow-left" size={20} color={C.text} />
             </Pressable>
             <Text style={styles.headerName} numberOfLines={1}>
@@ -352,6 +356,11 @@ export function GroupChatScreen() {
         {loading ? (
           <ActivityIndicator color={C.primary} style={{ flex: 1 }} />
         ) : (
+          <>
+          <View style={{ ...StyleSheet.absoluteFillObject }}>
+            <View style={{ position: 'absolute', width: 240, height: 240, borderRadius: 120, backgroundColor: 'rgba(0,141,155,0.10)', top: 60, left: -80 }} />
+            <View style={{ position: 'absolute', width: 300, height: 300, borderRadius: 150, backgroundColor: 'rgba(0,141,155,0.08)', bottom: 20, right: -120 }} />
+          </View>
           <FlatList
             ref={listRef}
             style={styles.messageList}
@@ -360,7 +369,8 @@ export function GroupChatScreen() {
             keyExtractor={(item) => item.id}
             onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
             renderItem={({ item }) => {
-              const isMe = item.senderId === ACTIVE_USER_ID;
+              const isMe = item.senderId === currentUserId;
+              const sender = group?.members.find((m) => m.id === item.senderId);
               return (
                 <>
                   {item.dateLabel && (
@@ -368,6 +378,7 @@ export function GroupChatScreen() {
                   )}
                   <View style={[styles.bubbleRow, isMe ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
                     <View style={[styles.bubble, isMe ? styles.bubbleMine : styles.bubbleTheirs]}>
+                      {!isMe && sender ? <Text style={{ fontSize: 11, fontWeight: '700', color: '#4B5563', marginBottom: 2 }}>{sender.username}</Text> : null}
                       <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMine : styles.bubbleTextTheirs]}>
                         {item.text}
                       </Text>
@@ -380,10 +391,11 @@ export function GroupChatScreen() {
               );
             }}
           />
+          </>
         )}
 
         {/* Input bar */}
-        <View style={styles.inputBar}>
+        <View style={[styles.inputBar, { paddingBottom: Math.max(10, insets.bottom + 4) }]}>
           <View style={styles.inputWrapper}>
             <TextInput
               value={inputText}
