@@ -128,7 +128,35 @@ module.exports = function groupsRoutes(supabaseAdmin) {
       if (!name || name.length < 3) {
         return res.status(400).json({ error: 'Group name must be at least 3 characters.' });
       }
+      if (!createdBy) {
+        return res.status(400).json({
+          error: {
+            code: 'INVALID_CREATED_BY',
+            message: 'createdBy is required.',
+          },
+        });
+      }
       assertUuid(createdBy, 'createdBy');
+
+      const { data: profile, error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('id', createdBy)
+        .maybeSingle();
+
+      if (profileError) {
+        const wrapped = makeError(profileError.message || 'Failed to verify profile.', 502, 'UPSTREAM_ERROR');
+        throw wrapped;
+      }
+
+      if (!profile) {
+        return res.status(400).json({
+          error: {
+            code: 'INVALID_PROFILE',
+            message: 'createdBy must be an existing profiles.id',
+          },
+        });
+      }
 
       const { data: group, error: groupError } = await supabaseAdmin
         .from('groups')

@@ -1,8 +1,24 @@
 import { API_BASE_URL, APP_ENV } from './app-config';
-
-const DEMO_USER_ID = '00000000-0000-4000-8000-000000000002';
+import { supabase } from './supabase';
 
 const base = () => (API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL);
+
+let cachedUserId = '';
+void supabase.auth.getSession().then(({ data }) => {
+  cachedUserId = data.session?.user?.id ?? '';
+});
+
+
+async function resolveActiveUserId(userId?: string): Promise<string> {
+  if (userId && userId.trim()) return userId.trim();
+
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user?.id) {
+    throw new Error('No authenticated user session found. Please log in again.');
+  }
+
+  return data.user.id;
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${base()}${path}`, {
@@ -43,7 +59,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export function getActiveUserId() {
-  return DEMO_USER_ID;
+  return cachedUserId;
 }
 
 export type GroupRow = {
@@ -60,88 +76,72 @@ export type GroupRow = {
   max_budget: number | null;
   created_at: string | null;
 };
+export type GroupMemberRow = { id: string; group_id: string; user_id: string; joined_at: string | null };
+export type GroupMessageRow = { id: string; group_id: string; sender_id: string; content: string; created_at: string };
+export type ItineraryItemRow = { id: string; group_id: string; title: string; date: string; time: string | null; created_by: string; created_at: string };
 
-export type GroupMemberRow = {
-  id: string;
-  group_id: string;
-  user_id: string;
-  joined_at: string | null;
-};
-
-export type GroupMessageRow = {
-  id: string;
-  group_id: string;
-  sender_id: string;
-  content: string;
-  created_at: string;
-};
-
-export type ItineraryItemRow = {
-  id: string;
-  group_id: string;
-  title: string;
-  date: string;
-  time: string | null;
-  created_by: string;
-  created_at: string;
-};
-
-export function fetchMyGroups(userId = DEMO_USER_ID) {
-  const params = new URLSearchParams({ userId });
+export async function fetchMyGroups(userId?: string) {
+  const resolvedUserId = await resolveActiveUserId(userId);
+  const params = new URLSearchParams({ userId: resolvedUserId });
   return request<{ groups: GroupRow[] }>(`/api/groups?${params.toString()}`, { method: 'GET' });
 }
 
-export function createGroupApi(name: string, createdBy = DEMO_USER_ID, description?: string) {
+export async function createGroupApi(name: string, createdBy?: string, description?: string) {
+  const resolvedUserId = await resolveActiveUserId(createdBy);
   return request<GroupRow>('/api/groups', {
     method: 'POST',
-    body: JSON.stringify({ name, createdBy, description: description ?? null }),
+    body: JSON.stringify({ name, createdBy: resolvedUserId, description: description ?? null }),
   });
 }
 
-export function fetchGroupMembers(groupId: string, userId = DEMO_USER_ID) {
-  const params = new URLSearchParams({ userId });
+export async function fetchGroupMembers(groupId: string, userId?: string) {
+  const resolvedUserId = await resolveActiveUserId(userId);
+  const params = new URLSearchParams({ userId: resolvedUserId });
   return request<{ members: GroupMemberRow[] }>(`/api/groups/${groupId}/members?${params.toString()}`, { method: 'GET' });
 }
 
-export function addGroupMember(groupId: string, newUserId: string, actorId = DEMO_USER_ID) {
+export async function addGroupMember(groupId: string, newUserId: string, actorId?: string) {
+  const resolvedActorId = await resolveActiveUserId(actorId);
   return request<GroupMemberRow>(`/api/groups/${groupId}/members`, {
     method: 'POST',
-    body: JSON.stringify({ actorId, userId: newUserId }),
+    body: JSON.stringify({ actorId: resolvedActorId, userId: newUserId }),
   });
 }
 
-export function fetchGroupMessages(groupId: string, userId = DEMO_USER_ID, offset = 0, limit = 50) {
-  const params = new URLSearchParams({ userId, offset: String(offset), limit: String(limit) });
+export async function fetchGroupMessages(groupId: string, userId?: string, offset = 0, limit = 50) {
+  const resolvedUserId = await resolveActiveUserId(userId);
+  const params = new URLSearchParams({ userId: resolvedUserId, offset: String(offset), limit: String(limit) });
   return request<{ messages: GroupMessageRow[] }>(`/api/groups/${groupId}/messages?${params.toString()}`, { method: 'GET' });
 }
 
-export function postGroupMessage(groupId: string, content: string, userId = DEMO_USER_ID) {
+export async function postGroupMessage(groupId: string, content: string, userId?: string) {
+  const resolvedUserId = await resolveActiveUserId(userId);
   return request<GroupMessageRow>(`/api/groups/${groupId}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ userId, content }),
+    body: JSON.stringify({ userId: resolvedUserId, content }),
   });
 }
 
-export function fetchItinerary(groupId: string, userId = DEMO_USER_ID) {
-  const params = new URLSearchParams({ userId });
+export async function fetchItinerary(groupId: string, userId?: string) {
+  const resolvedUserId = await resolveActiveUserId(userId);
+  const params = new URLSearchParams({ userId: resolvedUserId });
   return request<{ items: ItineraryItemRow[] }>(`/api/groups/${groupId}/itinerary?${params.toString()}`, { method: 'GET' });
 }
 
-export function createItineraryItem(groupId: string, title: string, date: string, time?: string | null, userId = DEMO_USER_ID) {
+export async function createItineraryItem(groupId: string, title: string, date: string, time?: string | null, userId?: string) {
+  const resolvedUserId = await resolveActiveUserId(userId);
   return request<ItineraryItemRow>(`/api/groups/${groupId}/itinerary`, {
     method: 'POST',
-    body: JSON.stringify({ userId, title, date, time: time ?? null }),
+    body: JSON.stringify({ userId: resolvedUserId, title, date, time: time ?? null }),
   });
 }
 
-export function deleteItineraryItem(groupId: string, itemId: string, userId = DEMO_USER_ID) {
-  const params = new URLSearchParams({ userId });
+export async function deleteItineraryItem(groupId: string, itemId: string, userId?: string) {
+  const resolvedUserId = await resolveActiveUserId(userId);
+  const params = new URLSearchParams({ userId: resolvedUserId });
   return fetch(`${base()}/api/groups/${groupId}/itinerary/${itemId}?${params.toString()}`, {
     method: 'DELETE',
-    headers: {
-      'content-type': 'application/json',
-      'x-app-env': APP_ENV,
-    },
+    headers: { 'content-type': 'application/json', 'x-app-env': APP_ENV },
   }).then(async (response) => {
     if (response.status === 204) return;
     const payload = await response.json().catch(() => ({}));
