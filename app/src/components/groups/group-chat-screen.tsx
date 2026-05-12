@@ -210,6 +210,15 @@ function initials(name: string) {
   return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 }
 
+function formatChatTime(createdAt: string | Date) {
+  const value = createdAt instanceof Date ? createdAt.toISOString() : createdAt;
+  const normalized = /z$|[+-]\d{2}:?\d{2}$/i.test(value) ? value : `${value}Z`;
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime())
+    ? ''
+    : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
@@ -268,7 +277,7 @@ export function GroupChatScreen() {
           groupId: msg.group_id,
           senderId: msg.sender_id,
           text: msg.content,
-          timestamp: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestamp: formatChatTime(msg.created_at),
           dateLabel: null,
         })),
       );
@@ -289,7 +298,7 @@ export function GroupChatScreen() {
         groupId: msg.group_id,
         senderId: msg.sender_id,
         text: msg.content,
-        timestamp: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        timestamp: formatChatTime(msg.created_at),
         dateLabel: null,
       }]);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
@@ -323,7 +332,7 @@ export function GroupChatScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerTopRow}>
-            <Pressable style={styles.backButton} onPress={() => router.push({ pathname: '/group-hub', params: { groupId } })} accessibilityRole="button">
+            <Pressable style={styles.backButton} onPress={() => (groupId ? router.replace({ pathname: '/group-hub', params: { groupId } }) : router.replace('/groups'))} accessibilityRole="button">
               <Feather name="arrow-left" size={20} color={C.text} />
             </Pressable>
             <Text style={styles.headerName} numberOfLines={1}>
