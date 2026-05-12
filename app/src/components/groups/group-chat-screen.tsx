@@ -286,6 +286,14 @@ export function GroupChatScreen() {
     void load();
   }, [groupId]);
 
+  const handleBackPress = () => {
+    if (groupId) {
+      router.replace({ pathname: '/group-hub', params: { groupId } });
+      return;
+    }
+    router.replace('/groups');
+  };
+
   const handleSend = async () => {
     const text = inputText.trim();
     if (!text || sending || !groupId) return;
@@ -332,7 +340,7 @@ export function GroupChatScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerTopRow}>
-            <Pressable style={styles.backButton} onPress={() => (groupId ? router.replace({ pathname: '/group-hub', params: { groupId } }) : router.replace('/groups'))} accessibilityRole="button">
+            <Pressable style={styles.backButton} onPress={handleBackPress} accessibilityRole="button">
               <Feather name="arrow-left" size={20} color={C.text} />
             </Pressable>
             <Text style={styles.headerName} numberOfLines={1}>

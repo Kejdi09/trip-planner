@@ -87,10 +87,19 @@ function ActiveGroupCard({ group, onInvite, onPress, onPressVoting, onDelete, ca
   const extraCount = group.members.length - visibleMembers.length;
 
   return (
+    <View style={{ position: 'relative' }}>
+      {canDelete ? (
+        <Pressable
+          onPress={onDelete}
+          style={{ position: 'absolute', top: 10, right: 10, zIndex: 3 }}
+          accessibilityRole='button'
+          accessibilityLabel='Delete group'>
+          <Feather name='x-circle' size={20} color={COLORS.upcomingText} />
+        </Pressable>
+      ) : null}
     <Pressable style={styles.activeCard} onPress={onPress}>
       <View style={styles.activeCardTopRow}>
         <Text style={styles.activeCardName}>{group.name}</Text>
-        {canDelete && <Pressable onPress={(e) => { e.stopPropagation?.(); onDelete(); }}><Feather name='x-circle' size={20} color={COLORS.upcomingText} /></Pressable>}
         {group.votingOpen && (
           <Pressable style={styles.votingBadge} onPress={onPressVoting}>
             <Text style={styles.votingBadgeText}>{'Voting\nOpen'}</Text>
@@ -135,6 +144,7 @@ function ActiveGroupCard({ group, onInvite, onPress, onPressVoting, onDelete, ca
         )}
       </View>
     </Pressable>
+    </View>
   );
 }
 
@@ -156,8 +166,9 @@ function statusLabel(status: GroupStatus): string {
 
 function OtherGroupRow({ group, onPress, canDelete, onDelete }: { group: Group; onPress: () => void; canDelete: boolean; onDelete: () => void }) {
   return (
+    <View style={{ position: 'relative' }}>
+      {canDelete ? <Pressable onPress={onDelete} style={{ position: 'absolute', top: 10, right: 10, zIndex: 3 }} accessibilityRole='button' accessibilityLabel='Delete group'><Feather name='x-circle' size={18} color={COLORS.upcomingText} /></Pressable> : null}
     <Pressable style={styles.otherCard} onPress={onPress}>
-      {canDelete ? <Pressable onPress={(e) => { e.stopPropagation?.(); onDelete(); }} style={{ position: 'absolute', top: 10, right: 10, zIndex: 2 }}><Feather name='x-circle' size={18} color={COLORS.upcomingText} /></Pressable> : null}
       <View style={styles.otherCardIcon}>
         <Ionicons name="people-outline" size={22} color={COLORS.mutedText} />
       </View>
@@ -172,6 +183,7 @@ function OtherGroupRow({ group, onPress, canDelete, onDelete }: { group: Group; 
       </View>
       <Feather name="chevron-right" size={20} color={COLORS.chevron} style={styles.chevron} />
     </Pressable>
+    </View>
   );
 }
 
