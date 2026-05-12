@@ -36,7 +36,7 @@ export type VotingOptionBudget = {
 };
 
 export type VotingStatePayload = {
-  group: { id: string; status: string; votingDeadline: string | null; isVotingLocked: boolean };
+  group: { id: string; createdBy?: string; status: string; votingDeadline: string | null; isVotingLocked: boolean };
   destinations: { options: VotingOptionDestination[]; hasTie: boolean };
   dates: { options: VotingOptionDate[]; hasTie: boolean };
   budget: { options: VotingOptionBudget[]; hasTie: boolean; hasConflict: boolean };
@@ -90,4 +90,12 @@ export function finalizeVoting(groupId: string, userId: string) {
     method: 'POST',
     body: JSON.stringify({ groupId, userId }),
   });
+}
+
+export function deleteDateOption(groupId: string, optionId: string, userId: string) {
+  return request(`/voting/${groupId}/date-options/${optionId}?userId=${encodeURIComponent(userId)}`, { method: 'DELETE' });
+}
+
+export function deleteBudgetOption(groupId: string, optionId: string, userId: string) {
+  return request(`/voting/${groupId}/budget-options/${optionId}?userId=${encodeURIComponent(userId)}`, { method: 'DELETE' });
 }

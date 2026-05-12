@@ -26,7 +26,7 @@ module.exports = function votingRoutes(supabaseAdmin) {
   async function getGroupOrThrow(groupId) {
     const { data, error } = await supabaseAdmin
       .from('groups')
-      .select('id, status, voting_deadline, destination_place_id, start_date, end_date, min_budget, max_budget')
+      .select('id, created_by, status, voting_deadline, destination_place_id, start_date, end_date, min_budget, max_budget')
       .eq('id', groupId)
       .maybeSingle();
 
@@ -211,6 +211,7 @@ module.exports = function votingRoutes(supabaseAdmin) {
       return res.json({
         group: {
           id: group.id,
+          createdBy: group.created_by,
           status: group.status,
           votingDeadline: group.voting_deadline,
           isVotingLocked: isVotingLocked(group),
@@ -545,6 +546,38 @@ module.exports = function votingRoutes(supabaseAdmin) {
       return next(error);
     }
   });
+
+
+  router.delete('/:groupId/:optionType/:optionId', async (req, res, next) => {
+    try {
+      const groupId = String(req.params.groupId || '').trim();
+      const optionType = String(req.params.optionType || '').trim();
+      const optionId = String(req.params.optionId || '').trim();
+      const userId = String(req.body?.userId || req.query?.userId || '').trim();
+      assertUuid(groupId, 'groupId');
+      assertUuid(optionId, 'optionId');
+      assertUuid(userId, 'userId');
+
+      const group = await getGroupOrThrow(groupId);
+      if (group.created_by !== userId) return res.status(403).json({ error: 'Only group creator can delete options.' });
+      await ensurePlanningAndOpenOrThrow(group);
+
+      if (optionType === 'date-options') {
+        await supabaseAdmin.from('date_votes').delete().eq('date_option_id', optionId);
+        const { error } = await supabaseAdmin.from('date_options').delete().eq('id', optionId).eq('group_id', groupId);
+        if (error) throw makeError(error.message || 'Failed to delete date option.', 502, 'UPSTREAM_ERROR');
+        return res.json({ success: true });
+      }
+      if (optionType === 'budget-options') {
+        await supabaseAdmin.from('budget_votes').delete().eq('budget_option_id', optionId);
+        const { error } = await supabaseAdmin.from('budget_options').delete().eq('id', optionId).eq('group_id', groupId);
+        if (error) throw makeError(error.message || 'Failed to delete budget option.', 502, 'UPSTREAM_ERROR');
+        return res.json({ success: true });
+      }
+      return res.status(400).json({ error: 'Unsupported optionType.' });
+    } catch (error) { return next(error); }
+  });
+
 
   return router;
 };

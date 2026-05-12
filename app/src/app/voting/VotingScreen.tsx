@@ -5,7 +5,7 @@ import { supabase } from '../../../lib/supabase';
 import { VotingTab } from './_types';
 import DateVotingScreen from './DateVotingScreen';
 import BudgetVotingScreen from './BudgetVotingScreen';
-import { castVote, createBudgetOption, createDateOption, fetchVotingState, finalizeVoting, VotingStatePayload } from '../../../lib/voting-api';
+import { castVote, createBudgetOption, createDateOption, deleteBudgetOption, deleteDateOption, fetchVotingState, finalizeVoting, VotingStatePayload } from '../../../lib/voting-api';
 
 const VotingScreen: React.FC = () => {
   const params = useLocalSearchParams<{ groupId?: string; userId?: string }>();
@@ -44,13 +44,14 @@ const VotingScreen: React.FC = () => {
     try { await finalizeVoting(groupId, userId); await loadState(); } catch (error) { Alert.alert('Finalize voting', error instanceof Error ? error.message : 'Unable to finalize voting.'); }
   };
 
-  const sharedProps = { tripName: state?.group.id ? 'Group Voting' : 'Voting', timeLeft: votingFinished ? 'Voting has finished' : '2d left', onTabChange: setActiveTab, onBack: () => router.push({ pathname: '/group-hub', params: { groupId } }), votingFinished };
+  const canManageOptions = Boolean(state?.group.createdBy && state.group.createdBy === userId);
+  const sharedProps = { tripName: state?.group.id ? 'Group Voting' : 'Voting', onTabChange: setActiveTab, onBack: () => router.push({ pathname: '/group-hub', params: { groupId } }), votingFinished, canManageOptions };
 
   const dateOptions = state?.dates.options.map((o) => ({ id: o.id, label: o.label, startDate: new Date(o.startDate), endDate: new Date(o.endDate), votedCount: o.votedCount, totalMembers: o.totalMembers, voters: o.voters.map((v) => ({ id: v.id, initials: v.id.slice(0,1).toUpperCase(), avatarColor: '#94A3B8' })), selected: o.selected })) || [];
   const budgetOptions = state?.budget.options.map((o) => ({ id: o.id, label: `€${o.min} - €${o.max}`, min: o.min, max: o.max, votedCount: o.votedCount, totalMembers: o.totalMembers, voters: o.voters.map((v) => ({ id: v.id, initials: v.id.slice(0,1).toUpperCase(), avatarColor: '#94A3B8' })), selected: o.selected })) || [];
 
   return <View style={{ flex:1 }}>
-    {activeTab === 'Budget' ? <BudgetVotingScreen {...sharedProps} budgetOptions={budgetOptions} onVote={(id)=>void handleVote('budget', id)} onCreateBudgetOption={(mn,mx)=>void handleCreateBudgetOption(mn,mx)} totalBudgetMin={totalBudgetMin} totalBudgetMax={totalBudgetMax} /> : <DateVotingScreen {...sharedProps} dateOptions={dateOptions} onVote={(id)=>void handleVote('date', id)} onCreateDateOption={(s,e)=>void handleCreateDateOption(s,e)} />}
+    {activeTab === 'Budget' ? <BudgetVotingScreen {...sharedProps} budgetOptions={budgetOptions} onVote={(id)=>void handleVote('budget', id)} onCreateBudgetOption={(mn,mx)=>void handleCreateBudgetOption(mn,mx)} totalBudgetMin={totalBudgetMin} totalBudgetMax={totalBudgetMax} onDeleteOption={(id)=>void (deleteBudgetOption(groupId,id,userId).then(loadState))} /> : <DateVotingScreen {...sharedProps} dateOptions={dateOptions} onVote={(id)=>void handleVote('date', id)} onCreateDateOption={(s,e)=>void handleCreateDateOption(s,e)} onDeleteOption={(id)=>void (deleteDateOption(groupId,id,userId).then(loadState))} />}
     <View style={{ position:'absolute', left:16, right:16, bottom:92 }}><Pressable disabled={Boolean(votingFinished)} onPress={()=>void handleFinalize()} style={{ backgroundColor:'#008D9B', borderRadius:14, paddingVertical:14, alignItems:'center', opacity:votingFinished?0.55:1 }}><Text style={{ color:'#fff', fontWeight:'800', fontSize:16 }}>{votingFinished ? 'Voting Finished' : 'Finish Voting'}</Text></Pressable></View>
   </View>;
 };

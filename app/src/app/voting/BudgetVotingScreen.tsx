@@ -1,150 +1,22 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  PanResponder,
-  StyleSheet,
-  SafeAreaView,
-  LayoutChangeEvent,
-} from 'react-native';
-import {
-  COLORS,
-  Header,
-  TabBar,
-  OptionCard,
-  Checkmark,
-  RadioCircle,
-  VotedLabel,
-  VoteProgress,
-  VoterAvatars,
-} from './_components';
+import { Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { COLORS, Header, TabBar, OptionCard, Checkmark, RadioCircle, VotedLabel, VoteProgress, VoterAvatars } from './_components';
 import { BudgetOption, VotingTab } from './_types';
 
-const SLIDER_MIN = 0;
-const SLIDER_MAX = 20000;
-
-interface RangeSliderProps { min: number; max: number; onChange: (min: number, max: number) => void; }
-
-const RangeSlider: React.FC<RangeSliderProps> = ({ min, max, onChange }) => {
-  const [trackWidth, setTrackWidth] = useState(0);
-  const toPercent = (val: number) => ((val - SLIDER_MIN) / (SLIDER_MAX - SLIDER_MIN)) * 100;
-  const toValue = (px: number) => Math.round(Math.max(SLIDER_MIN, Math.min(SLIDER_MAX, (px / trackWidth) * (SLIDER_MAX - SLIDER_MIN) + SLIDER_MIN)) / 100) * 100;
-  const leftPct = toPercent(min);
-  const rightPct = toPercent(max);
-
-  const makeResponder = (thumb: 'min' | 'max') => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderMove: (_, gs) => {
-      if (!trackWidth) return;
-      const pct = (thumb === 'min' ? leftPct : rightPct) / 100;
-      const newVal = toValue(pct * trackWidth + gs.dx);
-      if (thumb === 'min') {
-        onChange(Math.min(newVal, max - 100), max);
-      } else {
-        onChange(min, Math.max(newVal, min + 100));
-      }
-    },
-  });
-
-  const minR = makeResponder('min');
-  const maxR = makeResponder('max');
-
-  return (
-    <View style={sl.wrapper}>
-      <View style={sl.labelRow}>
-        <Text style={sl.label}>Budget</Text>
-        <Text style={sl.label}>$0-20000+</Text>
-      </View>
-      <View style={sl.track} onLayout={(e: LayoutChangeEvent) => setTrackWidth(e.nativeEvent.layout.width)}>
-        <View style={[sl.seg, sl.inactive, { left: 0, width: `${leftPct}%` as any }]} />
-        <View style={[sl.seg, sl.active, { left: `${leftPct}%` as any, width: `${rightPct - leftPct}%` as any }]} />
-        <View style={[sl.seg, sl.inactive, { left: `${rightPct}%` as any, right: 0 }]} />
-        <View {...minR.panHandlers} style={[sl.thumb, { left: `${leftPct}%` as any }]} />
-        <View {...maxR.panHandlers} style={[sl.thumb, { left: `${rightPct}%` as any }]} />
-      </View>
-    </View>
-  );
-};
-
-const sl = StyleSheet.create({
-  wrapper: { marginTop: 12 },
-  labelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  label: { fontSize: 12, color: COLORS.textSecondary },
-  track: { height: 4, backgroundColor: COLORS.progressBg, borderRadius: 2, position: 'relative', marginHorizontal: 12 },
-  seg: { position: 'absolute', top: 0, height: 4, borderRadius: 2 },
-  inactive: { backgroundColor: COLORS.progressBg },
-  active: { backgroundColor: COLORS.primary },
-  thumb: { position: 'absolute', width: 20, height: 20, borderRadius: 10, backgroundColor: COLORS.textPrimary, top: -8, marginLeft: -10, elevation: 3 },
-});
-
-interface BudgetCardProps { option: BudgetOption; onVote: (id: string) => void; }
-const BudgetCard: React.FC<BudgetCardProps> = ({ option, onVote }) => (
-  <OptionCard selected={option.selected} onPress={() => !votingFinished && onVote(option.id)}>
-    <View style={bc.row}>
-      <View style={bc.info}>
-        <Text style={bc.label}>{option.label}</Text>
-        <VotedLabel votedCount={option.votedCount} totalMembers={option.totalMembers} />
-        <VoteProgress votedCount={option.votedCount} totalMembers={option.totalMembers} />
-        <VoterAvatars voters={option.voters} totalMembers={option.totalMembers} />
-      </View>
-      <View style={bc.indicator}>{option.selected ? <Checkmark /> : <RadioCircle />}</View>
-    </View>
-  </OptionCard>
-);
-const bc = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'flex-start' },
-  info: { flex: 1 },
-  label: { fontSize: 16, fontWeight: '600', color: COLORS.textPrimary },
-  indicator: { paddingTop: 2 },
-});
-
-interface BudgetVotingScreenProps {
-  tripName?: string; timeLeft?: string; votingFinished?: boolean; budgetOptions: BudgetOption[];
-  onTabChange?: (tab: VotingTab) => void; onBack?: () => void;   onVote?: (id: string) => void;
-  onCreateBudgetOption?: (min: number, max: number) => void; totalBudgetMin?: number; totalBudgetMax?: number;
+export default function BudgetVotingScreen({ tripName='Voting', budgetOptions, onTabChange, onBack, onVote, onCreateBudgetOption, totalBudgetMin=0, totalBudgetMax=0, votingFinished, canManageOptions, onDeleteOption }:{tripName?:string;budgetOptions:BudgetOption[];onTabChange?:(tab:VotingTab)=>void;onBack?:()=>void;onVote?:(id:string)=>void;onCreateBudgetOption?:(min:number,max:number)=>void;totalBudgetMin?:number;totalBudgetMax?:number;votingFinished?:boolean;canManageOptions?:boolean;onDeleteOption?:(id:string)=>void;}){
+  const [minBudget,setMinBudget]=useState(''); const [maxBudget,setMaxBudget]=useState(''); const [err,setErr]=useState<string|null>(null); const [pendingDelete,setPendingDelete]=useState<string|null>(null);
+  const add=()=>{const min=Number(minBudget),max=Number(maxBudget); if(!minBudget||!maxBudget){setErr('Min and max budget are required.');return;} if(!Number.isFinite(min)||!Number.isFinite(max)||min<=0||max<=0){setErr('Budgets must be positive numbers.');return;} if(min>max){setErr('Min budget must be less than or equal to max budget.');return;} setErr(null); onCreateBudgetOption?.(min,max); setMinBudget(''); setMaxBudget('');};
+  return <SafeAreaView style={styles.safe}><Header title={tripName} onBack={onBack}/><TabBar tabs={['Dates','Budget']} activeTab='Budget' onTabPress={(t)=>onTabChange?.(t as VotingTab)} />
+    {votingFinished ? <View style={styles.closedPill}><Text style={styles.closedText}>Voting is closed</Text></View> : null}
+    <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      {budgetOptions.map((o)=><View key={o.id} style={{position:'relative'}}><OptionCard selected={o.selected} onPress={()=>!votingFinished && onVote?.(o.id)}><Text style={styles.label}>{`€${o.min} - €${o.max}`}</Text><VotedLabel votedCount={o.votedCount} totalMembers={o.totalMembers}/><VoteProgress votedCount={o.votedCount} totalMembers={o.totalMembers}/><VoterAvatars voters={o.voters} totalMembers={o.totalMembers}/><View style={styles.ind}>{o.selected?<Checkmark/>:<RadioCircle/>}</View></OptionCard>{canManageOptions && !votingFinished ? <Pressable hitSlop={12} onPress={(e)=>{e.stopPropagation?.();setPendingDelete(o.id);}} style={styles.x}><Text style={styles.xText}>✕</Text></Pressable>:null}</View>)}
+      <Text style={styles.total}>{`Total budget range: €${totalBudgetMin} - €${totalBudgetMax}`}</Text>
+      <Text style={styles.label2}>Min budget (€)</Text><TextInput keyboardType='numeric' value={minBudget} onChangeText={setMinBudget} editable={!votingFinished} style={styles.input}/>
+      <Text style={styles.label2}>Max budget (€)</Text><TextInput keyboardType='numeric' value={maxBudget} onChangeText={setMaxBudget} editable={!votingFinished} style={styles.input}/>
+      {err ? <Text style={styles.err}>{err}</Text> : null}
+      <Pressable disabled={Boolean(votingFinished)} onPress={add} style={[styles.btn,votingFinished&&{opacity:.5}]}><Text style={styles.btnText}>Add Budget Option</Text></Pressable>
+    </ScrollView>
+    <Modal transparent visible={Boolean(pendingDelete)} onRequestClose={()=>setPendingDelete(null)}><View style={styles.modalBg}><View style={styles.modal}><Text style={styles.modalTitle}>Delete budget option?</Text><Text style={styles.modalBody}>Are you sure you want to delete this budget option?</Text><View style={styles.row}><Pressable onPress={()=>setPendingDelete(null)}><Text>Cancel</Text></Pressable><Pressable onPress={()=>{ if(pendingDelete) onDeleteOption?.(pendingDelete); setPendingDelete(null); }}><Text style={{color:'#BE123C',fontWeight:'700'}}>Delete</Text></Pressable></View></View></View></Modal>
+  </SafeAreaView>
 }
-
-const BudgetVotingScreen: React.FC<BudgetVotingScreenProps> = ({
-  tripName = 'Summer Europe Trip', timeLeft = '2d left',
-  budgetOptions, onTabChange, onBack, onVote, onCreateBudgetOption, totalBudgetMin = 0, totalBudgetMax = 0, votingFinished,
-}) => {
-  const [customMin, setCustomMin] = useState(0);
-  const [customMax, setCustomMax] = useState(20000);
-
-  const handleVote = (id: string) =>
-    onVote?.(id);
-
-  return (
-    <SafeAreaView style={styles.safe}>
-      <Header title={tripName} timeLeft={timeLeft} onBack={onBack} />
-      <TabBar tabs={['Dates', 'Budget']} activeTab="Budget" onTabPress={(t) => onTabChange?.(t as VotingTab)} />
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {budgetOptions.map((o) => <BudgetCard key={o.id} option={o} onVote={handleVote} />)}
-        <Text style={styles.sectionLabel}>{`Total budget range: €${totalBudgetMin} - €${totalBudgetMax}`}</Text>
-        <Text style={styles.sectionLabel}>Select another budget range</Text>
-        <RangeSlider min={customMin} max={customMax} onChange={(mn, mx) => { setCustomMin(mn); setCustomMax(mx); }} />
-        <TouchableOpacity
-          style={styles.btn}
-          onPress={() => !votingFinished && onCreateBudgetOption?.(customMin, customMax)}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.btnText}>Add Budget Option</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
-  );
-};
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.background },
-  scroll: { flex: 1 },
-  scrollContent: { padding: 16, paddingBottom: 32 },
-  sectionLabel: { fontSize: 14, fontWeight: '600', color: COLORS.textPrimary, marginTop: 8, marginBottom: 4 },
-  btn: { marginTop: 24, backgroundColor: COLORS.buttonBg, borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
-  btnText: { color: COLORS.buttonText, fontSize: 16, fontWeight: '700' },
-});
-
-export default BudgetVotingScreen;
+const styles=StyleSheet.create({safe:{flex:1,backgroundColor:COLORS.background},scroll:{flex:1},content:{padding:16,paddingBottom:220},label:{fontWeight:'600',fontSize:16},ind:{position:'absolute',right:8,top:8},label2:{marginTop:10,fontWeight:'600'},input:{borderWidth:1,borderColor:'#CBD5E1',borderRadius:10,paddingHorizontal:12,paddingVertical:10,marginTop:6},btn:{marginTop:14,backgroundColor:COLORS.buttonBg,borderRadius:10,padding:14,alignItems:'center'},btnText:{color:COLORS.buttonText,fontWeight:'700'},err:{marginTop:8,color:'#BE123C'},total:{marginTop:8,color:'#0F172A',fontWeight:'700'},closedPill:{alignSelf:'flex-start',marginHorizontal:16,marginTop:8,backgroundColor:'#FCE7F3',paddingHorizontal:10,paddingVertical:6,borderRadius:999},closedText:{color:'#BE123C',fontWeight:'700',fontSize:12},x:{position:'absolute',top:10,right:10,zIndex:50,elevation:50,width:32,height:32,borderRadius:16,backgroundColor:'#fff',alignItems:'center',justifyContent:'center'},xText:{color:'#BE123C',fontWeight:'800'},modalBg:{flex:1,backgroundColor:'rgba(0,0,0,0.35)',alignItems:'center',justifyContent:'center',padding:24},modal:{backgroundColor:'#fff',borderRadius:16,padding:18,width:'100%',maxWidth:340},modalTitle:{fontWeight:'800',fontSize:18},modalBody:{marginTop:8,color:'#64748B'},row:{marginTop:16,flexDirection:'row',justifyContent:'flex-end',gap:16}})
