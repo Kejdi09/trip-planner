@@ -4,7 +4,8 @@ import React from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { fetchGroupMembers, fetchMyGroups, getActiveUserId, GroupRow } from '../../../lib/groups-api';
+import { deleteGroupApi, fetchGroupMembers, fetchMyGroups, getActiveUserId, GroupRow } from '../../../lib/groups-api';
+import { supabase } from '../../../lib/supabase';
 import { COLORS, groupsStyles as styles } from './groups-screen.styles';
 
 type GroupMember = { id: string; fullName: string; avatarUrl: string | null; role: 'admin' | 'member' };
@@ -183,7 +184,7 @@ export function GroupsScreen() {
   const [currentUserId, setCurrentUserId] = React.useState(getActiveUserId());
 
   React.useEffect(() => {
-    void (async () => { const { data } = await (await import('../../../lib/supabase')).supabase.auth.getUser(); setCurrentUserId(data.user?.id ?? getActiveUserId()); })();
+    void (async () => { const { data } = await supabase.auth.getUser(); setCurrentUserId(data.user?.id ?? getActiveUserId()); })();
     const load = async () => {
       try {
         const { groups: rows } = await fetchMyGroups();
@@ -218,6 +219,46 @@ export function GroupsScreen() {
   const activeGroups = groups.filter((g) => g.status === 'active');
   const otherGroups = groups.filter((g) => g.status !== 'active');
 
+  const handleDeleteGroup = (groupId: string) => {
+    Alert.alert(
+      'Delete group?',
+      'Are you sure you want to delete this group? This will remove its chat, voting, itinerary, and members.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteGroupApi(groupId, currentUserId);
+              const { groups: rows } = await fetchMyGroups(currentUserId);
+              const mapped = await Promise.all(
+                rows.map(async (row) => {
+                  const { members } = await fetchGroupMembers(row.id, currentUserId);
+                  return {
+                    id: row.id,
+                    name: row.name ?? 'Untitled Group',
+                    adminId: row.created_by ?? '',
+                    members: members.map((m) => ({ id: m.user_id, fullName: `Member ${m.user_id.slice(0, 4)}`, avatarUrl: null, role: m.user_id === row.created_by ? 'admin' : 'member' })),
+                    status: mapStatus(row),
+                    votingOpen: row.status === 'planning',
+                    places: [],
+                    dateRange: row.start_date && row.end_date ? `${row.start_date} - ${row.end_date}` : null,
+                    budgetRange: row.min_budget != null && row.max_budget != null ? `$${row.min_budget}-$${row.max_budget}` : null,
+                    destination: null,
+                  } as Group;
+                }),
+              );
+              setGroups(mapped);
+            } catch (error) {
+              Alert.alert('Delete failed', error instanceof Error ? error.message : 'Unable to delete group.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.screen}>
@@ -250,6 +291,10 @@ export function GroupsScreen() {
                     group={g}
                     onInvite={() => router.push({ pathname: '../../invite-to-group', params: { groupId: g.id } })}
                     onPress={() => router.push({ pathname: '../../group-hub', params: { groupId: g.id } })}
+                    onPressVoting={() => router.push({ pathname: '../../voting', params: { groupId: g.id } })}
+                    canDelete={g.adminId === currentUserId}
+                    currentUserId={currentUserId}
+                    onDelete={() => handleDeleteGroup(g.id)}
                   />
                 ))}
               </>
@@ -264,6 +309,10 @@ export function GroupsScreen() {
                     key={g.id}
                     group={g}
                     onPress={() => router.push({ pathname: '../../group-hub', params: { groupId: g.id } })}
+                    onPressVoting={() => router.push({ pathname: '../../voting', params: { groupId: g.id } })}
+                    canDelete={g.adminId === currentUserId}
+                    currentUserId={currentUserId}
+                    onDelete={() => handleDeleteGroup(g.id)}
                   />
                 ))}
               </>
