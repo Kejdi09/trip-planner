@@ -443,103 +443,21 @@ module.exports = function votingRoutes(supabaseAdmin) {
       assertUuid(userId, 'userId');
 
       const group = await getGroupOrThrow(groupId);
-      await assertMemberOrThrow(groupId, userId);
-
+      if (group.created_by !== userId) {
+        return res.status(403).json({ error: 'Only the group creator can finish voting.' });
+      }
       if (group.status !== 'planning') {
-        return res.status(409).json({ error: 'Group is not in planning status.' });
-      }
-
-      if (!isVotingLocked(group)) {
-        return res.status(409).json({ error: 'Voting cannot be finalized before the deadline.' });
-      }
-
-      const stateReq = {
-        query: { groupId, userId },
-      };
-
-      const stateRes = {};
-      let payload;
-      await new Promise((resolve, reject) => {
-        router.handle(
-          { ...req, method: 'GET', url: '/state', query: stateReq.query },
-          {
-            status(code) {
-              this.statusCode = code;
-              return this;
-            },
-            json(body) {
-              payload = body;
-              resolve();
-              return body;
-            },
-          },
-          (err) => {
-            if (err) reject(err);
-            else resolve();
-          },
-        );
-      });
-      void stateRes;
-
-      const destinationOptions = payload?.destinations?.options || [];
-      const dateOptions = payload?.dates?.options || [];
-      const budgetOptions = payload?.budget?.options || [];
-
-      if (destinationOptions.length === 0 || dateOptions.length === 0 || budgetOptions.length === 0) {
-        return res.status(409).json({ error: 'Cannot finalize voting with missing options.' });
-      }
-
-      const pickWinner = (options) => {
-        const sorted = [...options].sort((a, b) => b.votedCount - a.votedCount);
-        const top = sorted[0];
-        if (!top || top.votedCount <= 0) return null;
-        if (sorted.length > 1 && sorted[1].votedCount === top.votedCount) return null;
-        return top;
-      };
-
-      const destinationWinner = pickWinner(destinationOptions);
-      const dateWinner = pickWinner(dateOptions);
-      const budgetWinner = pickWinner(budgetOptions);
-
-      if (!destinationWinner || !dateWinner || !budgetWinner) {
-        return res.status(409).json({ error: 'Voting conflict or tie detected. Resolve conflicts before finalizing.' });
+        return res.status(409).json({ error: 'Voting is already closed for this group.' });
       }
 
       const { data, error } = await supabaseAdmin
         .from('groups')
-        .update({
-          destination_place_id: destinationWinner.destinationId,
-          start_date: dateWinner.startDate,
-          end_date: dateWinner.endDate,
-          min_budget: budgetWinner.min,
-          max_budget: budgetWinner.max,
-          status: 'active',
-        })
+        .update({ status: 'active' })
         .eq('id', groupId)
-        .select('id, status, destination_place_id, start_date, end_date, min_budget, max_budget')
+        .select('id, created_by, status, voting_deadline, destination_place_id, start_date, end_date, min_budget, max_budget')
         .single();
 
-      if (error) {
-        const wrapped = new Error(error.message || 'Failed to finalize voting.');
-        wrapped.status = 502;
-        throw wrapped;
-      }
-
-      const { data: members } = await supabaseAdmin
-        .from('group_members')
-        .select('user_id')
-        .eq('group_id', groupId);
-      const recipients = (members || []).map((m) => m.user_id).filter(Boolean);
-
-      await Promise.all(recipients.map((recipientId) =>
-        createNotification(recipientId, 'voting_finalized', JSON.stringify({ deepLink: `/group-chat?groupId=${groupId}`, groupId })),
-      ));
-
-      if (group.voting_deadline) {
-        await Promise.all(recipients.map((recipientId) =>
-          createNotification(recipientId, 'voting_deadline', JSON.stringify({ deepLink: `/voting?groupId=${groupId}`, groupId, votingDeadline: group.voting_deadline })),
-        ));
-      }
+      if (error) throw makeError(error.message || 'Failed to finish voting.', 502, 'UPSTREAM_ERROR');
 
       return res.json({ group: data });
     } catch (error) {
