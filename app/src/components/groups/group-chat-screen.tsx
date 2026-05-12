@@ -290,7 +290,7 @@ export function GroupChatScreen() {
 
   const handleBackPress = () => {
     if (groupId) {
-      router.replace({ pathname: '/group-hub', params: { groupId } });
+      router.replace({ pathname: '/group-hub', params: { groupId: String(groupId) } });
       return;
     }
     router.replace('/groups');
@@ -388,7 +388,7 @@ export function GroupChatScreen() {
           <ActivityIndicator color={C.primary} style={{ flex: 1 }} />
         ) : (
           <>
-          <View style={{ ...StyleSheet.absoluteFillObject }}>
+          <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
             <View style={{ position: 'absolute', width: 240, height: 240, borderRadius: 120, backgroundColor: 'rgba(0,141,155,0.10)', top: 60, left: -80 }} />
             <View style={{ position: 'absolute', width: 300, height: 300, borderRadius: 150, backgroundColor: 'rgba(0,141,155,0.08)', bottom: 20, right: -120 }} />
           </View>
