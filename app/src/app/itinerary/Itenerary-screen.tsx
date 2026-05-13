@@ -119,8 +119,14 @@ export default function TripDetailScreen() {
         setContextLoading(true); setContextError(null);
         const params = new URLSearchParams({ groupId, userId: currentUserId });
         const response = await fetch(`${API_BASE_URL}/api/itinerary-context?${params.toString()}`, { headers: { 'x-app-env': APP_ENV } });
-        const payload = await response.json();
-        if (!response.ok) throw new Error(payload?.error || 'Unable to load itinerary context');
+        const raw = await response.text();
+        let payload: any = null;
+        try {
+          payload = raw ? JSON.parse(raw) : null;
+        } catch {
+          throw new Error(`Itinerary context request did not return JSON (${response.status}): ${raw.slice(0, 200)}`);
+        }
+        if (!response.ok) throw new Error(payload?.error?.message ?? `Itinerary context request failed (${response.status})`);
         setTripContext(payload);
       } catch (error) {
         const msg = error instanceof Error ? error.message : 'Unable to load itinerary context';
