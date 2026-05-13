@@ -17,7 +17,6 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { BrandHeader } from "@/components/ui/brand-header";
 import { createItineraryItem, deleteItineraryItem, fetchItinerary, getActiveUserId } from "../../../lib/groups-api";
 import { API_BASE_URL, APP_ENV } from "../../../lib/app-config";
 
@@ -185,7 +184,7 @@ export default function TripDetailScreen() {
 
       setPlaces((current) => [...current, newPlace]);
 
-      if (groupId) {
+      if (groupId && trip.startDate && !Number.isNaN(new Date(trip.startDate).getTime())) {
         const dayDate = new Date(trip.startDate);
         dayDate.setDate(dayDate.getDate() + (newPlace.day - 1));
         const date = dayDate.toISOString().slice(0, 10);
@@ -194,7 +193,7 @@ export default function TripDetailScreen() {
 
       return newPlace.id;
     },
-    [groupId, selectedDay],
+    [groupId, selectedDay, trip.city, trip.country, trip.startDate, currentUserId],
   );
 
   const removePlaceFromItinerary = useCallback((placeId: string) => {
@@ -301,7 +300,15 @@ export default function TripDetailScreen() {
       }
 
       console.log("AI places parsed:", aiPlaces);
-      addPlacesFromAI(aiPlaces);
+      setPlaces((current) => [...current, ...aiPlaces.map((place) => ({ id: createId(), name: place.name, city: place.city || trip.city, country: place.country || trip.country, day: place.day || 1, timeBlock: place.timeBlock || "unscheduled", startTime: place.startTime, endTime: place.endTime, description: place.description }))]);
+      if (groupId && trip.startDate && !Number.isNaN(new Date(trip.startDate).getTime())) {
+        for (const place of aiPlaces) {
+          const d = new Date(trip.startDate);
+          d.setDate(d.getDate() + ((place.day || 1) - 1));
+          const date = d.toISOString().slice(0, 10);
+          void createItineraryItem(groupId, place.name, date, place.startTime ?? null, currentUserId);
+        }
+      }
       setSelectedDay(aiPlaces[0].day ?? 1);
     } catch {
       Alert.alert("AI error", "Could not generate itinerary.");
@@ -440,33 +447,6 @@ export default function TripDetailScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.brandRow}>
-          <BrandHeader
-            brandName="TripSync"
-            containerStyle={styles.brandHeader}
-            badgeStyle={styles.brandBadge}
-            brandTextStyle={styles.brandText}
-          />
-
-          <View style={styles.datePill}>
-            <Text style={styles.dateText}>Jun 15-25, 2026</Text>
-          </View>
-        </View>
-
-        <View style={styles.groupRow}>
-          <View style={styles.avatarStack}>
-            <View style={[styles.avatar, styles.avatarOne]} />
-            <View style={[styles.avatar, styles.avatarTwo]} />
-            <View style={[styles.avatar, styles.avatarThree]} />
-            <View style={styles.moreAvatar}>
-              <Text style={styles.moreAvatarText}>+1</Text>
-            </View>
-          </View>
-
-          <Pressable style={styles.leaveButton}>
-            <Text style={styles.leaveButtonText}>Leave group</Text>
-          </Pressable>
-        </View>
 
         {renderDayTabs()}
 

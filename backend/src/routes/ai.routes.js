@@ -1,4 +1,5 @@
 const express = require('express');
+const { ensureGroupDestinationPlace } = require('../services/destinations');
 
 function daysInclusive(startDate, endDate) {
   if (!startDate || !endDate) return null;
@@ -22,9 +23,7 @@ module.exports = function aiRoutes(supabaseAdmin) {
     const { data: group } = await supabaseAdmin.from('groups').select('id,name,destination_place_id,start_date,end_date,min_budget,max_budget,status').eq('id', groupId).maybeSingle();
     if (!group) return null;
 
-    const { data: place } = group.destination_place_id
-      ? await supabaseAdmin.from('places').select('id,name,city,country,description').eq('id', group.destination_place_id).maybeSingle()
-      : { data: null };
+    const place = await ensureGroupDestinationPlace(supabaseAdmin, group);
 
     const { data: dateOptions = [] } = await supabaseAdmin.from('date_options').select('id,start_date,end_date').eq('group_id', groupId).order('start_date', { ascending: true });
     const dateIds = dateOptions.map((d) => d.id);

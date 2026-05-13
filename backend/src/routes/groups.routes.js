@@ -1,6 +1,6 @@
 const express = require('express');
 const { assertUuid, makeError } = require('../utils/http');
-const { geocodeCityFromQuery } = require('../services/mapbox');
+const { resolveDestinationPlaceIdFromName, ensureGroupDestinationPlace } = require('../services/destinations');
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -74,40 +74,6 @@ module.exports = function groupsRoutes(supabaseAdmin) {
   }
 
 
-  async function resolveDestinationPlaceIdFromGroupName(groupName) {
-    const cityCountry = await geocodeCityFromQuery(groupName);
-    if (!cityCountry) return null;
-
-    const city = cityCountry.city;
-    const country = cityCountry.country;
-
-    const { data: existing, error: existingError } = await supabaseAdmin
-      .from('places')
-      .select('id, city, country')
-      .ilike('city', city)
-      .ilike('country', country)
-      .limit(1)
-      .maybeSingle();
-
-    if (existingError) {
-      throw makeError(existingError.message || 'Failed to find destination place.', 502, 'UPSTREAM_ERROR');
-    }
-
-    if (existing?.id) return existing.id;
-
-    const { data: created, error: createdError } = await supabaseAdmin
-      .from('places')
-      .insert({ name: city, city, country, description: null })
-      .select('id')
-      .single();
-
-    if (createdError) {
-      throw makeError(createdError.message || 'Failed to create destination place.', 502, 'UPSTREAM_ERROR');
-    }
-
-    return created.id;
-  }
-
   async function requireCreator(groupId, userId) {
     const group = await requireGroup(groupId);
     if (group.created_by !== userId) {
@@ -155,6 +121,49 @@ module.exports = function groupsRoutes(supabaseAdmin) {
     }
   });
 
+
+  router.get('/travel-summary', async (req, res, next) => {
+    try {
+      const userId = String(req.query.userId || '').trim();
+      assertUuid(userId, 'userId');
+
+      const { data: memberships = [] } = await supabaseAdmin.from('group_members').select('group_id').eq('user_id', userId);
+      const groupIds = memberships.map((row) => row.group_id).filter(Boolean);
+
+      const { count: placesRated = 0 } = await supabaseAdmin
+        .from('reviews')
+        .select('user_id', { count: 'exact', head: true })
+        .eq('user_id', userId);
+
+      if (groupIds.length === 0) {
+        return res.json({ countries: 0, cities: 0, placesRated, groupTrips: 0, visitedCountries: [], visitedCities: [] });
+      }
+
+      const { data: groups = [] } = await supabaseAdmin.from('groups').select('id,name,destination_place_id').in('id', groupIds);
+
+      const places = [];
+      for (const group of groups) {
+        try {
+          const place = await ensureGroupDestinationPlace(supabaseAdmin, group);
+          if (place?.country || place?.city) places.push(place);
+        } catch {}
+      }
+
+      const visitedCountries = [...new Set(places.map((p) => p.country).filter(Boolean))];
+      const visitedCities = [...new Set(places.map((p) => `${p.city}, ${p.country}`).filter((v) => !v.startsWith('null') && !v.startsWith('undefined')) )];
+
+      return res.json({
+        countries: visitedCountries.length,
+        cities: visitedCities.length,
+        placesRated,
+        groupTrips: groupIds.length,
+        visitedCountries,
+        visitedCities,
+      });
+    } catch (error) {
+      return next(error);
+    }
+  });
   router.post('/', async (req, res, next) => {
     try {
       const name = String(req.body?.name || '').trim();
@@ -196,7 +205,7 @@ module.exports = function groupsRoutes(supabaseAdmin) {
 
       let destinationPlaceId = null;
       try {
-        destinationPlaceId = await resolveDestinationPlaceIdFromGroupName(name);
+        destinationPlaceId = await resolveDestinationPlaceIdFromName(supabaseAdmin, name);
       } catch (error) {
         console.warn('Mapbox destination lookup failed:', error?.message || error);
       }
