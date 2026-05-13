@@ -146,7 +146,9 @@ module.exports = function groupsRoutes(supabaseAdmin) {
         try {
           const place = await ensureGroupDestinationPlace(supabaseAdmin, group);
           if (place?.country || place?.city) places.push(place);
-        } catch {}
+        } catch (error) {
+          console.warn('Skipping destination backfill:', error?.message || error);
+        }
       }
 
       const visitedCountries = [...new Set(places.map((p) => p.country).filter(Boolean))];
