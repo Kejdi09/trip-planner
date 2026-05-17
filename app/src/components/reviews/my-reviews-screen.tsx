@@ -5,10 +5,9 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RatingStars } from '@/components/reviews/rating-stars';
-import { AppBottomNav } from '@/components/ui/app-bottom-nav';
 import { FadeIn } from '@/components/ui/fade-in';
 import { StatusMessage } from '@/components/ui/status-message';
-import type { PlaceRecord, ReviewRecord } from '../../../lib/reviews-api';
+import type { PlaceRecord } from '../../../lib/reviews-api';
 import { fetchPlacesByIds, fetchReviewsByUser } from '../../../lib/reviews-api';
 import { supabase } from '../../../lib/supabase';
 import { formatRelativeTime } from '../../../lib/reviews-utils';
@@ -211,7 +210,6 @@ export function MyReviewsScreen() {
           ) : null}
         </ScrollView>
 
-        <AppBottomNav activeTab="Profile" />
       </View>
     </SafeAreaView>
   );

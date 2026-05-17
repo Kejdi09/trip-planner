@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -17,11 +17,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { AppBottomNav } from "@/components/ui/app-bottom-nav";
-import { BrandHeader } from "@/components/ui/brand-header";
+import { createItineraryItem, deleteItineraryItem, fetchItinerary, getActiveUserId } from "../../../lib/groups-api";
+import { API_BASE_URL, APP_ENV } from "../../../lib/app-config";
 
-const AI_API_BASE_URL =
-  process.env.EXPO_PUBLIC_AI_API_URL ?? "http://localhost:3000";
 
 type TimeBlock = "morning" | "afternoon" | "evening" | "unscheduled";
 
@@ -48,14 +46,6 @@ type AddPlaceInput = {
   description?: string;
 };
 
-const trip = {
-  title: "Summer Europe Trip",
-  city: "Barcelona",
-  country: "Spain",
-  startDate: "2026-06-15",
-  endDate: "2026-06-25",
-  totalDays: 5,
-};
 
 function createId() {
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -73,8 +63,23 @@ function getDayDateLabel(startDate: string, dayNumber: number) {
 
 export default function TripDetailScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ groupId?: string }>();
+  const groupId = params.groupId ? String(params.groupId) : null;
 
-  const { width } = useWindowDimensions();
+  useWindowDimensions();
+
+  const currentUserId = React.useMemo(() => getActiveUserId(), []);
+  const [tripContext, setTripContext] = useState<any>(null);
+  const [contextLoading, setContextLoading] = useState(true);
+  const [contextError, setContextError] = useState<string | null>(null);
+  const trip = {
+    title: tripContext?.groupName ?? '',
+    city: tripContext?.destination?.city ?? '',
+    country: tripContext?.destination?.country ?? '',
+    startDate: tripContext?.dates?.startDate ?? '',
+    endDate: tripContext?.dates?.endDate ?? '',
+    totalDays: tripContext?.dates?.totalDays ?? 1,
+  };
 
   const goToPreviousDay = useCallback(() => {
     setSelectedDay((current) => Math.max(1, current - 1));
@@ -106,6 +111,52 @@ export default function TripDetailScreen() {
   const [placeName, setPlaceName] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
 
+  React.useEffect(() => {
+    if (!groupId || !currentUserId) { setContextLoading(false); return; }
+    const loadContext = async () => {
+      try {
+        setContextLoading(true); setContextError(null);
+        const params = new URLSearchParams({ groupId, userId: currentUserId });
+        const response = await fetch(`${API_BASE_URL}/api/itinerary-context?${params.toString()}`, { headers: { 'x-app-env': APP_ENV } });
+        const raw = await response.text();
+        let payload: any = null;
+        try {
+          payload = raw ? JSON.parse(raw) : null;
+        } catch {
+          throw new Error(`Itinerary context request did not return JSON (${response.status}): ${raw.slice(0, 200)}`);
+        }
+        if (!response.ok) throw new Error(payload?.error?.message ?? `Itinerary context request failed (${response.status})`);
+        setTripContext(payload);
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : 'Unable to load itinerary context';
+        setContextError(msg.includes('date range') ? 'Select trip dates in voting before generating an itinerary.' : msg);
+      } finally { setContextLoading(false); }
+    };
+    void loadContext();
+  }, [groupId, currentUserId]);
+
+  React.useEffect(() => {
+    if (!groupId) return;
+    const load = async () => {
+      try {
+        const { items } = await fetchItinerary(groupId, currentUserId);
+        setPlaces(items.map((item) => ({
+          id: item.id,
+          name: item.title,
+          city: trip.city,
+          country: trip.country,
+          day: Math.max(1, Math.floor((new Date(item.date).getTime() - new Date(trip.startDate).getTime()) / 86400000) + 1),
+          timeBlock: 'unscheduled',
+          startTime: item.time ?? undefined,
+          description: undefined,
+        })));
+      } catch {
+        // ignore for local fallback mode
+      }
+    };
+    void load();
+  }, [groupId]);
+
   const selectedDayPlaces = useMemo(() => {
     return places.filter((place) => place.day === selectedDay);
   }, [places, selectedDay]);
@@ -133,14 +184,24 @@ export default function TripDetailScreen() {
 
       setPlaces((current) => [...current, newPlace]);
 
+      if (groupId && trip.startDate && !Number.isNaN(new Date(trip.startDate).getTime())) {
+        const dayDate = new Date(trip.startDate);
+        dayDate.setDate(dayDate.getDate() + (newPlace.day - 1));
+        const date = dayDate.toISOString().slice(0, 10);
+        void createItineraryItem(groupId, newPlace.name, date, newPlace.startTime ?? null, currentUserId);
+      }
+
       return newPlace.id;
     },
-    [selectedDay],
+    [groupId, selectedDay, trip.city, trip.country, trip.startDate, currentUserId],
   );
 
   const removePlaceFromItinerary = useCallback((placeId: string) => {
     setPlaces((current) => current.filter((place) => place.id !== placeId));
-  }, []);
+    if (groupId) {
+      void deleteItineraryItem(groupId, placeId, currentUserId);
+    }
+  }, [groupId]);
 
   const addPlacesFromAI = useCallback(
     (aiPlaces: AddPlaceInput[]) => {
@@ -174,20 +235,15 @@ export default function TripDetailScreen() {
       setIsGenerating(true);
 
       const response = await fetch(
-        `${AI_API_BASE_URL}/api/generate-itinerary`,
+        `${API_BASE_URL}/api/generate-itinerary`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            city: trip.city,
-            country: trip.country,
-            days: trip.totalDays,
-            startDate: trip.startDate,
-            endDate: trip.endDate,
-            interests: ["food", "history", "landmarks", "walking"],
-            pace: "balanced",
+            groupId,
+            userId: currentUserId,
           }),
         },
       );
@@ -200,6 +256,8 @@ export default function TripDetailScreen() {
       console.log("AI itinerary:", itinerary);
 
       const aiPlaces: AddPlaceInput[] = [];
+      const destinationText = String(itinerary.destination || "");
+      const [destCity, destCountry] = destinationText.split(",").map((part: string) => part.trim());
 
       console.log("AI itinerary response:", JSON.stringify(itinerary, null, 2));
 
@@ -220,8 +278,8 @@ export default function TripDetailScreen() {
 
           aiPlaces.push({
             name,
-            city: trip.city,
-            country: trip.country,
+            city: destCity || trip.city,
+            country: destCountry || trip.country,
             day: dayNumber,
             timeBlock: place.timeBlock ?? place.period ?? "unscheduled",
             startTime: place.startTime ?? place.time,
@@ -242,14 +300,26 @@ export default function TripDetailScreen() {
       }
 
       console.log("AI places parsed:", aiPlaces);
-      addPlacesFromAI(aiPlaces);
+      setPlaces((current) => [...current, ...aiPlaces.map((place) => ({ id: createId(), name: place.name, city: place.city || trip.city, country: place.country || trip.country, day: place.day || 1, timeBlock: place.timeBlock || "unscheduled", startTime: place.startTime, endTime: place.endTime, description: place.description }))]);
+      if (groupId && trip.startDate && !Number.isNaN(new Date(trip.startDate).getTime())) {
+        for (const place of aiPlaces) {
+          const d = new Date(trip.startDate);
+          d.setDate(d.getDate() + ((place.day || 1) - 1));
+          const date = d.toISOString().slice(0, 10);
+          void createItineraryItem(groupId, place.name, date, place.startTime ?? null, currentUserId);
+        }
+      }
       setSelectedDay(aiPlaces[0].day ?? 1);
-    } catch (error) {
+    } catch {
       Alert.alert("AI error", "Could not generate itinerary.");
     } finally {
       setIsGenerating(false);
     }
   };
+
+  if (contextLoading) { return <SafeAreaView style={styles.safeArea}><View style={styles.screen}><Text style={{ padding: 24 }}>Loading trip context...</Text></View></SafeAreaView>; }
+
+  if (contextError) { return <SafeAreaView style={styles.safeArea}><View style={styles.screen}><Text style={{ padding: 24, color: "#BE123C" }}>{contextError}</Text></View></SafeAreaView>; }
 
   const renderDayTabs = () => {
     return (
@@ -361,7 +431,7 @@ export default function TripDetailScreen() {
     <SafeAreaView style={styles.screen}>
       <View style={styles.phoneFrame}>
         <View style={styles.header}>
-          <Pressable style={styles.iconButton} onPress={() => router.back()}>
+          <Pressable style={styles.iconButton} onPress={() => router.replace({ pathname: '/group-hub', params: groupId ? { groupId } : undefined })}>
             <Feather name="arrow-left" size={23} color="#111827" />
           </Pressable>
 
@@ -377,33 +447,6 @@ export default function TripDetailScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.brandRow}>
-          <BrandHeader
-            brandName="TripSync"
-            containerStyle={styles.brandHeader}
-            badgeStyle={styles.brandBadge}
-            brandTextStyle={styles.brandText}
-          />
-
-          <View style={styles.datePill}>
-            <Text style={styles.dateText}>Jun 15-25, 2026</Text>
-          </View>
-        </View>
-
-        <View style={styles.groupRow}>
-          <View style={styles.avatarStack}>
-            <View style={[styles.avatar, styles.avatarOne]} />
-            <View style={[styles.avatar, styles.avatarTwo]} />
-            <View style={[styles.avatar, styles.avatarThree]} />
-            <View style={styles.moreAvatar}>
-              <Text style={styles.moreAvatarText}>+1</Text>
-            </View>
-          </View>
-
-          <Pressable style={styles.leaveButton}>
-            <Text style={styles.leaveButtonText}>Leave group</Text>
-          </Pressable>
-        </View>
 
         {renderDayTabs()}
 
@@ -473,7 +516,6 @@ export default function TripDetailScreen() {
           </Pressable>
         </View>
 
-        <AppBottomNav activeTab="Discover" />
       </View>
 
       <Modal

@@ -15,6 +15,7 @@ const sharedSupabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 const sharedApiUrl = process.env.EXPO_PUBLIC_API_URL;
 const sharedAppUrl = process.env.EXPO_PUBLIC_APP_URL;
 const sharedReviewPhotoBucket = process.env.EXPO_PUBLIC_REVIEW_PHOTO_BUCKET;
+const useReviewsBackendRaw = (process.env.EXPO_PUBLIC_USE_REVIEWS_BACKEND ?? 'false').trim().toLowerCase();
 
 const devSupabaseUrl =
   sharedSupabaseUrl ??
@@ -67,6 +68,7 @@ if (!selectedAppUrl) {
 }
 
 export const REVIEW_PHOTO_BUCKET: string = selectedReviewPhotoBucket ?? 'reviewPics';
+export const USE_REVIEWS_BACKEND: boolean = useReviewsBackendRaw === 'true' || useReviewsBackendRaw === '1';
 
 export const SUPABASE_URL: string = selectedSupabaseUrl;
 export const SUPABASE_ANON_KEY: string = selectedSupabaseAnonKey;

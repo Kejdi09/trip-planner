@@ -1,4 +1,5 @@
 import { Feather, Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import React from 'react';
 import {
   ActivityIndicator,
@@ -11,7 +12,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppBottomNav } from '@/components/ui/app-bottom-nav';
 import {
   acceptFriendRequest,
   declineFriendRequest,
@@ -127,7 +127,7 @@ type SearchResultCardProps = {
 
 function SearchResultCard({ user, onAdd, isSending }: SearchResultCardProps) {
   return (
-    <View style={styles.resultCard}>
+    <Pressable style={styles.resultCard} onPress={() => router.push('/profile')}>
       <Avatar uri={user.avatarUrl} name={user.fullName} />
 
       <View style={styles.userInfo}>
@@ -151,7 +151,7 @@ function SearchResultCard({ user, onAdd, isSending }: SearchResultCardProps) {
           </Text>
         </Pressable>
       )}
-    </View>
+    </Pressable>
   );
 }
 
@@ -187,7 +187,7 @@ export function AddFriendsScreen() {
         if (!cancelled) {
           setRequests(data);
         }
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setRequestsError('Could not load friend requests.');
         }
@@ -234,7 +234,7 @@ export function AddFriendsScreen() {
   const handleAccept = async (request: FriendRequest) => {
     setProcessingIds((prev) => new Set(prev).add(request.id));
     try {
-      await acceptFriendRequest(request.id, request.senderId);
+      await acceptFriendRequest(request.id);
       setRequests((prev) => prev.filter((r) => r.id !== request.id));
     } catch {
       // silently ignore — production code would surface an alert
@@ -374,7 +374,6 @@ export function AddFriendsScreen() {
           )}
         </ScrollView>
 
-        <AppBottomNav activeTab="Feed" />
       </View>
     </SafeAreaView>
   );

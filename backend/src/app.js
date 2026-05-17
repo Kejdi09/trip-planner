@@ -3,6 +3,10 @@ const cors = require("cors");
 const { createClient } = require("@supabase/supabase-js");
 const { version: backendVersion } = require("../package.json");
 const aiRoutes = require("./routes/ai.routes");
+const votingRoutes = require("./routes/voting.routes");
+const groupsRoutes = require("./routes/groups.routes");
+const reviewsRoutes = require("./routes/reviews.routes");
+const notificationsRoutes = require("./routes/notifications.routes");
 require("dotenv").config();
 
 const required = ["SUPABASE_URL", "SUPABASE_SERVICE_KEY"];
@@ -359,13 +363,23 @@ app.delete("/wishlists", ensureClientEnvMatches, async (req, res, next) => {
   }
 });
 
-app.use("/api", aiRoutes);
+app.use("/api", aiRoutes(supabaseAdmin));
+app.use("/voting", ensureClientEnvMatches, votingRoutes(supabaseAdmin));
+app.use("/groups", ensureClientEnvMatches, groupsRoutes(supabaseAdmin));
+app.use("/api/groups", ensureClientEnvMatches, groupsRoutes(supabaseAdmin));
+app.use("/reviews-api", ensureClientEnvMatches, reviewsRoutes(supabaseAdmin));
+app.use("/notifications", ensureClientEnvMatches, notificationsRoutes(supabaseAdmin));
 app.use((err, req, res, next) => {
   void next;
   console.error(err);
-  res
-    .status(err.status || 500)
-    .json({ error: err.message || "Internal server error" });
+  const status = err.status || 500;
+  const code = err.code || (status >= 500 ? "INTERNAL_ERROR" : "REQUEST_ERROR");
+  res.status(status).json({
+    error: {
+      code,
+      message: err.message || "Internal server error",
+    },
+  });
 });
 
 module.exports = { app, supabaseAdmin };
