@@ -10,6 +10,12 @@ import { StatusMessage } from '@/components/ui/status-message';
 import type { FilterGroup, FilterOption } from '@/components/ui/types';
 import type { DiscoverPlace } from '../../../lib/discover-api';
 import { fetchDiscoverPlaces } from '../../../lib/discover-api';
+import { supabase } from '../../../lib/supabase';
+import {
+  addWishlistPlace,
+  fetchWishlistPlaceIds,
+  removeWishlistPlace,
+} from '../../../lib/wishlist-api';
 import { styles } from './discover-screen.styles';
 
 function buildCountryFilterGroups(options: FilterOption[]): FilterGroup[] {
@@ -22,6 +28,7 @@ export function DiscoverScreen() {
   const [isFilterOpen, setIsFilterOpen] = React.useState(false);
   const [selectedFilters, setSelectedFilters] = React.useState<string[]>([]);
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [userId, setUserId] = React.useState<string | null>(null);
   const [savedPlaceIds, setSavedPlaceIds] = React.useState<string[]>([]);
   const [places, setPlaces] = React.useState<DiscoverPlace[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -66,6 +73,32 @@ export function DiscoverScreen() {
     return () => { isMounted = false; };
   }, []);
 
+  React.useEffect(() => {
+    let isMounted = true;
+
+    const loadWishlist = async () => {
+      try {
+        const { data } = await supabase.auth.getUser();
+        const user = data.user;
+
+        if (!user || !isMounted) {
+          return;
+        }
+
+        setUserId(user.id);
+        const wishlistIds = await fetchWishlistPlaceIds(user.id);
+        if (!isMounted) return;
+        setSavedPlaceIds(wishlistIds);
+      } catch {
+        if (!isMounted) return;
+        setSavedPlaceIds([]);
+      }
+    };
+
+    void loadWishlist();
+    return () => { isMounted = false; };
+  }, []);
+
   const filteredPlaces = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     const activeCountries = selectedFilters;
@@ -86,10 +119,27 @@ export function DiscoverScreen() {
     );
   };
 
-  const toggleSavedPlace = (placeId: string) => {
-    setSavedPlaceIds((current) =>
-      current.includes(placeId) ? current.filter((id) => id !== placeId) : [...current, placeId],
-    );
+  const toggleSavedPlace = async (placeId: string) => {
+    if (!userId) {
+      return;
+    }
+
+    const isSaved = savedPlaceIds.includes(placeId);
+    const nextSaved = isSaved
+      ? savedPlaceIds.filter((id) => id !== placeId)
+      : [...savedPlaceIds, placeId];
+
+    setSavedPlaceIds(nextSaved);
+
+    try {
+      if (isSaved) {
+        await removeWishlistPlace(userId, placeId);
+      } else {
+        await addWishlistPlace(userId, placeId);
+      }
+    } catch {
+      setSavedPlaceIds(savedPlaceIds);
+    }
   };
 
   const handlePressPlaceDetails = (place: DiscoverPlace) => {

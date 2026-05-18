@@ -118,6 +118,22 @@ export async function fetchReviewPhotosByReviewIds(reviewIds: string[]): Promise
   return (data as ReviewPhotoRecord[]) ?? [];
 }
 
+export async function deleteReviewById(reviewId: string): Promise<void> {
+  const { error: photoError } = await supabase
+    .from('review_photos')
+    .delete()
+    .eq('review_id', reviewId);
+
+  if (photoError) throw photoError;
+
+  const { error } = await supabase
+    .from('reviews')
+    .delete()
+    .eq('id', reviewId);
+
+  if (error) throw error;
+}
+
 export async function fetchTagsByReviewIds(reviewIds: string[]): Promise<TagRecord[]> {
   if (reviewIds.length === 0) return [];
 

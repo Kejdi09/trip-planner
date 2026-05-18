@@ -9,7 +9,6 @@ Keep work simple, focused, and easy to review.
 Start from `dev`, then create your branch:
 
 ```bash
-git checkout dev
 git pull origin dev
 git checkout -b feature/<short-scope>
 ```
