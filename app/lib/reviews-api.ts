@@ -1,3 +1,6 @@
+import { decode as decodeBase64 } from 'base64-arraybuffer';
+import * as FileSystem from 'expo-file-system';
+
 import { REVIEW_PHOTO_BUCKET } from './app-config';
 import { supabase } from './supabase';
 
@@ -217,8 +220,7 @@ const getFileExtension = (uri: string): string => {
   return extension && extension.length <= 5 ? extension.toLowerCase() : 'jpg';
 };
 
-const getContentType = (extension: string, fallbackType?: string): string => {
-  if (fallbackType) return fallbackType;
+const getContentType = (extension: string): string => {
   if (extension === 'png') return 'image/png';
   if (extension === 'webp') return 'image/webp';
   return 'image/jpeg';
@@ -239,13 +241,16 @@ async function uploadReviewPhotos(
     const fileName = `${Date.now()}-${index}.${extension}`;
     const filePath = `${userId}/${reviewId}/${fileName}`;
 
-    const response = await fetch(uri);
-    const blob = await response.blob();
+    // Use FileSystem for Android content:// URIs to avoid fetch failures.
+    const fileBase64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    const fileBuffer = decodeBase64(fileBase64);
 
     const { error: uploadError } = await supabase.storage
       .from(REVIEW_PHOTO_BUCKET)
-      .upload(filePath, blob, {
-        contentType: getContentType(extension, blob.type),
+      .upload(filePath, fileBuffer, {
+        contentType: getContentType(extension),
         upsert: false,
       });
 

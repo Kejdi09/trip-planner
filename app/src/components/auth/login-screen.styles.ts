@@ -24,6 +24,12 @@ export const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
+  keyboardAvoiding: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
   screen: {
     flex: 1,
     justifyContent: 'space-between',

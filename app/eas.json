@@ -12,16 +12,28 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_APP_ENV": "preview",
-        "EXPO_PUBLIC_REVIEW_PHOTO_BUCKET_PREVIEW": "reviewsPics"
+        "EXPO_PUBLIC_SUPABASE_URL_DEV": "https://rplpqgfnacwrigovsyrz.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY_DEV": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJwbHBxZ2ZuYWN3cmlnb3ZzeXJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NDU4MjUsImV4cCI6MjA5MTIyMTgyNX0.VKXgHX9BJndoSBv1C-KMSXNVDzNhmcZc-YnGTT5gYY8",
+        "EXPO_PUBLIC_API_URL_DEV": "https://trip-planner-1-xcdc.onrender.com",
+        "EXPO_PUBLIC_APP_URL_DEV": "http://localhost:8081",
+        "EXPO_PUBLIC_REVIEW_PHOTO_BUCKET_PREVIEW": "reviewPics"
       },
       "android": {
         "buildType": "apk"
       }
     },
     "production": {
+      "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_APP_ENV": "production",
-        "EXPO_PUBLIC_REVIEW_PHOTO_BUCKET_PROD": "Roicseviews"
+        "EXPO_PUBLIC_APP_ENV": "preview",
+        "EXPO_PUBLIC_SUPABASE_URL_DEV": "https://rplpqgfnacwrigovsyrz.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY_DEV": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJwbHBxZ2ZuYWN3cmlnb3ZzeXJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NDU4MjUsImV4cCI6MjA5MTIyMTgyNX0.VKXgHX9BJndoSBv1C-KMSXNVDzNhmcZc-YnGTT5gYY8",
+        "EXPO_PUBLIC_API_URL_DEV": "https://trip-planner-1-xcdc.onrender.com",
+        "EXPO_PUBLIC_APP_URL_DEV": "http://localhost:8081",
+        "EXPO_PUBLIC_REVIEW_PHOTO_BUCKET_PREVIEW": "reviewPics"
+      },
+      "android": {
+        "buildType": "apk"
       },
       "autoIncrement": true
     }

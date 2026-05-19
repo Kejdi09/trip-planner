@@ -265,6 +265,9 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  galleryList: {
+    flex: 1,
+  },
   galleryImage: {
     width: '100%',
     height: '100%',

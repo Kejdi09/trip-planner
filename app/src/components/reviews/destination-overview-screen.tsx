@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
-import { FlatList, Image, Modal, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
+import { Dimensions, FlatList, Image, Modal, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DestinationSummary } from '@/components/reviews/destination-summary';
@@ -38,7 +38,9 @@ export function DestinationOverviewScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
   const insets = useSafeAreaInsets();
-  const { width: galleryWidth } = useWindowDimensions();
+  const { width: windowWidth } = useWindowDimensions();
+  const fallbackWidth = Dimensions.get('window').width || 360;
+  const galleryWidth = windowWidth > 0 ? windowWidth : fallbackWidth;
   const [place, setPlace] = React.useState<PlaceRecord | null>(null);
   const [rating, setRating] = React.useState(0);
   const [photos, setPhotos] = React.useState<PhotoItem[]>([]);
@@ -329,6 +331,7 @@ export function DestinationOverviewScreen() {
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
+            style={styles.galleryList}
             keyExtractor={(item) => item.id}
             initialScrollIndex={activePhotoIndex ?? 0}
             getItemLayout={(_, index) => ({
@@ -341,7 +344,7 @@ export function DestinationOverviewScreen() {
               setActivePhotoIndex(nextIndex);
             }}
             renderItem={({ item }) => (
-              <View style={[styles.gallerySlide, { width: galleryWidth }]}>
+              <View style={[styles.gallerySlide, { width: galleryItemSize }]}>
                 <Image
                   source={{ uri: item.url }}
                   style={styles.galleryImage}

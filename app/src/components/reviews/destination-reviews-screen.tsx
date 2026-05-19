@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
-import { FlatList, Image, Modal, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
+import { Dimensions, FlatList, Image, Modal, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DestinationSummary } from '@/components/reviews/destination-summary';
@@ -62,7 +62,9 @@ export function DestinationReviewsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
   const insets = useSafeAreaInsets();
-  const { width: galleryWidth } = useWindowDimensions();
+  const { width: windowWidth } = useWindowDimensions();
+  const fallbackWidth = Dimensions.get('window').width || 360;
+  const galleryWidth = windowWidth > 0 ? windowWidth : fallbackWidth;
   const [activeSort, setActiveSort] = React.useState<SortOption>('Newest');
   const [place, setPlace] = React.useState<PlaceRecord | null>(null);
   const [reviews, setReviews] = React.useState<ReviewRecord[]>([]);
@@ -349,74 +351,82 @@ export function DestinationReviewsScreen() {
 
                   return (
                     <FadeIn key={review.id} delay={160 + index * 70}>
-                      <Pressable
-                        style={[styles.reviewCard, isExpanded && styles.reviewCardExpanded]}
-                        accessibilityRole="button"
-                        accessibilityHint="Expand or collapse review"
-                        hitSlop={6}
-                        onPress={() => handleToggleReview(review.id)}
-                      >
-                      <View style={styles.reviewHeader}>
-                        <View style={[styles.avatar, { backgroundColor: review.avatarColor }]}>
-                          <Text style={styles.avatarText}>{review.initials}</Text>
-                        </View>
-                        <View style={styles.reviewMeta}>
-                          <View style={styles.titleRow}>
-                            <Text style={styles.reviewerName}>{review.name}</Text>
-                          <View style={styles.reviewMetaRight}>
-                            {hasPhotos ? (
-                              <View style={styles.photoBadge}>
-                                <Feather name="image" size={12} color={REVIEW_COLORS.buttonText} />
-                                <Text style={styles.photoBadgeText}>{review.photos.length}</Text>
-                              </View>
-                            ) : null}
-                            <Feather name={isExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={REVIEW_COLORS.textSecondary} />
-                            <Text style={styles.reviewTime}>{review.timeAgo}</Text>
-                          </View>
-                          </View>
-                          <View style={styles.ratingRow}>
-                            <RatingStars value={review.rating} size={12} />
-                          </View>
-                        </View>
-                      </View>
-                    <Text style={styles.reviewBody} numberOfLines={isExpanded ? undefined : 2}>
-                        {review.body}
-                      </Text>
-                    {isExpanded && hasPhotos ? (
-                      <View style={styles.reviewPhotoGrid}>
-                        {review.photos.map((uri, photoIndex) => (
-                          <Pressable
-                            key={`${review.id}-${photoIndex}`}
-                            style={styles.reviewPhotoTile}
-                            accessibilityRole="button"
-                            accessibilityHint="Open review photo"
-                            onPress={() =>
-                              setActiveGallery({
-                                photos: review.photos,
-                                index: photoIndex,
-                                reviewerName: review.name,
-                              })
-                            }
-                          >
-                            <Image
-                              source={{ uri }}
-                              style={styles.reviewPhotoImage}
-                              accessibilityLabel={`Review photo by ${review.name}`}
-                            />
-                          </Pressable>
-                        ))}
-                      </View>
-                    ) : null}
-                      {review.tags.length > 0 ? (
-                        <View style={styles.reviewTagsRow}>
-                          {review.tags.map((tag) => (
-                            <View key={`${review.id}-${tag}`} style={styles.reviewTagChip}>
-                              <Text style={styles.reviewTagText}>{tag}</Text>
+                      <View style={[styles.reviewCard, isExpanded && styles.reviewCardExpanded]}>
+                        <Pressable
+                          style={styles.reviewToggle}
+                          accessibilityRole="button"
+                          accessibilityHint="Expand or collapse review"
+                          hitSlop={6}
+                          onPress={() => handleToggleReview(review.id)}
+                        >
+                          <View style={styles.reviewHeader}>
+                            <View style={[styles.avatar, { backgroundColor: review.avatarColor }]}>
+                              <Text style={styles.avatarText}>{review.initials}</Text>
                             </View>
-                          ))}
-                        </View>
-                      ) : null}
-                      </Pressable>
+                            <View style={styles.reviewMeta}>
+                              <View style={styles.titleRow}>
+                                <Text style={styles.reviewerName}>{review.name}</Text>
+                                <View style={styles.reviewMetaRight}>
+                                  {hasPhotos ? (
+                                    <View style={styles.photoBadge}>
+                                      <Feather name="image" size={12} color={REVIEW_COLORS.buttonText} />
+                                      <Text style={styles.photoBadgeText}>{review.photos.length}</Text>
+                                    </View>
+                                  ) : null}
+                                  <Feather
+                                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                                    size={14}
+                                    color={REVIEW_COLORS.textSecondary}
+                                  />
+                                  <Text style={styles.reviewTime}>{review.timeAgo}</Text>
+                                </View>
+                              </View>
+                              <View style={styles.ratingRow}>
+                                <RatingStars value={review.rating} size={12} />
+                              </View>
+                            </View>
+                          </View>
+                          <Text style={styles.reviewBody} numberOfLines={isExpanded ? undefined : 2}>
+                            {review.body}
+                          </Text>
+                        </Pressable>
+
+                        {isExpanded && hasPhotos ? (
+                          <View style={styles.reviewPhotoGrid}>
+                            {review.photos.map((uri, photoIndex) => (
+                              <Pressable
+                                key={`${review.id}-${photoIndex}`}
+                                style={styles.reviewPhotoTile}
+                                accessibilityRole="button"
+                                accessibilityHint="Open review photo"
+                                onPress={() =>
+                                  setActiveGallery({
+                                    photos: review.photos,
+                                    index: photoIndex,
+                                    reviewerName: review.name,
+                                  })
+                                }
+                              >
+                                <Image
+                                  source={{ uri }}
+                                  style={styles.reviewPhotoImage}
+                                  accessibilityLabel={`Review photo by ${review.name}`}
+                                />
+                              </Pressable>
+                            ))}
+                          </View>
+                        ) : null}
+
+                        {review.tags.length > 0 ? (
+                          <View style={styles.reviewTagsRow}>
+                            {review.tags.map((tag) => (
+                              <View key={`${review.id}-${tag}`} style={styles.reviewTagChip}>
+                                <Text style={styles.reviewTagText}>{tag}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        ) : null}
+                      </View>
                     </FadeIn>
                   );
                 })
@@ -459,6 +469,7 @@ export function DestinationReviewsScreen() {
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
+            style={styles.galleryList}
             keyExtractor={(item, index) => `${index}-${item}`}
             initialScrollIndex={activeGallery?.index ?? 0}
             getItemLayout={(_, index) => ({
@@ -471,7 +482,7 @@ export function DestinationReviewsScreen() {
               setActiveGallery((current) => (current ? { ...current, index: nextIndex } : current));
             }}
             renderItem={({ item }) => (
-              <View style={[styles.gallerySlide, { width: galleryWidth }]}>
+              <View style={[styles.gallerySlide, { width: galleryItemSize }]}>
                 <Image
                   source={{ uri: item }}
                   style={styles.galleryImage}

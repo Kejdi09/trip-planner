@@ -123,6 +123,9 @@ export const styles = StyleSheet.create({
   reviewCardExpanded: {
     backgroundColor: REVIEW_COLORS.surface,
   },
+  reviewToggle: {
+    flex: 1,
+  },
   reviewHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -313,6 +316,9 @@ export const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  galleryList: {
+    flex: 1,
   },
   galleryImage: {
     width: '100%',

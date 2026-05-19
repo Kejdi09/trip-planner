@@ -222,45 +222,43 @@ export function MyReviewsScreen() {
           ) : (
             visibleReviews.map((review, index) => (
               <FadeIn key={review.id} delay={160 + index * 70}>
-                <Pressable
-                  style={styles.reviewCard}
-                  onPress={() =>
-                    router.push(
-                      review.placeId
-                        ? { pathname: '/destination-reviews', params: { id: review.placeId } }
-                        : '/destination-reviews',
-                    )
-                  }
-                >
-                  <View style={styles.reviewHeader}>
-                    <View style={[styles.avatar, { backgroundColor: review.avatarColor }]} />
-                    <View style={styles.reviewMeta}>
-                      <View style={styles.titleRow}>
-                        <Text style={styles.destinationTitle}>{review.destination}</Text>
-                        <View style={styles.reviewActions}>
+                <View style={styles.reviewCard}>
+                  <Pressable
+                    style={styles.reviewPressable}
+                    onPress={() =>
+                      router.push(
+                        review.placeId
+                          ? { pathname: '/destination-reviews', params: { id: review.placeId } }
+                          : '/destination-reviews',
+                      )
+                    }
+                  >
+                    <View style={styles.reviewHeader}>
+                      <View style={[styles.avatar, { backgroundColor: review.avatarColor }]} />
+                      <View style={styles.reviewMeta}>
+                        <View style={styles.titleRow}>
+                          <Text style={styles.destinationTitle}>{review.destination}</Text>
                           <Text style={styles.reviewTime}>{review.timeAgo}</Text>
-                          <Pressable
-                            accessibilityRole="button"
-                            accessibilityHint="Delete review"
-                            style={styles.deleteButton}
-                            onPress={(event) => {
-                              event.stopPropagation();
-                              handleRequestDelete(review);
-                            }}
-                          >
-                            <Feather name="x" size={14} color={REVIEW_COLORS.textSecondary} />
-                          </Pressable>
+                        </View>
+                        <View style={styles.ratingRow}>
+                          <RatingStars value={review.rating} size={14} />
                         </View>
                       </View>
-                      <View style={styles.ratingRow}>
-                        <RatingStars value={review.rating} size={14} />
-                      </View>
                     </View>
-                  </View>
-                  <Text style={styles.reviewBody} numberOfLines={2}>
-                    {review.body}
-                  </Text>
-                </Pressable>
+                    <Text style={styles.reviewBody} numberOfLines={2}>
+                      {review.body}
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityHint="Delete review"
+                    style={styles.deleteButton}
+                    onPress={() => handleRequestDelete(review)}
+                  >
+                    <Feather name="x" size={14} color={REVIEW_COLORS.textSecondary} />
+                  </Pressable>
+                </View>
               </FadeIn>
             ))
           )}
