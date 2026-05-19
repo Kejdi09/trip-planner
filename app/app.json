@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "TripSync",
+    "icon": "./assets/splash-icon.png",
     "slug": "app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -17,7 +18,11 @@
     "android": {
       "predictiveBackGestureEnabled": false,
       "package": "com.tripsync.app",
-      "permissions": ["READ_MEDIA_IMAGES", "READ_EXTERNAL_STORAGE", "CAMERA"]
+      "permissions": ["READ_MEDIA_IMAGES", "READ_EXTERNAL_STORAGE", "CAMERA"],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/splash-icon.png",
+        "backgroundColor": "#208AEF"
+      }
     },
     "web": {
       "output": "static"

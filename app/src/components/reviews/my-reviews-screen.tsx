@@ -1,20 +1,23 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RatingStars } from '@/components/reviews/rating-stars';
+import { AppBottomNav } from '@/components/ui/app-bottom-nav';
 import { FadeIn } from '@/components/ui/fade-in';
 import { StatusMessage } from '@/components/ui/status-message';
 import type { PlaceRecord } from '../../../lib/reviews-api';
-import { fetchPlacesByIds, fetchReviewsByUser } from '../../../lib/reviews-api';
+import { deleteReviewById, fetchPlacesByIds, fetchReviewsByUser } from '../../../lib/reviews-api';
 import { supabase } from '../../../lib/supabase';
 import { formatRelativeTime } from '../../../lib/reviews-utils';
 import { REVIEW_COLORS } from './review-theme';
 import { styles } from './my-reviews-screen.styles';
 
 const SORT_OPTIONS = ['Newest', 'Highest', 'Lowest'] as const;
+const INITIAL_VISIBLE_REVIEWS = 3;
+const LOAD_MORE_STEP = 3;
 
 type SortOption = (typeof SORT_OPTIONS)[number];
 
@@ -38,6 +41,9 @@ export function MyReviewsScreen() {
   const [reviews, setReviews] = React.useState<ReviewItem[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = React.useState(INITIAL_VISIBLE_REVIEWS);
+  const [reviewToDelete, setReviewToDelete] = React.useState<ReviewItem | null>(null);
+  const [isDeleting, setIsDeleting] = React.useState(false);
 
   const handleBack = () => {
     const canGoBack =
@@ -98,6 +104,7 @@ export function MyReviewsScreen() {
         }
 
         setReviews(items);
+        setVisibleCount(Math.min(INITIAL_VISIBLE_REVIEWS, items.length));
       } catch (error) {
         if (!isMounted) {
           return;
@@ -130,6 +137,48 @@ export function MyReviewsScreen() {
 
     return [...reviews].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
   }, [activeSort, reviews]);
+
+  React.useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE_REVIEWS);
+  }, [activeSort]);
+
+  const visibleReviews = sortedReviews.slice(0, visibleCount);
+  const remainingReviews = Math.max(sortedReviews.length - visibleCount, 0);
+  const canLoadMore = remainingReviews > 0;
+
+  const handleLoadMore = () => {
+    setVisibleCount((current) => Math.min(current + LOAD_MORE_STEP, sortedReviews.length));
+  };
+
+  const handleRequestDelete = (review: ReviewItem) => {
+    setReviewToDelete(review);
+  };
+
+  const handleCancelDelete = () => {
+    if (isDeleting) return;
+    setReviewToDelete(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!reviewToDelete || isDeleting) return;
+    setIsDeleting(true);
+    setErrorMessage(null);
+
+    try {
+      await deleteReviewById(reviewToDelete.id);
+      setReviews((current) => {
+        const nextReviews = current.filter((item) => item.id !== reviewToDelete.id);
+        setVisibleCount((count) => Math.min(count, nextReviews.length));
+        return nextReviews;
+      });
+      setReviewToDelete(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to delete review.';
+      setErrorMessage(message);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -171,45 +220,93 @@ export function MyReviewsScreen() {
           ) : sortedReviews.length === 0 ? (
             <StatusMessage message="No reviews yet." style={styles.statusText} />
           ) : (
-            sortedReviews.map((review, index) => (
+            visibleReviews.map((review, index) => (
               <FadeIn key={review.id} delay={160 + index * 70}>
-                <Pressable
-                  style={styles.reviewCard}
-                  onPress={() =>
-                    router.push(
-                      review.placeId
-                        ? { pathname: '/destination-reviews', params: { id: review.placeId } }
-                        : '/destination-reviews',
-                    )
-                  }
-                >
-                  <View style={styles.reviewHeader}>
-                    <View style={[styles.avatar, { backgroundColor: review.avatarColor }]} />
-                    <View style={styles.reviewMeta}>
-                      <View style={styles.titleRow}>
-                        <Text style={styles.destinationTitle}>{review.destination}</Text>
-                        <Text style={styles.reviewTime}>{review.timeAgo}</Text>
-                      </View>
-                      <View style={styles.ratingRow}>
-                        <RatingStars value={review.rating} size={14} />
+                <View style={styles.reviewCard}>
+                  <Pressable
+                    style={styles.reviewPressable}
+                    onPress={() =>
+                      router.push(
+                        review.placeId
+                          ? { pathname: '/destination-reviews', params: { id: review.placeId } }
+                          : '/destination-reviews',
+                      )
+                    }
+                  >
+                    <View style={styles.reviewHeader}>
+                      <View style={[styles.avatar, { backgroundColor: review.avatarColor }]} />
+                      <View style={styles.reviewMeta}>
+                        <View style={styles.titleRow}>
+                          <Text style={styles.destinationTitle}>{review.destination}</Text>
+                          <Text style={styles.reviewTime}>{review.timeAgo}</Text>
+                        </View>
+                        <View style={styles.ratingRow}>
+                          <RatingStars value={review.rating} size={14} />
+                        </View>
                       </View>
                     </View>
-                  </View>
-                  <Text style={styles.reviewBody} numberOfLines={2}>
-                    {review.body}
-                  </Text>
-                </Pressable>
+                    <Text style={styles.reviewBody} numberOfLines={2}>
+                      {review.body}
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityHint="Delete review"
+                    style={styles.deleteButton}
+                    onPress={() => handleRequestDelete(review)}
+                  >
+                    <Feather name="x" size={14} color={REVIEW_COLORS.textSecondary} />
+                  </Pressable>
+                </View>
               </FadeIn>
             ))
           )}
 
-          {sortedReviews.length > 0 ? (
-            <Pressable style={styles.viewMoreButton}>
-              <Text style={styles.viewMoreText}>View More</Text>
+          {canLoadMore ? (
+            <Pressable style={styles.viewMoreButton} onPress={handleLoadMore}>
+              <Text style={styles.viewMoreText}>Load more ({remainingReviews})</Text>
             </Pressable>
           ) : null}
         </ScrollView>
 
+        <Modal
+          visible={Boolean(reviewToDelete)}
+          transparent
+          animationType="fade"
+          onRequestClose={handleCancelDelete}
+        >
+          <Pressable style={styles.modalBackdrop} onPress={handleCancelDelete}>
+            <Pressable style={styles.modalCard} onPress={(event) => event.stopPropagation()}>
+              <Text style={styles.modalTitle}>Delete review?</Text>
+              <Text style={styles.modalBody}>
+                This will remove your review from {reviewToDelete?.destination ?? 'this place'}.
+              </Text>
+              <View style={styles.modalActions}>
+                <Pressable
+                  style={styles.modalCancelButton}
+                  onPress={handleCancelDelete}
+                  disabled={isDeleting}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.modalDeleteButton}
+                  onPress={handleConfirmDelete}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <ActivityIndicator size="small" color={REVIEW_COLORS.buttonText} />
+                  ) : (
+                    <Text style={styles.modalDeleteText}>Delete</Text>
+                  )}
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+
+        <AppBottomNav activeTab="Profile" />
       </View>
     </SafeAreaView>
   );

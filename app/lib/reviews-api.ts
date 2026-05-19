@@ -1,3 +1,5 @@
+import { decode as decodeBase64 } from 'base64-arraybuffer';
+import * as FileSystem from 'expo-file-system';
 import { API_BASE_URL, APP_ENV, REVIEW_PHOTO_BUCKET, USE_REVIEWS_BACKEND } from './app-config';
 import { supabase } from './supabase';
 
@@ -175,6 +177,22 @@ export async function fetchReviewPhotosByReviewIds(reviewIds: string[]): Promise
   return (data as ReviewPhotoRecord[]) ?? [];
 }
 
+export async function deleteReviewById(reviewId: string): Promise<void> {
+  const { error: photoError } = await supabase
+    .from('review_photos')
+    .delete()
+    .eq('review_id', reviewId);
+
+  if (photoError) throw photoError;
+
+  const { error } = await supabase
+    .from('reviews')
+    .delete()
+    .eq('id', reviewId);
+
+  if (error) throw error;
+}
+
 export async function fetchTagsByReviewIds(reviewIds: string[]): Promise<TagRecord[]> {
   if (reviewIds.length === 0) return [];
 
@@ -258,8 +276,7 @@ const getFileExtension = (uri: string): string => {
   return extension && extension.length <= 5 ? extension.toLowerCase() : 'jpg';
 };
 
-const getContentType = (extension: string, fallbackType?: string): string => {
-  if (fallbackType) return fallbackType;
+const getContentType = (extension: string): string => {
   if (extension === 'png') return 'image/png';
   if (extension === 'webp') return 'image/webp';
   return 'image/jpeg';
@@ -280,13 +297,16 @@ async function uploadReviewPhotos(
     const fileName = `${Date.now()}-${index}.${extension}`;
     const filePath = `${userId}/${reviewId}/${fileName}`;
 
-    const response = await fetch(uri);
-    const blob = await response.blob();
+    // Use FileSystem for Android content:// URIs to avoid fetch failures.
+    const fileBase64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    const fileBuffer = decodeBase64(fileBase64);
 
     const { error: uploadError } = await supabase.storage
       .from(REVIEW_PHOTO_BUCKET)
-      .upload(filePath, blob, {
-        contentType: getContentType(extension, blob.type),
+      .upload(filePath, fileBuffer, {
+        contentType: getContentType(extension),
         upsert: false,
       });
 

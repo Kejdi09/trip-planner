@@ -46,6 +46,7 @@ export function WriteReviewScreen() {
   const [isEmpty, setIsEmpty] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
+  const bottomPadding = insets.bottom + 120;
 
   const handleBack = () => {
     const canGoBack =
@@ -240,7 +241,7 @@ export function WriteReviewScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}>
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomPadding }]}>
           {isEmpty ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyTitle}>No destinations yet</Text>

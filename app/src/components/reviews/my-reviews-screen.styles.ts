@@ -82,6 +82,10 @@ export const styles = StyleSheet.create({
     padding: rs(14),
     borderWidth: 1,
     borderColor: REVIEW_COLORS.border,
+    position: 'relative',
+  },
+  reviewPressable: {
+    flex: 1,
   },
   reviewHeader: {
     flexDirection: 'row',
@@ -101,6 +105,7 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: rs(8),
+    paddingRight: rs(36),
   },
   reviewActions: {
     flexDirection: 'row',
@@ -108,6 +113,10 @@ export const styles = StyleSheet.create({
     gap: rs(8),
   },
   deleteButton: {
+    position: 'absolute',
+    top: rs(10),
+    right: rs(10),
+    zIndex: 2,
     width: rs(28),
     height: rs(28),
     borderRadius: rs(14),

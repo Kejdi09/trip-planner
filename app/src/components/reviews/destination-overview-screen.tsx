@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
-import { Image, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { Dimensions, FlatList, Image, Modal, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DestinationSummary } from '@/components/reviews/destination-summary';
@@ -38,6 +38,9 @@ export function DestinationOverviewScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const fallbackWidth = Dimensions.get('window').width || 360;
+  const galleryWidth = windowWidth > 0 ? windowWidth : fallbackWidth;
   const [place, setPlace] = React.useState<PlaceRecord | null>(null);
   const [rating, setRating] = React.useState(0);
   const [photos, setPhotos] = React.useState<PhotoItem[]>([]);
@@ -47,7 +50,7 @@ export function DestinationOverviewScreen() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [isEmpty, setIsEmpty] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
-  const [activePhoto, setActivePhoto] = React.useState<PhotoItem | null>(null);
+  const [activePhotoIndex, setActivePhotoIndex] = React.useState<number | null>(null);
 
   const handleBack = () => {
     const canGoBack =
@@ -168,6 +171,9 @@ export function DestinationOverviewScreen() {
     : '';
   const displayTags = hasDestination ? tags.filter(isValidTag) : [];
   const displayPhotos = hasDestination ? photos : [];
+  const galleryItemSize = Math.max(galleryWidth, 1);
+  const isGalleryOpen = activePhotoIndex !== null;
+  const activePhoto = isGalleryOpen ? displayPhotos[activePhotoIndex] : null;
   const friendsLabel =
     friendsVisited === 0
       ? 'No friends visited yet'
@@ -277,7 +283,7 @@ export function DestinationOverviewScreen() {
                             style={styles.photoTilePressable}
                             accessibilityRole="button"
                             accessibilityHint="Open photo"
-                            onPress={() => setActivePhoto(photo)}
+                            onPress={() => setActivePhotoIndex(index)}
                           >
                             <Image
                               source={{ uri: photo.url }}
@@ -305,32 +311,57 @@ export function DestinationOverviewScreen() {
 
       {/* Photo lightbox modal */}
       <Modal
-        visible={Boolean(activePhoto)}
+        visible={isGalleryOpen}
         transparent
         animationType="fade"
-        onRequestClose={() => setActivePhoto(null)}
+        onRequestClose={() => setActivePhotoIndex(null)}
       >
-        <Pressable style={styles.modalBackdrop} onPress={() => setActivePhoto(null)}>
-          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-            <Pressable style={styles.modalClose} onPress={() => setActivePhoto(null)}>
-              <Feather name="x" size={18} color={REVIEW_COLORS.textPrimary} />
+        <View style={styles.galleryBackdrop}>
+          <View style={[styles.galleryHeader, { paddingTop: insets.top + 12 }]}>
+            <Pressable style={styles.galleryClose} onPress={() => setActivePhotoIndex(null)}>
+              <Feather name="x" size={18} color={REVIEW_COLORS.buttonText} />
             </Pressable>
-            {activePhoto ? (
-              <>
+            <Text style={styles.galleryCounter}>
+              {activePhotoIndex !== null ? activePhotoIndex + 1 : 0} / {displayPhotos.length}
+            </Text>
+          </View>
+
+          <FlatList
+            data={displayPhotos}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            style={styles.galleryList}
+            keyExtractor={(item) => item.id}
+            initialScrollIndex={activePhotoIndex ?? 0}
+            getItemLayout={(_, index) => ({
+              length: galleryItemSize,
+              offset: galleryItemSize * index,
+              index,
+            })}
+            onMomentumScrollEnd={(event) => {
+              const nextIndex = Math.round(event.nativeEvent.contentOffset.x / galleryItemSize);
+              setActivePhotoIndex(nextIndex);
+            }}
+            renderItem={({ item }) => (
+              <View style={[styles.gallerySlide, { width: galleryItemSize }]}>
                 <Image
-                  source={{ uri: activePhoto.url }}
-                  style={styles.modalImage}
-                  resizeMode="cover"
-                  accessibilityLabel={`Photo by ${activePhoto.reviewerName}`}
+                  source={{ uri: item.url }}
+                  style={styles.galleryImage}
+                  resizeMode="contain"
+                  accessibilityLabel={`Photo by ${item.reviewerName}`}
                 />
-                <View style={styles.modalMeta}>
-                  <Feather name="user" size={14} color={REVIEW_COLORS.textSecondary} />
-                  <Text style={styles.modalName}>{activePhoto.reviewerName}</Text>
-                </View>
-              </>
-            ) : null}
-          </Pressable>
-        </Pressable>
+              </View>
+            )}
+          />
+
+          {activePhoto ? (
+            <View style={[styles.galleryFooter, { paddingBottom: insets.bottom + 14 }]}>
+              <Feather name="user" size={14} color={REVIEW_COLORS.buttonText} />
+              <Text style={styles.galleryName}>{activePhoto.reviewerName}</Text>
+            </View>
+          ) : null}
+        </View>
       </Modal>
     </SafeAreaView>
   );

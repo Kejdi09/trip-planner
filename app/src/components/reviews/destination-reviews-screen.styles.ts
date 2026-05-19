@@ -121,7 +121,10 @@ export const styles = StyleSheet.create({
     borderColor: REVIEW_COLORS.border,
   },
   reviewCardExpanded: {
-    backgroundColor: REVIEW_COLORS.surfaceMuted,
+    backgroundColor: REVIEW_COLORS.surface,
+  },
+  reviewToggle: {
+    flex: 1,
   },
   reviewHeader: {
     flexDirection: 'row',
@@ -280,38 +283,59 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
     color: REVIEW_COLORS.textPrimary,
   },
-  modalBackdrop: {
+  galleryBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    backgroundColor: '#000000',
+  },
+  galleryHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 2,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: rs(20),
+    justifyContent: 'space-between',
+    paddingHorizontal: rs(16),
+    paddingBottom: rs(8),
   },
-  modalCard: {
-    width: '100%',
-    borderRadius: rs(18),
-    backgroundColor: REVIEW_COLORS.surface,
-    padding: rs(16),
-    gap: rs(12),
-  },
-  modalClose: {
-    alignSelf: 'flex-end',
-    height: rs(28),
-    width: rs(28),
-    borderRadius: rs(14),
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: REVIEW_COLORS.surfaceMuted,
-  },
-  modalImage: {
-    width: '100%',
-    height: rs(320),
+  galleryClose: {
+    height: rs(32),
+    width: rs(32),
     borderRadius: rs(16),
-    backgroundColor: REVIEW_COLORS.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
   },
-  modalName: {
-    fontSize: rs(15),
+  galleryCounter: {
+    fontSize: rs(12),
     fontWeight: '700',
-    color: REVIEW_COLORS.textPrimary,
+    color: REVIEW_COLORS.buttonText,
+  },
+  gallerySlide: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  galleryList: {
+    flex: 1,
+  },
+  galleryImage: {
+    width: '100%',
+    height: '100%',
+  },
+  galleryFooter: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 2,
+    paddingHorizontal: rs(16),
+    paddingTop: rs(8),
+  },
+  galleryName: {
+    fontSize: rs(14),
+    fontWeight: '700',
+    color: REVIEW_COLORS.buttonText,
   },
 });

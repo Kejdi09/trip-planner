@@ -1,7 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { APP_URL } from '../../../lib/app-config';
 import { checkUsernameAvailability, checkEmailAvailability } from '../../../lib/auth-api';
@@ -332,8 +332,17 @@ export function LoginScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <StatusBar style="dark" />
 
-      <View style={styles.screen}>
-        <View style={styles.topSection}>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoiding}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.scrollContent}
+        >
+          <View style={styles.screen}>
+            <View style={styles.topSection}>
           <BrandHeader
             containerStyle={styles.brandRow}
             badgeStyle={styles.logoBadge}
@@ -494,8 +503,10 @@ export function LoginScreen() {
           <Pressable accessibilityRole="button" onPress={() => switchMode(mode === 'signup' ? 'login' : 'signup')}>
             <Text style={styles.footerAction}>{mode === 'signup' ? 'Log in' : 'Sign up'}</Text>
           </Pressable>
-        </View>
-      </View>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
