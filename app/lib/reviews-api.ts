@@ -1,7 +1,6 @@
 import { decode as decodeBase64 } from 'base64-arraybuffer';
 import * as FileSystem from 'expo-file-system';
-
-import { REVIEW_PHOTO_BUCKET } from './app-config';
+import { API_BASE_URL, APP_ENV, REVIEW_PHOTO_BUCKET, USE_REVIEWS_BACKEND } from './app-config';
 import { supabase } from './supabase';
 
 type SelectResult<T> = T | null;
@@ -45,6 +44,21 @@ type TagRecord = {
 export type { PlaceRecord, ReviewRecord, ProfileRecord, ReviewPhotoRecord, TagRecord };
 
 export async function fetchPlaceById(placeId: string): Promise<PlaceRecord | null> {
+  if (USE_REVIEWS_BACKEND) {
+    const base = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+    const response = await fetch(`${base}/reviews-api/places/${encodeURIComponent(placeId)}`, {
+      method: 'GET',
+      headers: {
+        'content-type': 'application/json',
+        'x-app-env': APP_ENV,
+      },
+    });
+    if (response.status === 404) return null;
+    const payload = (await response.json().catch(() => ({}))) as PlaceRecord & { error?: string };
+    if (!response.ok) throw new Error(payload.error ?? 'Failed to load place.');
+    return payload as PlaceRecord;
+  }
+
   const { data, error } = await supabase
     .from('places')
     .select('id, name, description, city, country, created_at')
@@ -56,6 +70,20 @@ export async function fetchPlaceById(placeId: string): Promise<PlaceRecord | nul
 }
 
 export async function fetchFirstPlace(): Promise<PlaceRecord | null> {
+  if (USE_REVIEWS_BACKEND) {
+    const base = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+    const response = await fetch(`${base}/reviews-api/places?limit=1`, {
+      method: 'GET',
+      headers: {
+        'content-type': 'application/json',
+        'x-app-env': APP_ENV,
+      },
+    });
+    const payload = (await response.json().catch(() => ({}))) as { places?: PlaceRecord[]; error?: string };
+    if (!response.ok) throw new Error(payload.error ?? 'Failed to load places.');
+    return payload.places?.[0] ?? null;
+  }
+
   const { data, error } = await supabase
     .from('places')
     .select('id, name, description, city, country, created_at')
@@ -67,6 +95,20 @@ export async function fetchFirstPlace(): Promise<PlaceRecord | null> {
 }
 
 export async function fetchReviewsByPlace(placeId: string): Promise<ReviewRecord[]> {
+  if (USE_REVIEWS_BACKEND) {
+    const base = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+    const response = await fetch(`${base}/reviews-api/reviews?placeId=${encodeURIComponent(placeId)}&limit=300`, {
+      method: 'GET',
+      headers: {
+        'content-type': 'application/json',
+        'x-app-env': APP_ENV,
+      },
+    });
+    const payload = (await response.json().catch(() => ({}))) as { reviews?: ReviewRecord[]; error?: string };
+    if (!response.ok) throw new Error(payload.error ?? 'Failed to load reviews.');
+    return payload.reviews ?? [];
+  }
+
   const { data, error } = await supabase
     .from('reviews')
     .select('id, user_id, place_id, rating, review, created_at')
@@ -78,6 +120,20 @@ export async function fetchReviewsByPlace(placeId: string): Promise<ReviewRecord
 }
 
 export async function fetchReviewsByUser(userId: string): Promise<ReviewRecord[]> {
+  if (USE_REVIEWS_BACKEND) {
+    const base = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+    const response = await fetch(`${base}/reviews-api/reviews?userId=${encodeURIComponent(userId)}&limit=300`, {
+      method: 'GET',
+      headers: {
+        'content-type': 'application/json',
+        'x-app-env': APP_ENV,
+      },
+    });
+    const payload = (await response.json().catch(() => ({}))) as { reviews?: ReviewRecord[]; error?: string };
+    if (!response.ok) throw new Error(payload.error ?? 'Failed to load reviews.');
+    return payload.reviews ?? [];
+  }
+
   const { data, error } = await supabase
     .from('reviews')
     .select('id, user_id, place_id, rating, review, created_at')
@@ -278,6 +334,24 @@ export async function createReviewWithTags({
   tagNames = [],
   photoUris = [],
 }: CreateReviewInput): Promise<string> {
+  if (USE_REVIEWS_BACKEND) {
+    const uploadedUrls = await uploadReviewPhotos('temp-review', userId, photoUris);
+    const base = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+    const response = await fetch(`${base}/reviews-api/reviews`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-app-env': APP_ENV,
+      },
+      body: JSON.stringify({ userId, placeId, rating, review, tagNames, photoUrls: uploadedUrls }),
+    });
+
+    const payload = (await response.json().catch(() => ({}))) as { id?: string; error?: string };
+    if (!response.ok) throw new Error(payload.error ?? 'Failed to create review.');
+    if (!payload.id) throw new Error('Review creation did not return an id.');
+    return payload.id;
+  }
+
   const { data, error } = await supabase
     .from('reviews')
     .insert({

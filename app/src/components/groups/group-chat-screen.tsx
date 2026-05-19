@@ -14,16 +14,13 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { fetchGroupMembers, fetchGroupMessages, fetchMyGroups, getActiveUserId, postGroupMessage } from '../../../lib/groups-api';
+import { supabase } from '../../../lib/supabase';
 
-import {
-  ChatMessage,
-  CURRENT_USER,
-  fetchGroupById,
-  fetchMessages,
-  Group,
-  sendMessage,
-} from '../friends/dummy-data';
+type ChatMessage = { id: string; groupId: string; senderId: string; text: string; timestamp: string; dateLabel: string | null };
+type Group = { id: string; name: string; adminId: string; members: { id: string; fullName: string; username: string; avatarUrl: string | null; tripCount: number; role: 'admin' | 'member' }[]; status: string; votingOpen: boolean; places: { name: string }[]; dateRange: string | null; budgetRange: string | null; destination: string | null };
+
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TYPE_SCALE = Math.min(Math.max(SCREEN_WIDTH / 390, 0.9), 1.08);
@@ -213,27 +210,91 @@ function initials(name: string) {
   return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 }
 
+function formatChatTime(createdAt: string | Date) {
+  const value = createdAt instanceof Date ? createdAt.toISOString() : createdAt;
+  const normalized = /z$|[+-]\d{2}:?\d{2}$/i.test(value) ? value : `${value}Z`;
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime())
+    ? ''
+    : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
 
 export function GroupChatScreen() {
-  const { groupId } = useLocalSearchParams<{ groupId: string }>();
+  const params = useLocalSearchParams<{ groupId?: string | string[] }>();
+  const rawGroupId = params.groupId;
+  const groupId = Array.isArray(rawGroupId) ? rawGroupId[0] : rawGroupId;
   const [group, setGroup] = React.useState<Group | null>(null);
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [inputText, setInputText] = React.useState('');
   const [sending, setSending] = React.useState(false);
+  const [currentUserId, setCurrentUserId] = React.useState(getActiveUserId());
+  const insets = useSafeAreaInsets();
   const listRef = React.useRef<FlatList>(null);
 
   React.useEffect(() => {
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      setCurrentUserId(data.user?.id ?? getActiveUserId());
+    })();
+
     if (!groupId) return;
-    Promise.all([fetchGroupById(groupId), fetchMessages(groupId)]).then(([g, msgs]) => {
-      setGroup(g);
-      setMessages(msgs);
+    const load = async () => {
+      const [{ groups }, { members }, { messages: rows }] = await Promise.all([
+        fetchMyGroups(),
+        fetchGroupMembers(groupId),
+        fetchGroupMessages(groupId),
+      ]);
+      const groupRow = groups.find((g) => g.id === groupId) ?? null;
+      setGroup(
+        groupRow
+          ? {
+              id: groupRow.id,
+              name: groupRow.name ?? 'Group',
+              adminId: groupRow.created_by ?? '',
+              members: members.map((m) => ({
+                id: m.user_id,
+                fullName: `Member ${m.user_id.slice(0, 4)}`,
+                username: m.user_id.slice(0, 8),
+                avatarUrl: null,
+                tripCount: 0,
+                role: m.user_id === groupRow.created_by ? 'admin' : 'member',
+              })),
+              status: groupRow.status === 'completed' ? 'completed' : groupRow.status === 'active' ? 'active' : 'upcoming',
+              votingOpen: groupRow.status === 'planning',
+              places: [],
+              dateRange: groupRow.start_date && groupRow.end_date ? `${groupRow.start_date} - ${groupRow.end_date}` : null,
+              budgetRange: null,
+              destination: null,
+            }
+          : null,
+      );
+      setMessages(
+        rows.map((msg) => ({
+          id: msg.id,
+          groupId: msg.group_id,
+          senderId: msg.sender_id,
+          text: msg.content,
+          timestamp: formatChatTime(msg.created_at),
+          dateLabel: null,
+        })),
+      );
       setLoading(false);
-    });
+    };
+    void load();
   }, [groupId]);
+
+  const handleBackPress = () => {
+    if (groupId) {
+      router.replace({ pathname: '/group-hub', params: { groupId: String(groupId) } });
+      return;
+    }
+    router.replace('/groups');
+  };
 
   const handleSend = async () => {
     const text = inputText.trim();
@@ -241,13 +302,31 @@ export function GroupChatScreen() {
     setInputText('');
     setSending(true);
     try {
-      const msg = await sendMessage(groupId, text);
-      setMessages((prev) => [...prev, msg]);
+      const msg = await postGroupMessage(groupId, text, currentUserId);
+      setMessages((prev) => [...prev, {
+        id: msg.id,
+        groupId: msg.group_id,
+        senderId: msg.sender_id,
+        text: msg.content,
+        timestamp: formatChatTime(msg.created_at),
+        dateLabel: null,
+      }]);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
     } finally {
       setSending(false);
     }
   };
+
+  if (!groupId) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={[styles.screen, { alignItems: 'center', justifyContent: 'center', padding: 24 }]}>
+          <Text style={{ color: C.text, fontSize: 16, fontWeight: '600' }}>Missing group context.</Text>
+          <Pressable onPress={() => router.replace('/groups')} style={{ marginTop: 14 }}><Text style={{ color: C.primary, fontWeight: '700' }}>Back to Groups</Text></Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   // Header avatar stack
   const visibleMembers = group?.members.slice(0, 3) ?? [];
@@ -263,7 +342,7 @@ export function GroupChatScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerTopRow}>
-            <Pressable style={styles.backButton} onPress={() => router.back()} accessibilityRole="button">
+            <Pressable style={styles.backButton} onPress={handleBackPress} accessibilityRole="button">
               <Feather name="arrow-left" size={20} color={C.text} />
             </Pressable>
             <Text style={styles.headerName} numberOfLines={1}>
@@ -308,6 +387,11 @@ export function GroupChatScreen() {
         {loading ? (
           <ActivityIndicator color={C.primary} style={{ flex: 1 }} />
         ) : (
+          <>
+          <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
+            <View style={{ position: 'absolute', width: 240, height: 240, borderRadius: 120, backgroundColor: 'rgba(0,141,155,0.10)', top: 60, left: -80 }} />
+            <View style={{ position: 'absolute', width: 300, height: 300, borderRadius: 150, backgroundColor: 'rgba(0,141,155,0.08)', bottom: 20, right: -120 }} />
+          </View>
           <FlatList
             ref={listRef}
             style={styles.messageList}
@@ -316,7 +400,8 @@ export function GroupChatScreen() {
             keyExtractor={(item) => item.id}
             onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
             renderItem={({ item }) => {
-              const isMe = item.senderId === CURRENT_USER.id;
+              const isMe = item.senderId === currentUserId;
+              const sender = group?.members.find((m) => m.id === item.senderId);
               return (
                 <>
                   {item.dateLabel && (
@@ -324,6 +409,7 @@ export function GroupChatScreen() {
                   )}
                   <View style={[styles.bubbleRow, isMe ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
                     <View style={[styles.bubble, isMe ? styles.bubbleMine : styles.bubbleTheirs]}>
+                      {!isMe && sender ? <Text style={{ fontSize: 11, fontWeight: '700', color: '#4B5563', marginBottom: 2 }}>{sender.username}</Text> : null}
                       <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMine : styles.bubbleTextTheirs]}>
                         {item.text}
                       </Text>
@@ -336,10 +422,11 @@ export function GroupChatScreen() {
               );
             }}
           />
+          </>
         )}
 
         {/* Input bar */}
-        <View style={styles.inputBar}>
+        <View style={[styles.inputBar, { paddingBottom: Math.max(10, insets.bottom + 78) }]}>
           <View style={styles.inputWrapper}>
             <TextInput
               value={inputText}

@@ -1,7 +1,8 @@
 {
   "extends": "expo/tsconfig.base.json",
   "compilerOptions": {
-    "ignoreDeprecations": "6.0",
+    "ignoreDeprecations": "5.0",
+    "module": "esnext",
     "strict": true,
     "types": ["jest", "node"],
     "paths": {

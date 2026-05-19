@@ -14,14 +14,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { AppBottomNav } from '@/components/ui/app-bottom-nav';
-import {
-  DUMMY_FRIENDS,
-  fetchGroupById,
-  Friend,
-  Group,
-  inviteFriendToGroup,
-} from '../friends/dummy-data';
+import { addGroupMember, fetchGroupMembers, fetchMyGroups, getActiveUserId } from '../../../lib/groups-api';
+import { supabase } from '../../../lib/supabase';
+
+type Friend = { id: string; fullName: string; username: string; avatarUrl: string | null; tripCount: number };
+type Group = { id: string; name: string; adminId: string; members: { id: string; fullName: string; username: string; avatarUrl: string | null; tripCount: number; role: 'admin' | 'member' }[]; status: string; votingOpen: boolean; places: { name: string }[]; dateRange: string | null; budgetRange: string | null; destination: string | null };
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TYPE_SCALE = Math.min(Math.max(SCREEN_WIDTH / 390, 0.9), 1.08);
@@ -208,13 +205,56 @@ export function InviteToGroupScreen() {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [invitedIds, setInvitedIds] = React.useState<Set<string>>(new Set());
   const [sendingIds, setSendingIds] = React.useState<Set<string>>(new Set());
+  const [friends, setFriends] = React.useState<Friend[]>([]);
+  const [activeUserId, setActiveUserId] = React.useState(getActiveUserId());
 
   // Load group to know who's already a member
   React.useEffect(() => {
     if (groupId) {
-      fetchGroupById(groupId).then(setGroup);
+      void (async () => {
+        const [{ groups }, { members }] = await Promise.all([
+          fetchMyGroups(),
+          fetchGroupMembers(groupId),
+        ]);
+        const row = groups.find((g) => g.id === groupId) ?? null;
+        if (!row) {
+          setGroup(null);
+          return;
+        }
+
+        setGroup({
+          id: row.id,
+          name: row.name ?? 'Group',
+          adminId: row.created_by ?? '',
+          members: members.map((m) => ({ id: m.user_id, fullName: `Member ${m.user_id.slice(0, 4)}`, username: m.user_id.slice(0, 8), avatarUrl: null, tripCount: 0, role: m.user_id === row.created_by ? 'admin' : 'member' })),
+          status: row.status === 'completed' ? 'completed' : row.status === 'active' ? 'active' : 'upcoming',
+          votingOpen: row.status === 'planning',
+          places: [],
+          dateRange: null,
+          budgetRange: null,
+          destination: null,
+        });
+      })();
     }
   }, [groupId]);
+
+  React.useEffect(() => {
+    (async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      const me = auth.user?.id ?? getActiveUserId();
+      setActiveUserId(me);
+      if (!me) return;
+      const { data: rows } = await supabase
+        .from('friendships')
+        .select('requester_id, receiver_id')
+        .eq('status', 'accepted')
+        .or(`requester_id.eq.${me},receiver_id.eq.${me}`);
+      const ids = (rows ?? []).map((r) => (r.requester_id === me ? r.receiver_id : r.requester_id));
+      if (ids.length === 0) { setFriends([]); return; }
+      const { data: profiles } = await supabase.from('profiles').select('id, full_name, username, avatar_url').in('id', ids);
+      setFriends((profiles ?? []).map((p) => ({ id: p.id, fullName: p.full_name ?? p.username ?? 'Friend', username: p.username ?? 'friend', avatarUrl: p.avatar_url ?? null, tripCount: 0 })));
+    })();
+  }, []);
 
   const alreadyMemberIds = React.useMemo(
     () => new Set(group?.members.map((m) => m.id) ?? []),
@@ -222,7 +262,7 @@ export function InviteToGroupScreen() {
   );
 
   const eligibleFriends = React.useMemo(
-    () => DUMMY_FRIENDS.filter((f) => !alreadyMemberIds.has(f.id)),
+    () => friends.filter((f) => !alreadyMemberIds.has(f.id) && f.id !== activeUserId),
     [alreadyMemberIds],
   );
 
@@ -240,7 +280,7 @@ export function InviteToGroupScreen() {
     if (!groupId || invitedIds.has(friend.id)) return;
     setSendingIds((prev) => new Set(prev).add(friend.id));
     try {
-      await inviteFriendToGroup(groupId, friend.id);
+      await addGroupMember(groupId, friend.id, activeUserId);
       setInvitedIds((prev) => new Set(prev).add(friend.id));
     } finally {
       setSendingIds((prev) => { const n = new Set(prev); n.delete(friend.id); return n; });
@@ -252,7 +292,7 @@ export function InviteToGroupScreen() {
       <View style={styles.screen}>
         {/* Header */}
         <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={() => router.back()} accessibilityRole="button">
+          <Pressable style={styles.backButton} onPress={() => router.replace({ pathname: '/group-hub', params: groupId ? { groupId } : undefined })} accessibilityRole="button">
             <Feather name="arrow-left" size={18} color="#111318" />
           </Pressable>
           <Text style={styles.title}>Add to Group</Text>
@@ -335,7 +375,6 @@ export function InviteToGroupScreen() {
           )}
         </ScrollView>
 
-        <AppBottomNav activeTab="Groups" />
       </View>
     </SafeAreaView>
   );

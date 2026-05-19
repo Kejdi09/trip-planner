@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -18,29 +18,27 @@ import {
   VoteProgress,
   VoterAvatars,
 } from './_components';
-import { DestinationOption, MOCK_DESTINATIONS, VotingTab } from './_types';
+import { DestinationOption, VotingTab } from './_types';
 
 interface DestinationVotingScreenProps {
   tripName?: string;
   timeLeft?: string;
-  destinations?: DestinationOption[];
+  destinations: DestinationOption[];
   onTabChange?: (tab: VotingTab) => void;
   onBack?: () => void;
+  onVote?: (id: string) => void;
 }
 
 const DestinationVotingScreen: React.FC<DestinationVotingScreenProps> = ({
   tripName = 'Summer Europe Trip',
   timeLeft = '2d left',
-  destinations: initialDestinations = MOCK_DESTINATIONS,
+  destinations,
   onTabChange,
   onBack,
+  onVote,
 }) => {
-  const [destinations, setDestinations] = useState<DestinationOption[]>(initialDestinations);
-
   const handleVote = (id: string) => {
-    setDestinations((prev) =>
-      prev.map((d) => ({ ...d, selected: d.id === id }))
-    );
+    onVote?.(id);
   };
 
   return (
