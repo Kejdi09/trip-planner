@@ -6,12 +6,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { deleteGroupApi, fetchMyGroups, getActiveUserId } from '../../../lib/groups-api';
 import { supabase } from '../../../lib/supabase';
+import { AppLoading } from '@/components/common/AppLoading';
 
 export function GroupHubScreen() {
   const { groupId } = useLocalSearchParams<{ groupId?: string }>();
   const [groupName, setGroupName] = React.useState('Your Group');
   const [isCreator, setIsCreator] = React.useState(false);
   const [currentUserId, setCurrentUserId] = React.useState(getActiveUserId());
+  const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
     if (!groupId) return;
@@ -25,10 +27,15 @@ export function GroupHubScreen() {
         if (match?.name) setGroupName(match.name);
         setIsCreator(Boolean(match?.created_by && match.created_by === uid));
       } catch {}
+      finally { setLoading(false); }
     })();
   }, [groupId]);
 
   const routeParams = groupId ? { groupId } : undefined;
+
+  if (loading) {
+    return <SafeAreaView style={styles.safeArea}><AppLoading message="Loading group details..." /></SafeAreaView>;
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
