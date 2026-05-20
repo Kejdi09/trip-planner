@@ -240,13 +240,14 @@ export function MyFriendsScreen() {
   const handleRemove = (friend: Friend) => {
     Alert.alert(
       'Remove Friend',
-      `Remove ${friend.fullName} from your friends?`,
+      `Remove ${friend.fullName} as a friend?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Remove',
           style: 'destructive',
           onPress: async () => {
+            console.log('remove friend confirmed', friend.id);
             setRemovingIds((prev) => new Set(prev).add(friend.id));
             const { data: auth } = await supabase.auth.getUser();
             const me = auth.user?.id;
@@ -263,6 +264,7 @@ export function MyFriendsScreen() {
               Alert.alert('Could not remove friend', 'Please try again.');
             } else {
               setFriends((prev) => prev.filter((f) => f.id !== friend.id));
+              console.log('friend removed successfully');
             }
             setRemovingIds((prev) => { const n = new Set(prev); n.delete(friend.id); return n; });
           },
@@ -338,25 +340,27 @@ export function MyFriendsScreen() {
               </View>
             ) : (
               filtered.map((friend) => (
-                <Pressable key={friend.id} style={styles.card} onPress={() => router.push({ pathname: '/user-profile/[userId]', params: { userId: friend.id } })}>
-                  <Avatar friend={friend} />
-                  <View style={styles.cardInfo}>
-                    <Text style={styles.cardName}>{friend.fullName}</Text>
-                    <Text style={styles.cardHandle}>@{friend.username}</Text>
-                  </View>
+                <View key={friend.id} style={styles.card}>
+                  <Pressable style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }} onPress={() => router.push({ pathname: '/user-profile/[userId]', params: { userId: friend.id } })}>
+                    <Avatar friend={friend} />
+                    <View style={styles.cardInfo}>
+                      <Text style={styles.cardName}>{friend.fullName}</Text>
+                      <Text style={styles.cardHandle}>@{friend.username}</Text>
+                    </View>
+                  </Pressable>
                   {removingIds.has(friend.id) ? (
                     <ActivityIndicator size="small" color={C.primary} />
                   ) : (
                     <Pressable
-                      style={styles.removeButton}
-                      onPress={(event) => { event.stopPropagation?.(); handleRemove(friend); }}
+                      style={[styles.removeButton, { zIndex: 10, elevation: 10 }]}
+                      onPress={(event) => { console.log('remove friend pressed', friend.id); event.stopPropagation?.(); handleRemove(friend); }}
                       accessibilityRole="button"
                       accessibilityLabel={`Remove ${friend.fullName}`}
                       hitSlop={10}>
                       <Feather name="x" size={16} color={C.removeIcon} />
                     </Pressable>
                   )}
-                </Pressable>
+                </View>
               ))
             )}
           </ScrollView>

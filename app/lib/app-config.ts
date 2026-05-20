@@ -15,7 +15,7 @@ const sharedSupabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 const sharedApiUrl = process.env.EXPO_PUBLIC_API_URL;
 const sharedAppUrl = process.env.EXPO_PUBLIC_APP_URL;
 const sharedReviewPhotoBucket = process.env.EXPO_PUBLIC_REVIEW_PHOTO_BUCKET;
-const useReviewsBackendRaw = (process.env.EXPO_PUBLIC_USE_REVIEWS_BACKEND ?? 'false').trim().toLowerCase();
+const useReviewsBackendRaw = (process.env.EXPO_PUBLIC_USE_REVIEWS_BACKEND ?? 'true').trim().toLowerCase();
 
 const devSupabaseUrl =
   sharedSupabaseUrl ??
