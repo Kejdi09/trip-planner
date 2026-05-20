@@ -250,7 +250,11 @@ export function MyFriendsScreen() {
             setRemovingIds((prev) => new Set(prev).add(friend.id));
             const { data: auth } = await supabase.auth.getUser();
             const me = auth.user?.id;
-            if (!me) return;
+            if (!me) {
+              Alert.alert('Could not remove friend', 'Please log in again.');
+              setRemovingIds((prev) => { const n = new Set(prev); n.delete(friend.id); return n; });
+              return;
+            }
             const { error } = await supabase
               .from('friendships')
               .delete()
@@ -345,9 +349,10 @@ export function MyFriendsScreen() {
                   ) : (
                     <Pressable
                       style={styles.removeButton}
-                      onPress={() => handleRemove(friend)}
+                      onPress={(event) => { event.stopPropagation?.(); handleRemove(friend); }}
                       accessibilityRole="button"
-                      accessibilityLabel={`Remove ${friend.fullName}`}>
+                      accessibilityLabel={`Remove ${friend.fullName}`}
+                      hitSlop={10}>
                       <Feather name="x" size={16} color={C.removeIcon} />
                     </Pressable>
                   )}
