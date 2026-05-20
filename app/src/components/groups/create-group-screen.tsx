@@ -133,8 +133,7 @@ export function CreateGroupScreen() {
     setSubmitting(true);
     try {
       const group = await createGroupApi(name.trim());
-      // Navigate to the new group's chat (or back to groups)
-      router.replace({ pathname: '../../group-chat', params: { groupId: group.id } });
+      router.replace({ pathname: '../../group-hub', params: { groupId: group.id } });
     } catch {
       setError('Something went wrong. Please try again.');
     } finally {
