@@ -1,13 +1,12 @@
-import { API_BASE_URL, APP_ENV } from './app-config';
 import { supabase } from './supabase';
-
-const base = () => (API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL);
 
 export type AppNotification = {
   id: string;
   user_id: string;
   type: string;
-  content: string;
+  content: string | null;
+  title: string | null;
+  body: string | null;
   is_read: boolean;
   created_at: string;
 };
@@ -18,45 +17,80 @@ async function currentUserId() {
   return data.user.id;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${base()}${path}`, {
-    ...init,
-    headers: { 'content-type': 'application/json', 'x-app-env': APP_ENV, ...(init?.headers ?? {}) },
-  });
-  if (!response.ok) throw new Error(`Notification request failed (${response.status})`);
-  if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+export async function fetchNotifications(limit = 50): Promise<AppNotification[]> {
+  try {
+    const userId = await currentUserId();
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('id, user_id, type, content, title, body, is_read, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.warn('Failed to fetch notifications:', error.message);
+      return [];
+    }
+
+    return data ?? [];
+  } catch (error) {
+    console.warn('Failed to fetch notifications:', error);
+    return [];
+  }
 }
 
-export async function fetchNotifications(limit = 50) {
-  const userId = await currentUserId();
-  const params = new URLSearchParams({ userId, limit: String(limit) });
-  const payload = await request<{ notifications: AppNotification[] }>(`/api/notifications?${params.toString()}`);
-  return payload.notifications ?? [];
-}
+export async function fetchUnreadNotificationCount(): Promise<number> {
+  try {
+    const userId = await currentUserId();
+    const { count, error } = await supabase
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_read', false);
 
-export async function fetchUnreadNotificationCount() {
-  const notifications = await fetchNotifications(100);
-  return notifications.filter((n) => !n.is_read).length;
+    if (error) return 0;
+    return count ?? 0;
+  } catch {
+    return 0;
+  }
 }
 
 export async function markNotificationRead(notificationId: string) {
-  const userId = await currentUserId();
-  return request<AppNotification>(`/api/notifications/${notificationId}/read`, { method: 'PATCH', body: JSON.stringify({ userId }) });
+  try {
+    const userId = await currentUserId();
+    const { data } = await supabase
+      .from('notifications')
+      .update({ is_read: true })
+      .eq('id', notificationId)
+      .eq('user_id', userId)
+      .select('id, user_id, type, content, title, body, is_read, created_at')
+      .maybeSingle();
+
+    return data ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export async function markAllNotificationsRead() {
-  const userId = await currentUserId();
-  await request<void>(`/api/notifications/read-all`, { method: 'PATCH', body: JSON.stringify({ userId }) });
+  try {
+    const userId = await currentUserId();
+    await supabase.from('notifications').update({ is_read: true }).eq('user_id', userId).eq('is_read', false);
+  } catch {
+    // noop
+  }
 }
 
 export async function fetchIncomingPendingRequestCount() {
-  const userId = await currentUserId();
-  const { count, error } = await supabase
-    .from('friendships')
-    .select('id', { count: 'exact', head: true })
-    .eq('receiver_id', userId)
-    .eq('status', 'pending');
-  if (error) throw error;
-  return count ?? 0;
+  try {
+    const userId = await currentUserId();
+    const { count } = await supabase
+      .from('friendships')
+      .select('id', { count: 'exact', head: true })
+      .eq('receiver_id', userId)
+      .eq('status', 'pending');
+    return count ?? 0;
+  } catch {
+    return 0;
+  }
 }
