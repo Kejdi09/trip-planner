@@ -17,3 +17,13 @@ create index if not exists notifications_user_created_idx
 
 create index if not exists notifications_user_unread_idx
   on notifications (user_id, is_read);
+
+alter table notifications
+  add column if not exists related_entity_type text null,
+  add column if not exists related_entity_id uuid null,
+  add column if not exists title text,
+  add column if not exists body text;
+
+create unique index if not exists notifications_dedupe_idx
+  on notifications (user_id, type, related_entity_type, related_entity_id)
+  where related_entity_id is not null;
