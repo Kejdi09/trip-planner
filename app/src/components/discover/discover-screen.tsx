@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AppLoading } from '@/components/common/AppLoading';
 import { FilterSheet } from '@/components/ui/filter-sheet';
 import { PlaceListSection } from '@/components/ui/place-list-section';
 import { SearchHeader } from '@/components/ui/search-header';
@@ -150,7 +151,7 @@ export function DiscoverScreen() {
     router.push({ pathname: '/write-review', params: { id: place.id } });
   };
 
-  const statusMessage = isLoading ? 'Loading destinations...' : errorMessage;
+  const statusMessage = errorMessage;
   const showStatusMessage = Boolean(statusMessage);
 
   // BATCH 1: active filter count for badge
@@ -179,7 +180,9 @@ export function DiscoverScreen() {
             showsVerticalScrollIndicator={false}
             scrollEnabled={!isFilterOpen}>
 
-            {showStatusMessage ? (
+            {isLoading ? (
+              <AppLoading message="Loading destinations..." />
+            ) : showStatusMessage ? (
               <StatusMessage message={statusMessage!} style={styles.statusMessage} />
             ) : showEmptySearch ? (
               // BATCH 1: Empty search state
