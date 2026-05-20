@@ -398,7 +398,7 @@ export function GroupChatScreen() {
                   )}
                   <View style={[styles.bubbleRow, isMe ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
                     <View style={[styles.bubble, isMe ? styles.bubbleMine : styles.bubbleTheirs]}>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#4B5563', marginBottom: 2 }}>{isMe ? 'You' : (sender?.fullName || sender?.username || 'Unknown user')}</Text>
+                      <Pressable onPress={() => { if (!isMe && sender?.id) router.push({ pathname: '/user-profile/[userId]', params: { userId: sender.id } }); }}><Text style={{ fontSize: 11, fontWeight: '700', color: '#4B5563', marginBottom: 2 }}>{isMe ? 'You' : (sender?.fullName || sender?.username || 'Unknown user')}</Text></Pressable>
                       <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMine : styles.bubbleTextTheirs]}>
                         {item.text}
                       </Text>

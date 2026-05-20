@@ -338,7 +338,7 @@ export function MyFriendsScreen() {
               </View>
             ) : (
               filtered.map((friend) => (
-                <View key={friend.id} style={styles.card}>
+                <Pressable key={friend.id} style={styles.card} onPress={() => router.push({ pathname: '/user-profile/[userId]', params: { userId: friend.id } })}>
                   <Avatar friend={friend} />
                   <View style={styles.cardInfo}>
                     <Text style={styles.cardName}>{friend.fullName}</Text>
@@ -356,7 +356,7 @@ export function MyFriendsScreen() {
                       <Feather name="x" size={16} color={C.removeIcon} />
                     </Pressable>
                   )}
-                </View>
+                </Pressable>
               ))
             )}
           </ScrollView>
