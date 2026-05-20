@@ -31,7 +31,7 @@ export function AppBottomNav({ activeTab = 'Discover', onPressTab }: AppBottomNa
   };
 
   return (
-    <View style={[bottomNavStyles.bottomNav, { paddingBottom: Math.max(12, insets.bottom + 8) }]}>
+    <View style={[bottomNavStyles.bottomNav, { bottom: Math.max(10, insets.bottom + 6) }]}>
       <BottomNavItem
         label="Feed"
         active={activeTab === 'Feed'}

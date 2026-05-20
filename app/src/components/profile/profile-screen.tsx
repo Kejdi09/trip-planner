@@ -2,7 +2,6 @@ import {
   Feather,
   Ionicons,
   MaterialCommunityIcons,
-  AntDesign,
 } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
@@ -161,9 +160,6 @@ export function ProfileScreen() {
       <View style={styles.screen}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Profile</Text>
-          <Pressable style={styles.headerIconButton} onPress={() => router.push('/add-friends')}>
-            <Feather name="settings" size={22} color="#222222" />
-          </Pressable>
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 120 }]}> 
@@ -204,9 +200,6 @@ export function ProfileScreen() {
           </View>
 
           <View style={styles.settingsSection}>
-            <Text style={styles.settingsHeading}>SETTINGS</Text>
-            <SettingsRow icon={<Ionicons name="notifications-outline" size={20} color="#222222" />} label="Notifications" />
-            <SettingsRow icon={<AntDesign name="questioncircleo" size={18} color="#222222" />} label="Help & Support" />
             <SettingsRow icon={<MaterialCommunityIcons name="logout" size={20} color="#222222" />} label="Log out" onPress={handleLogout} />
             {statusMessage ? <Text style={styles.logoutMessage}>{statusMessage}</Text> : null}
           </View>
