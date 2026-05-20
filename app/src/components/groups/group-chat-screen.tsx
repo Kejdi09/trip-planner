@@ -287,6 +287,7 @@ export function GroupChatScreen() {
           dateLabel: null,
         })),
       );
+      await supabase.from('group_chat_reads').upsert({ group_id: groupId, user_id: currentUserId, last_read_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: 'group_id,user_id' });
       setLoading(false);
     };
     void load();

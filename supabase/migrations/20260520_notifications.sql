@@ -27,3 +27,13 @@ alter table notifications
 create unique index if not exists notifications_dedupe_idx
   on notifications (user_id, type, related_entity_type, related_entity_id)
   where related_entity_id is not null;
+
+create table if not exists group_chat_reads (
+  id uuid primary key default gen_random_uuid(),
+  group_id uuid not null references groups(id) on delete cascade,
+  user_id uuid not null references profiles(id) on delete cascade,
+  last_read_at timestamp not null default now(),
+  created_at timestamp not null default now(),
+  updated_at timestamp not null default now(),
+  unique (group_id, user_id)
+);

@@ -12,6 +12,7 @@ import { COLORS, groupsStyles as styles } from './groups-screen.styles';
 type GroupMember = { id: string; fullName: string; avatarUrl: string | null; role: 'admin' | 'member' };
 type GroupStatus = 'active' | 'upcoming' | 'completed';
 type Group = {
+  unreadCount?: number;
   id: string;
   name: string;
   adminId: string;
@@ -49,7 +50,14 @@ function ActiveGroupCard({ group, onInvite, onPress, onPressVoting, onDelete, ca
     <View style={{ position: 'relative' }}>
     <Pressable style={styles.activeCard} onPress={onPress}>
       <View style={styles.activeCardTopRow}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+        {group.unreadCount && group.unreadCount > 0 ? (
+          <View style={{ backgroundColor: '#EF4444', borderRadius: 999, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, marginRight: 6 }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '700' }}>{group.unreadCount > 99 ? '99+' : group.unreadCount}</Text>
+          </View>
+        ) : null}
         <Text style={styles.activeCardName}>{group.name}</Text>
+        </View>
         {group.votingOpen && (
           <Pressable style={styles.votingBadge} onPress={onPressVoting}>
             <Text style={styles.votingBadgeText}>{'Voting\nOpen'}</Text>
@@ -202,6 +210,12 @@ export function GroupsScreen() {
             const memberIds = members.map((m) => m.user_id);
             const { data: profiles } = await supabase.from('profiles').select('id, full_name, username').in('id', memberIds);
             const profileById = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
+            const { data: readRow } = await supabase.from('group_chat_reads').select('last_read_at').eq('group_id', row.id).eq('user_id', currentUserId).maybeSingle();
+            let unreadCount = 0;
+            let msgQuery = supabase.from('messages').select('id', { count: 'exact', head: true }).eq('group_id', row.id).neq('sender_id', currentUserId);
+            if (readRow?.last_read_at) msgQuery = msgQuery.gt('created_at', readRow.last_read_at);
+            const { count: unread } = await msgQuery;
+            unreadCount = unread ?? 0;
             return {
               id: row.id,
               name: row.name ?? 'Untitled Group',
@@ -213,6 +227,7 @@ export function GroupsScreen() {
               dateRange: row.start_date && row.end_date ? `${row.start_date} - ${row.end_date}` : null,
               budgetRange: row.min_budget != null && row.max_budget != null ? `$${row.min_budget}-$${row.max_budget}` : null,
               destination: null,
+              unreadCount,
             } as Group;
           }),
         );

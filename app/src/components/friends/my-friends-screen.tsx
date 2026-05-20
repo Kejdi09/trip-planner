@@ -2,7 +2,6 @@ import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Dimensions,
   Image,
@@ -16,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { supabase } from '../../../lib/supabase';
+import { AppLoading } from '@/components/common/AppLoading';
 
 type Friend = { id: string; fullName: string; username: string; avatarUrl: string | null; tripCount: number };
 
@@ -251,12 +251,15 @@ export function MyFriendsScreen() {
             const { data: auth } = await supabase.auth.getUser();
             const me = auth.user?.id;
             if (!me) return;
-            await supabase
+            const { error } = await supabase
               .from('friendships')
               .delete()
-              .eq('status', 'accepted')
               .or(`and(requester_id.eq.${me},receiver_id.eq.${friend.id}),and(requester_id.eq.${friend.id},receiver_id.eq.${me})`);
-            setFriends((prev) => prev.filter((f) => f.id !== friend.id));
+            if (error) {
+              Alert.alert('Could not remove friend', 'Please try again.');
+            } else {
+              setFriends((prev) => prev.filter((f) => f.id !== friend.id));
+            }
             setRemovingIds((prev) => { const n = new Set(prev); n.delete(friend.id); return n; });
           },
         },
@@ -289,7 +292,7 @@ export function MyFriendsScreen() {
         </View>
 
         {loading ? (
-          <ActivityIndicator color={C.primary} style={{ flex: 1 }} />
+          <AppLoading message="Loading your friends..." />
         ) : (
           <ScrollView
             contentContainerStyle={styles.scrollContent}
