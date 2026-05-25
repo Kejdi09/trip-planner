@@ -23,7 +23,9 @@ type FilterSheetProps = {
   selectedFilters: string[];
   onToggleFilter: (filterId: string) => void;
   onApplyFilters: () => void;
+  onClearFilters?: () => void;
   applyLabel?: string;
+  clearLabel?: string;
 };
 
 export function FilterSheet({
@@ -32,11 +34,15 @@ export function FilterSheet({
   selectedFilters,
   onToggleFilter,
   onApplyFilters,
+  onClearFilters,
   applyLabel = 'Apply Filters',
+  clearLabel = 'Clear filters',
 }: FilterSheetProps) {
   if (!isOpen) {
     return null;
   }
+
+  const canClear = Boolean(onClearFilters) && selectedFilters.length > 0;
 
   const renderChip = (filter: FilterOption) => {
     const isActive = selectedFilters.includes(filter.id);
@@ -65,9 +71,19 @@ export function FilterSheet({
           </View>
         ))}
 
-        <Pressable style={styles.applyButton} onPress={onApplyFilters}>
-          <Text style={styles.applyButtonText}>{applyLabel}</Text>
-        </Pressable>
+        <View style={styles.buttonStack}>
+          {onClearFilters ? (
+            <Pressable
+              style={[styles.clearButton, !canClear && styles.clearButtonDisabled]}
+              onPress={onClearFilters}
+              disabled={!canClear}>
+              <Text style={styles.clearButtonText}>{clearLabel}</Text>
+            </Pressable>
+          ) : null}
+          <Pressable style={styles.applyButton} onPress={onApplyFilters}>
+            <Text style={styles.applyButtonText}>{applyLabel}</Text>
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -92,6 +108,11 @@ const styles = StyleSheet.create({
     paddingTop: spacing * 3,
     paddingHorizontal: spacing * 3,
     paddingBottom: spacing * 3,
+  },
+  buttonStack: {
+    marginTop: 'auto',
+    gap: spacing * 1.5,
+    marginBottom: spacing * 6,
   },
   group: {
     marginBottom: spacing * 4,
@@ -131,14 +152,28 @@ const styles = StyleSheet.create({
   chipTextActive: {
     color: colors.background,
   },
+  clearButton: {
+    minHeight: 44,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clearButtonDisabled: {
+    opacity: 0.45,
+  },
+  clearButtonText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
   applyButton: {
-    marginTop: 'auto',
     minHeight: 48,
     borderRadius: 999,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing * 6,
   },
   applyButtonText: {
     color: colors.background,

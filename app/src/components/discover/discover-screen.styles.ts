@@ -26,4 +26,22 @@ export const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
   },
+  loadMoreWrapper: {
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  loadMoreButton: {
+    alignSelf: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#008D9B',
+    backgroundColor: '#FFFFFF',
+  },
+  loadMoreText: {
+    color: '#008D9B',
+    fontSize: 13,
+    fontWeight: '700',
+  },
 });

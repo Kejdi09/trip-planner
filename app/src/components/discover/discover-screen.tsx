@@ -1,6 +1,6 @@
 import React from 'react';
 import { useRouter } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FilterSheet } from '@/components/ui/filter-sheet';
@@ -22,6 +22,8 @@ function buildCountryFilterGroups(options: FilterOption[]): FilterGroup[] {
   return [{ id: 'country', title: 'Country', options, layout: 'wrap' }];
 }
 
+const PAGE_SIZE = 10;
+
 export function DiscoverScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -33,6 +35,7 @@ export function DiscoverScreen() {
   const [places, setPlaces] = React.useState<DiscoverPlace[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = React.useState(PAGE_SIZE);
 
   const countryOptions = React.useMemo<FilterOption[]>(() => {
     const countryMap = new Map<string, string>();
@@ -113,6 +116,10 @@ export function DiscoverScreen() {
     });
   }, [places, searchQuery, selectedFilters]);
 
+  React.useEffect(() => {
+    setVisibleCount(Math.min(PAGE_SIZE, filteredPlaces.length));
+  }, [filteredPlaces]);
+
   const toggleFilter = (filterId: string) => {
     setSelectedFilters((current) =>
       current.includes(filterId) ? current.filter((id) => id !== filterId) : [...current, filterId],
@@ -148,6 +155,14 @@ export function DiscoverScreen() {
 
   const handlePressAddPlace = (place: DiscoverPlace) => {
     router.push({ pathname: '/write-review', params: { id: place.id } });
+  };
+
+  const visiblePlaces = filteredPlaces.slice(0, visibleCount);
+  const remainingPlaces = Math.max(filteredPlaces.length - visibleCount, 0);
+  const canLoadMore = remainingPlaces > 0;
+
+  const handleLoadMore = () => {
+    setVisibleCount((current) => Math.min(current + PAGE_SIZE, filteredPlaces.length));
   };
 
   const statusMessage = isLoading ? 'Loading destinations...' : errorMessage;
@@ -202,15 +217,24 @@ export function DiscoverScreen() {
                 ) : null}
               </View>
             ) : (
-              <PlaceListSection
-                title="Popular Places"
-                places={filteredPlaces}
-                savedPlaceIds={savedPlaceIds}
-                searchQuery={searchQuery}
-                onToggleSavedPlace={toggleSavedPlace}
-                onPressPlaceDetails={handlePressPlaceDetails}
-                onPressAddPlace={handlePressAddPlace}
-              />
+              <View>
+                <PlaceListSection
+                  title="Popular Places"
+                  places={visiblePlaces}
+                  savedPlaceIds={savedPlaceIds}
+                  searchQuery={searchQuery}
+                  onToggleSavedPlace={toggleSavedPlace}
+                  onPressPlaceDetails={handlePressPlaceDetails}
+                  onPressAddPlace={handlePressAddPlace}
+                />
+                {canLoadMore ? (
+                  <View style={styles.loadMoreWrapper}>
+                    <Pressable style={styles.loadMoreButton} onPress={handleLoadMore}>
+                      <Text style={styles.loadMoreText}>Load more ({remainingPlaces})</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
             )}
           </ScrollView>
 
@@ -220,6 +244,7 @@ export function DiscoverScreen() {
             selectedFilters={selectedFilters}
             onToggleFilter={toggleFilter}
             onApplyFilters={() => setIsFilterOpen(false)}
+            onClearFilters={() => setSelectedFilters([])}
           />
         </View>
       </View>
