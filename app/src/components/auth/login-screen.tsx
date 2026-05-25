@@ -314,7 +314,7 @@ export function LoginScreen() {
         return;
       }
 
-      router.replace('/explore');
+      router.replace('/feed');
     } catch (error) {
       if (!isSignup) {
         setErrorMessage('Invalid credentials.');

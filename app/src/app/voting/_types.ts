@@ -39,7 +39,7 @@ export interface BudgetOption {
   selected: boolean;
 }
 
-export type VotingTab = 'Destinations' | 'Dates' | 'Budget';
+export type VotingTab = 'Dates' | 'Budget';
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 

@@ -1,8 +1,7 @@
-import React from "react";
+import React from 'react';
 
+import { LoginScreen } from '@/components/auth/login-screen';
 
-import { LoginScreen } from "@/components/auth/login-screen";
-
-export default function HomeScreen() {
+export default function Index() {
   return <LoginScreen />;
 }
