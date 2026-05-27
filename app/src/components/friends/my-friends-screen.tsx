@@ -19,7 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../../lib/supabase';
 import { AppLoading } from '@/components/common/AppLoading';
 
-type Friend = { id: string; friendshipId: string; fullName: string; username: string; avatarUrl: string | null; tripCount: number };
+type Friend = { id: string; friendshipId?: string; fullName: string; username: string; avatarUrl: string | null; tripCount: number };
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TYPE_SCALE = Math.min(Math.max(SCREEN_WIDTH / 390, 0.9), 1.08);
@@ -220,14 +220,20 @@ export function MyFriendsScreen() {
           .in('id', friendIds);
 
         const friendshipIdByProfileId = new Map(friendships.map((f) => [f.profileId, f.friendshipId]));
-        setFriends((profiles ?? []).map((p) => ({
-          id: p.id,
-          friendshipId: friendshipIdByProfileId.get(p.id) ?? '',
-          fullName: p.full_name ?? p.username ?? 'User',
-          username: p.username ?? 'user',
-          avatarUrl: p.avatar_url ?? null,
-          tripCount: 0,
-        })).filter((friend) => friend.friendshipId));
+        setFriends((profiles ?? []).map((p) => {
+          const friendshipId = friendshipIdByProfileId.get(p.id);
+          if (!friendshipId) {
+            console.warn('[friends] missing friendship row id for profile', { profileId: p.id });
+          }
+          return {
+            id: p.id,
+            friendshipId,
+            fullName: p.full_name ?? p.username ?? 'User',
+            username: p.username ?? 'user',
+            avatarUrl: p.avatar_url ?? null,
+            tripCount: 0,
+          };
+        }));
       } finally {
         setLoading(false);
       }
@@ -247,12 +253,26 @@ export function MyFriendsScreen() {
 
   const removeFriend = async (friend: Friend) => {
     if (removingIds.has(friend.id)) return;
+    if (!friend.friendshipId) {
+      console.error('[friends] missing friendshipId during remove', { friendId: friend.id });
+      Alert.alert('Could not remove friend', 'Please try again.');
+      return;
+    }
     setRemovingIds((prev) => new Set(prev).add(friend.id));
+    const { data: authData } = await supabase.auth.getUser();
+    const currentUserId = authData.user?.id ?? null;
+    console.log('[friends] removing friend', {
+      currentUserId,
+      friendId: friend.id,
+      friendshipId: friend.friendshipId,
+    });
+
     const { data, error } = await supabase
       .from('friendships')
       .delete()
       .eq('id', friend.friendshipId)
       .select('id');
+    console.log('[friends] delete result', { data, error });
 
     if (error) {
       console.error('Failed to delete friendship row', {
@@ -266,7 +286,12 @@ export function MyFriendsScreen() {
         friendId: friend.id,
         friendshipId: friend.friendshipId,
       });
-      Alert.alert('Could not remove friend', 'Please try again.');
+      const { data: existingRows, error: existingError } = await supabase
+        .from('friendships')
+        .select('id, requester_id, receiver_id, status')
+        .eq('id', friend.friendshipId);
+      console.log('[friends] row after failed delete', { existingRows, existingError });
+      Alert.alert('Could not remove friend', 'Could not remove friend. No friendship row was deleted.');
     } else {
       setFriends((prev) => prev.filter((f) => f.id !== friend.id));
     }
@@ -367,7 +392,7 @@ export function MyFriendsScreen() {
                   </Pressable>
                   {removingIds.has(friend.id) ? (
                     <ActivityIndicator size="small" color={C.primary} />
-                  ) : (
+                  ) : friend.friendshipId ? (
                     <Pressable
                       style={styles.removeButton}
                       onPress={(event) => { event.stopPropagation?.(); handleRemove(friend); }}
@@ -377,7 +402,7 @@ export function MyFriendsScreen() {
                       hitSlop={10}>
                       <Feather name="x" size={16} color={C.removeIcon} />
                     </Pressable>
-                  )}
+                  ) : null}
                 </View>
               ))
             )}
