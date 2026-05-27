@@ -19,7 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../../lib/supabase';
 import { AppLoading } from '@/components/common/AppLoading';
 
-type Friend = { id: string; friendshipId?: string; fullName: string; username: string; avatarUrl: string | null; tripCount: number };
+type Friend = { id: string; friendshipId: string; fullName: string; username: string; avatarUrl: string | null; tripCount: number };
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TYPE_SCALE = Math.min(Math.max(SCREEN_WIDTH / 390, 0.9), 1.08);
@@ -190,6 +190,7 @@ export function MyFriendsScreen() {
   const [loading, setLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [removingIds, setRemovingIds] = React.useState<Set<string>>(new Set());
+  const [removeError, setRemoveError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     (async () => {
@@ -204,11 +205,12 @@ export function MyFriendsScreen() {
           .eq('status', 'accepted')
           .or(`requester_id.eq.${me},receiver_id.eq.${me}`);
 
-        const friendships = (rows ?? []).map((r) => ({
-          friendshipId: r.id,
-          profileId: r.requester_id === me ? r.receiver_id : r.requester_id,
-        }));
-        const friendIds = friendships.map((f) => f.profileId);
+        const friendshipByFriendId = new Map<string, string>();
+        (rows ?? []).forEach((row) => {
+          const friendId = row.requester_id === me ? row.receiver_id : row.requester_id;
+          friendshipByFriendId.set(friendId, row.id);
+        });
+        const friendIds = Array.from(friendshipByFriendId.keys());
         if (friendIds.length === 0) {
           setFriends([]);
           return;
@@ -219,20 +221,20 @@ export function MyFriendsScreen() {
           .select('id, full_name, username, avatar_url')
           .in('id', friendIds);
 
-        const friendshipIdByProfileId = new Map(friendships.map((f) => [f.profileId, f.friendshipId]));
-        setFriends((profiles ?? []).map((p) => {
-          const friendshipId = friendshipIdByProfileId.get(p.id);
+        setFriends((profiles ?? []).flatMap((p) => {
+          const friendshipId = friendshipByFriendId.get(p.id);
           if (!friendshipId) {
             console.warn('[friends] missing friendship row id for profile', { profileId: p.id });
+            return [];
           }
-          return {
+          return [{
             id: p.id,
             friendshipId,
             fullName: p.full_name ?? p.username ?? 'User',
             username: p.username ?? 'user',
             avatarUrl: p.avatar_url ?? null,
             tripCount: 0,
-          };
+          }];
         }));
       } finally {
         setLoading(false);
@@ -253,11 +255,7 @@ export function MyFriendsScreen() {
 
   const removeFriend = async (friend: Friend) => {
     if (removingIds.has(friend.id)) return;
-    if (!friend.friendshipId) {
-      console.error('[friends] missing friendshipId during remove', { friendId: friend.id });
-      Alert.alert('Could not remove friend', 'Please try again.');
-      return;
-    }
+    setRemoveError(null);
     setRemovingIds((prev) => new Set(prev).add(friend.id));
     const { data: authData } = await supabase.auth.getUser();
     const currentUserId = authData.user?.id ?? null;
@@ -280,6 +278,7 @@ export function MyFriendsScreen() {
         friendshipId: friend.friendshipId,
         error,
       });
+      setRemoveError('Could not remove friend. Please try again.');
       Alert.alert('Could not remove friend', 'Please try again.');
     } else if (!data || data.length === 0) {
       console.error('Delete matched zero friendship rows', {
@@ -291,6 +290,7 @@ export function MyFriendsScreen() {
         .select('id, requester_id, receiver_id, status')
         .eq('id', friend.friendshipId);
       console.log('[friends] row after failed delete', { existingRows, existingError });
+      setRemoveError('Could not remove friend. No friendship row was deleted.');
       Alert.alert('Could not remove friend', 'Could not remove friend. No friendship row was deleted.');
     } else {
       setFriends((prev) => prev.filter((f) => f.id !== friend.id));
@@ -372,6 +372,7 @@ export function MyFriendsScreen() {
 
             {/* All friends */}
             <Text style={styles.sectionLabel}>ALL</Text>
+            {removeError ? <Text style={{ color: '#BE123C', marginBottom: rs(10), fontWeight: '600' }}>{removeError}</Text> : null}
 
             {filtered.length === 0 ? (
               <View style={styles.emptyState}>
@@ -392,7 +393,7 @@ export function MyFriendsScreen() {
                   </Pressable>
                   {removingIds.has(friend.id) ? (
                     <ActivityIndicator size="small" color={C.primary} />
-                  ) : friend.friendshipId ? (
+                  ) : (
                     <Pressable
                       style={styles.removeButton}
                       onPress={(event) => { event.stopPropagation?.(); handleRemove(friend); }}
@@ -402,7 +403,7 @@ export function MyFriendsScreen() {
                       hitSlop={10}>
                       <Feather name="x" size={16} color={C.removeIcon} />
                     </Pressable>
-                  ) : null}
+                  )}
                 </View>
               ))
             )}
