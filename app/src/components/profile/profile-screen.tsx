@@ -2,7 +2,6 @@ import {
   Feather,
   Ionicons,
   MaterialCommunityIcons,
-  AntDesign,
 } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
@@ -161,9 +160,6 @@ export function ProfileScreen() {
       <View style={styles.screen}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Profile</Text>
-          <Pressable style={styles.headerIconButton} onPress={() => router.push('/add-friends')}>
-            <Feather name="settings" size={22} color="#222222" />
-          </Pressable>
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 120 }]}> 
@@ -183,17 +179,17 @@ export function ProfileScreen() {
             {errorMessage ? <Text style={styles.logoutMessage}>{errorMessage}</Text> : null}
 
             <View style={styles.statsRow}>
-              <View style={styles.statBlock}>
+              <Pressable style={styles.statBlock} onPress={() => router.push('/my-friends')}>
                 <Text style={styles.statValue}>{stats.friends}</Text>
                 <Text style={styles.statLabel}>Friends</Text>
-              </View>
+              </Pressable>
 
               <View style={styles.statDivider} />
 
-              <View style={styles.statBlock}>
+              <Pressable style={styles.statBlock} onPress={() => router.push('/my-trips')}>
                 <Text style={styles.statValue}>{stats.trips}</Text>
                 <Text style={styles.statLabel}>Trips</Text>
-              </View>
+              </Pressable>
             </View>
           </View>
 
@@ -206,7 +202,6 @@ export function ProfileScreen() {
           <View style={styles.settingsSection}>
             <Text style={styles.settingsHeading}>SETTINGS</Text>
             <SettingsRow icon={<Ionicons name="notifications-outline" size={20} color="#222222" />} label="Notifications" />
-            <SettingsRow icon={<AntDesign name="questioncircleo" size={18} color="#222222" />} label="Help & Support" />
             <SettingsRow icon={<MaterialCommunityIcons name="logout" size={20} color="#222222" />} label="Log out" onPress={handleLogout} />
             {statusMessage ? <Text style={styles.logoutMessage}>{statusMessage}</Text> : null}
           </View>
