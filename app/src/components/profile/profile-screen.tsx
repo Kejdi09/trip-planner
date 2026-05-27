@@ -189,17 +189,17 @@ export function ProfileScreen() {
             {errorMessage ? <Text style={styles.logoutMessage}>{errorMessage}</Text> : null}
 
             <View style={styles.statsRow}>
-              <View style={styles.statBlock}>
+              <Pressable style={styles.statBlock} onPress={() => router.push('/my-friends')}>
                 <Text style={styles.statValue}>{stats.friends}</Text>
                 <Text style={styles.statLabel}>Friends</Text>
-              </View>
+              </Pressable>
 
               <View style={styles.statDivider} />
 
-              <View style={styles.statBlock}>
+              <Pressable style={styles.statBlock} onPress={() => router.push('/my-trips')}>
                 <Text style={styles.statValue}>{stats.trips}</Text>
                 <Text style={styles.statLabel}>Trips</Text>
-              </View>
+              </Pressable>
             </View>
           </View>
 
