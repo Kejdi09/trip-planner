@@ -1,21 +1,32 @@
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { G, Path } from 'react-native-svg';
 
 import { API_BASE_URL, APP_ENV } from '../../../lib/app-config';
 import { supabase } from '../../../lib/supabase';
 import { AppLoading } from '@/components/common/AppLoading';
+import { StatusMessage } from '@/components/ui/status-message';
 import { C, rs } from './theme';
 import { styles } from './my-trips-screen.styles';
 
 type TravelSummary = {
-  visitedCountries: string[];
+  countries?: number;
+  cities?: number;
+  placesRated?: number;
+  groupTrips?: number;
+  visitedCountries?: string[];
 };
 
 type Feature = { properties?: { name?: string; ADMIN?: string; NAME?: string }; geometry?: { type?: string; coordinates?: unknown } };
+
+type SummaryTileProps = {
+  value: number;
+  label: string;
+  icon: React.ReactNode;
+};
 
 function countryNameFromFeature(feature: Feature): string {
   return feature.properties?.name ?? feature.properties?.ADMIN ?? feature.properties?.NAME ?? '';
@@ -47,11 +58,23 @@ function toPathD(geometry: Feature['geometry']): string {
   return d;
 }
 
+function SummaryTile({ value, label, icon }: SummaryTileProps) {
+  return (
+    <View style={styles.summaryTile}>
+      <View style={styles.summaryTileIcon}>{icon}</View>
+      <Text style={styles.summaryTileValue}>{value}</Text>
+      <Text style={styles.summaryTileLabel}>{label}</Text>
+    </View>
+  );
+}
+
 export function MyTripsScreen() {
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [visitedCountries, setVisitedCountries] = React.useState<string[]>([]);
   const [worldFeatures, setWorldFeatures] = React.useState<Feature[]>([]);
+  const [summaryStats, setSummaryStats] = React.useState({ countries: 0, cities: 0, placesRated: 0, groupTrips: 0 });
 
   React.useEffect(() => {
     let mounted = true;
@@ -82,6 +105,12 @@ export function MyTripsScreen() {
 
         if (!mounted) return;
         setVisitedCountries(countries);
+        setSummaryStats({
+          countries: summary?.countries ?? countries.length,
+          cities: summary?.cities ?? 0,
+          placesRated: summary?.placesRated ?? 0,
+          groupTrips: summary?.groupTrips ?? 0,
+        });
         setWorldFeatures(features);
       } catch {
         if (!mounted) return;
@@ -91,7 +120,9 @@ export function MyTripsScreen() {
       }
     })();
 
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const visitedSet = React.useMemo(() => new Set(visitedCountries.map(normalizeCountryName)), [visitedCountries]);
@@ -103,50 +134,71 @@ export function MyTripsScreen() {
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.screen}>
-        <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Go back">
-            <Feather name="arrow-left" size={18} color={C.text} />
-          </Pressable>
-          <Text style={styles.title}>My Trips</Text>
-        </View>
+        <View style={styles.pageContainer}>
+          <View style={styles.header}>
+            <Pressable style={styles.backButton} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Go back">
+              <Feather name="arrow-left" size={18} color={C.text} />
+            </Pressable>
+            <View>
+              <Text style={styles.title}>My Trips</Text>
+              <Text style={styles.subtitle}>Your travel history at a glance</Text>
+            </View>
+          </View>
 
-        {error ? <Text style={{ color: '#BE123C', paddingHorizontal: rs(20), marginTop: rs(16) }}>{error}</Text> : null}
+          <ScrollView
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + rs(128) }]}
+            showsVerticalScrollIndicator={false}
+          >
+            {error ? <StatusMessage message={error} style={styles.errorMessage} /> : null}
 
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          <Text style={styles.sectionLabel}>Visited Countries</Text>
+            <View style={styles.summaryCard}>
+              <Text style={styles.sectionTitle}>Travel Summary</Text>
+              <View style={styles.summaryGrid}>
+                <SummaryTile value={summaryStats.countries} label="Countries" icon={<MaterialIcons name="language" size={rs(22)} color="#0F766E" />} />
+                <SummaryTile value={summaryStats.groupTrips} label="Trips" icon={<Ionicons name="map-outline" size={rs(22)} color="#0F766E" />} />
+                <SummaryTile value={summaryStats.cities} label="Cities" icon={<MaterialCommunityIcons name="city-variant-outline" size={rs(22)} color="#0F766E" />} />
+              </View>
+            </View>
 
-          {visitedCountries.length === 0 ? (
-            <Text style={{ color: '#64748B', marginBottom: rs(12) }}>No visited countries yet.</Text>
-          ) : null}
+            <View style={styles.sectionCard}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Visited Countries</Text>
+                <Text style={styles.sectionCount}>{visitedCountries.length}</Text>
+              </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: rs(12) }}>
-            <View style={{ flexDirection: 'row', gap: rs(8) }}>
-              {visitedCountries.map((country) => (
-                <View key={country} style={{ backgroundColor: '#D7EDF0', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 }}>
-                  <Text style={{ color: '#0F766E', fontWeight: '700', fontSize: 12 }}>{country}</Text>
+              {visitedCountries.length === 0 ? (
+                <StatusMessage message="No visited countries yet. Start planning your next trip!" style={styles.emptyMessage} />
+              ) : (
+                <View style={styles.chipsWrap}>
+                  {visitedCountries.map((country) => (
+                    <View key={country} style={styles.countryChip}>
+                      <Text style={styles.countryChipText}>{country}</Text>
+                    </View>
+                  ))}
                 </View>
-              ))}
+              )}
+            </View>
+
+            <View style={styles.sectionCard}>
+              <Text style={styles.sectionTitle}>Travel Map</Text>
+              <View style={styles.mapCard}>
+                <View style={styles.mapFrame}>
+                  <Svg width="100%" height="100%" viewBox="0 0 1000 520" preserveAspectRatio="xMidYMid meet">
+                    <G>
+                      {worldFeatures.map((feature, idx) => {
+                        const country = countryNameFromFeature(feature);
+                        const path = toPathD(feature.geometry);
+                        if (!path) return null;
+                        const visited = visitedSet.has(normalizeCountryName(country));
+                        return <Path key={`${country}-${idx}`} d={path} fill={visited ? '#14B8A6' : '#E5EEF2'} stroke="#C7D9E2" strokeWidth={0.6} />;
+                      })}
+                    </G>
+                  </Svg>
+                </View>
+              </View>
             </View>
           </ScrollView>
-
-          <ScrollView horizontal maximumZoomScale={4} minimumZoomScale={1} bouncesZoom>
-            <ScrollView maximumZoomScale={4} minimumZoomScale={1} bouncesZoom>
-              <View style={{ borderWidth: 1, borderColor: '#D7EEF0', borderRadius: 18, backgroundColor: '#F8FCFF', overflow: 'hidden' }}>
-                <Svg width={1000} height={520}>
-                  <G>
-                    {worldFeatures.map((feature, idx) => {
-                      const country = countryNameFromFeature(feature);
-                      const path = toPathD(feature.geometry);
-                      if (!path) return null;
-                      const visited = visitedSet.has(normalizeCountryName(country));
-                      return <Path key={`${country}-${idx}`} d={path} fill={visited ? '#14B8A6' : '#E5EEF2'} stroke="#C7D9E2" strokeWidth={0.6} />;
-                    })}
-                  </G>
-                </Svg>
-              </View>
-            </ScrollView>
-          </ScrollView>
-        </ScrollView>
+        </View>
       </View>
     </SafeAreaView>
   );
