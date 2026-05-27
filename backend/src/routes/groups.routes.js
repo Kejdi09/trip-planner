@@ -18,8 +18,27 @@ function parseLimit(value, fallback = 30, max = 100) {
 module.exports = function groupsRoutes(supabaseAdmin) {
   const router = express.Router();
 
-  async function createNotification(userId, type, content) {
-    const { error } = await supabaseAdmin.from('notifications').insert({ user_id: userId, type, content });
+  async function createNotification(userId, type, title, body, relatedEntityType = null, relatedEntityId = null) {
+    const { data: existing } = await supabaseAdmin
+      .from('notifications')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('type', type)
+      .eq('related_entity_type', relatedEntityType)
+      .eq('related_entity_id', relatedEntityId)
+      .limit(1);
+
+    if ((existing || []).length > 0) return;
+
+    const { error } = await supabaseAdmin.from('notifications').insert({
+      user_id: userId,
+      type,
+      title,
+      body,
+      related_entity_type: relatedEntityType,
+      related_entity_id: relatedEntityId,
+      content: JSON.stringify({ title, body }),
+    });
     if (error) {
       const wrapped = makeError(error.message || 'Failed to create notification.', 502, 'UPSTREAM_ERROR');
       throw wrapped;
@@ -389,9 +408,13 @@ module.exports = function groupsRoutes(supabaseAdmin) {
         throw wrapped;
       }
 
-      await createNotification(newUserId, 'group_invite', JSON.stringify({ deepLink: `/group-chat?groupId=${groupId}`, groupId, actorId }));
-      await createNotification(actorId, 'group_join', JSON.stringify({ deepLink: `/group-chat?groupId=${groupId}`, groupId, userId: newUserId }));
-
+      const [{ data: actorProfile }, { data: groupRow }] = await Promise.all([
+        supabaseAdmin.from('profiles').select('full_name, username').eq('id', actorId).maybeSingle(),
+        supabaseAdmin.from('groups').select('name').eq('id', groupId).maybeSingle(),
+      ]);
+      const actorName = actorProfile?.full_name || actorProfile?.username || 'Unknown user';
+      const groupName = groupRow?.name || 'your group';
+      await createNotification(newUserId, 'group_invite', 'New group invite', `${actorName} invited you to ${groupName}`, 'group', groupId);
       return res.status(201).json(data);
     } catch (error) {
       return next(error);
@@ -493,6 +516,19 @@ module.exports = function groupsRoutes(supabaseAdmin) {
         const wrapped = new Error(error.message || 'Failed to send message.');
         wrapped.status = 502;
         throw wrapped;
+      }
+
+      const [{ data: senderProfile }, { data: groupInfo }, { data: members }] = await Promise.all([
+        supabaseAdmin.from('profiles').select('full_name, username').eq('id', userId).maybeSingle(),
+        supabaseAdmin.from('groups').select('name').eq('id', groupId).maybeSingle(),
+        supabaseAdmin.from('group_members').select('user_id').eq('group_id', groupId),
+      ]);
+      const senderName = senderProfile?.full_name || senderProfile?.username || 'Unknown user';
+      const chatGroupName = groupInfo?.name || 'Group chat';
+      const preview = content.length > 80 ? `${content.slice(0, 77)}...` : content;
+      for (const member of members || []) {
+        if (!member?.user_id || member.user_id === userId) continue;
+        await createNotification(member.user_id, 'group_chat_message', chatGroupName, `${senderName}: ${preview}`, 'group_message', data.id);
       }
 
       return res.status(201).json(data);

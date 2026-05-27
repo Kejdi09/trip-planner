@@ -16,6 +16,31 @@ export type UserSearchResult = {
   requestSent: boolean;
 };
 
+
+async function createNotification(userId: string, type: string, title: string, body: string, relatedEntityType?: string, relatedEntityId?: string) {
+  const payload = {
+    user_id: userId,
+    type,
+    title,
+    body,
+    related_entity_type: relatedEntityType ?? null,
+    related_entity_id: relatedEntityId ?? null,
+    content: JSON.stringify({ title, body }),
+  };
+
+  const { data: existing } = await supabase
+    .from('notifications')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('type', type)
+    .eq('related_entity_type', relatedEntityType ?? null)
+    .eq('related_entity_id', relatedEntityId ?? null)
+    .limit(1);
+
+  if ((existing ?? []).length > 0) return;
+  await supabase.from('notifications').insert(payload);
+}
+
 async function currentUserId() {
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user?.id) throw new Error('No authenticated user.');
@@ -90,13 +115,23 @@ export async function searchUsers(query: string): Promise<UserSearchResult[]> {
 
 export async function sendFriendRequest(receiverId: string): Promise<void> {
   const userId = await currentUserId();
-  const { error } = await supabase.from('friendships').insert({ requester_id: userId, receiver_id: receiverId, status: 'pending' });
+  const { data: me } = await supabase.from('profiles').select('full_name, username').eq('id', userId).maybeSingle();
+  const actorName = me?.full_name ?? me?.username ?? 'Unknown user';
+  const { data, error } = await supabase.from('friendships').insert({ requester_id: userId, receiver_id: receiverId, status: 'pending' }).select('id').single();
   if (error) throw error;
+  await createNotification(receiverId, 'friend_request_received', 'New friend request', `${actorName} sent you a friend request`, 'friend_request', data?.id);
 }
 
 export async function acceptFriendRequest(requestId: string): Promise<void> {
+  const myId = await currentUserId();
+  const { data: row } = await supabase.from('friendships').select('id, requester_id, receiver_id').eq('id', requestId).maybeSingle();
   const { error } = await supabase.from('friendships').update({ status: 'accepted' }).eq('id', requestId);
   if (error) throw error;
+  const { data: me } = await supabase.from('profiles').select('full_name, username').eq('id', myId).maybeSingle();
+  const actorName = me?.full_name ?? me?.username ?? 'Unknown user';
+  if (row?.requester_id) {
+    await createNotification(row.requester_id, 'friend_request_accepted', 'Friend request accepted', `${actorName} accepted your friend request`, 'friend_request', requestId);
+  }
 }
 
 export async function declineFriendRequest(requestId: string): Promise<void> {

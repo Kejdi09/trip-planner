@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { supabase } from '../../../lib/supabase';
+import { AppLoading } from '@/components/common/AppLoading';
 
 type Friend = { id: string; fullName: string; username: string; avatarUrl: string | null; tripCount: number };
 
@@ -240,23 +241,32 @@ export function MyFriendsScreen() {
   const handleRemove = (friend: Friend) => {
     Alert.alert(
       'Remove Friend',
-      `Remove ${friend.fullName} from your friends?`,
+      `Remove ${friend.fullName} as a friend?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Remove',
           style: 'destructive',
           onPress: async () => {
+            console.log('remove friend confirmed', friend.id);
             setRemovingIds((prev) => new Set(prev).add(friend.id));
             const { data: auth } = await supabase.auth.getUser();
             const me = auth.user?.id;
-            if (!me) return;
-            await supabase
+            if (!me) {
+              Alert.alert('Could not remove friend', 'Please log in again.');
+              setRemovingIds((prev) => { const n = new Set(prev); n.delete(friend.id); return n; });
+              return;
+            }
+            const { error } = await supabase
               .from('friendships')
               .delete()
-              .eq('status', 'accepted')
               .or(`and(requester_id.eq.${me},receiver_id.eq.${friend.id}),and(requester_id.eq.${friend.id},receiver_id.eq.${me})`);
-            setFriends((prev) => prev.filter((f) => f.id !== friend.id));
+            if (error) {
+              Alert.alert('Could not remove friend', 'Please try again.');
+            } else {
+              setFriends((prev) => prev.filter((f) => f.id !== friend.id));
+              console.log('friend removed successfully');
+            }
             setRemovingIds((prev) => { const n = new Set(prev); n.delete(friend.id); return n; });
           },
         },
@@ -289,7 +299,7 @@ export function MyFriendsScreen() {
         </View>
 
         {loading ? (
-          <ActivityIndicator color={C.primary} style={{ flex: 1 }} />
+          <AppLoading message="Loading your friends..." />
         ) : (
           <ScrollView
             contentContainerStyle={styles.scrollContent}
@@ -332,19 +342,22 @@ export function MyFriendsScreen() {
             ) : (
               filtered.map((friend) => (
                 <View key={friend.id} style={styles.card}>
-                  <Avatar friend={friend} />
-                  <View style={styles.cardInfo}>
-                    <Text style={styles.cardName}>{friend.fullName}</Text>
-                    <Text style={styles.cardHandle}>@{friend.username}</Text>
-                  </View>
+                  <Pressable style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }} onPress={() => router.push({ pathname: '/user-profile/[userId]', params: { userId: friend.id } })}>
+                    <Avatar friend={friend} />
+                    <View style={styles.cardInfo}>
+                      <Text style={styles.cardName}>{friend.fullName}</Text>
+                      <Text style={styles.cardHandle}>@{friend.username}</Text>
+                    </View>
+                  </Pressable>
                   {removingIds.has(friend.id) ? (
                     <ActivityIndicator size="small" color={C.primary} />
                   ) : (
                     <Pressable
-                      style={styles.removeButton}
-                      onPress={() => handleRemove(friend)}
+                      style={[styles.removeButton, { zIndex: 10, elevation: 10 }]}
+                      onPress={(event) => { console.log('remove friend pressed', friend.id); event.stopPropagation?.(); handleRemove(friend); }}
                       accessibilityRole="button"
-                      accessibilityLabel={`Remove ${friend.fullName}`}>
+                      accessibilityLabel={`Remove ${friend.fullName}`}
+                      hitSlop={10}>
                       <Feather name="x" size={16} color={C.removeIcon} />
                     </Pressable>
                   )}

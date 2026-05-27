@@ -1,76 +1,113 @@
-type AppEnv = 'development' | 'production';
+type AppEnv = "development" | "production";
 
-const PROD_ALIASES = new Set(['prod', 'production', 'main']);
-const PREVIEW_ALIASES = new Set(['preview', 'staging']);
-const rawEnv = (process.env.EXPO_PUBLIC_APP_ENV ?? 'development').trim().toLowerCase();
+const PROD_ALIASES = new Set(["prod", "production", "main"]);
+const PREVIEW_ALIASES = new Set(["preview", "staging"]);
+const rawEnv = (process.env.EXPO_PUBLIC_APP_ENV ?? "development")
+  .trim()
+  .toLowerCase();
 
 export const APP_ENV: AppEnv = PROD_ALIASES.has(rawEnv)
-  ? 'production'
+  ? "production"
   : PREVIEW_ALIASES.has(rawEnv)
-    ? 'development'
-    : 'development';
+    ? "development"
+    : "development";
+
+const isGitHubActions = process.env.GITHUB_ACTIONS === "true";
 
 const sharedSupabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const sharedSupabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 const sharedApiUrl = process.env.EXPO_PUBLIC_API_URL;
 const sharedAppUrl = process.env.EXPO_PUBLIC_APP_URL;
 const sharedReviewPhotoBucket = process.env.EXPO_PUBLIC_REVIEW_PHOTO_BUCKET;
-const useReviewsBackendRaw = (process.env.EXPO_PUBLIC_USE_REVIEWS_BACKEND ?? 'false').trim().toLowerCase();
+const useReviewsBackendRaw = (
+  process.env.EXPO_PUBLIC_USE_REVIEWS_BACKEND ?? "true"
+)
+  .trim()
+  .toLowerCase();
 
 const devSupabaseUrl =
   sharedSupabaseUrl ??
   process.env.EXPO_PUBLIC_SUPABASE_URL_DEV ??
   process.env.EXPO_PUBLIC_SUPABASE_URL_STAGING;
+
 const devSupabaseAnonKey =
   sharedSupabaseAnonKey ??
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY_DEV ??
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY_STAGING;
+
 const devApiUrl =
-  sharedApiUrl ?? process.env.EXPO_PUBLIC_API_URL_DEV ?? process.env.EXPO_PUBLIC_API_URL_STAGING;
+  sharedApiUrl ??
+  process.env.EXPO_PUBLIC_API_URL_DEV ??
+  process.env.EXPO_PUBLIC_API_URL_STAGING;
+
 const devAppUrl =
-  sharedAppUrl ?? process.env.EXPO_PUBLIC_APP_URL_DEV ?? process.env.EXPO_PUBLIC_APP_URL_STAGING;
+  sharedAppUrl ??
+  process.env.EXPO_PUBLIC_APP_URL_DEV ??
+  process.env.EXPO_PUBLIC_APP_URL_STAGING;
+
 const devReviewPhotoBucket =
   sharedReviewPhotoBucket ??
   process.env.EXPO_PUBLIC_REVIEW_PHOTO_BUCKET_PREVIEW ??
   process.env.EXPO_PUBLIC_REVIEW_PHOTO_BUCKET_DEV ??
   process.env.EXPO_PUBLIC_REVIEW_PHOTO_BUCKET_STAGING;
 
-const prodSupabaseUrl = sharedSupabaseUrl ?? process.env.EXPO_PUBLIC_SUPABASE_URL_PROD;
-const prodSupabaseAnonKey = sharedSupabaseAnonKey ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY_PROD;
+const prodSupabaseUrl =
+  sharedSupabaseUrl ?? process.env.EXPO_PUBLIC_SUPABASE_URL_PROD;
+const prodSupabaseAnonKey =
+  sharedSupabaseAnonKey ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY_PROD;
 const prodApiUrl = sharedApiUrl ?? process.env.EXPO_PUBLIC_API_URL_PROD;
 const prodAppUrl = sharedAppUrl ?? process.env.EXPO_PUBLIC_APP_URL_PROD;
 const prodReviewPhotoBucket =
   sharedReviewPhotoBucket ?? process.env.EXPO_PUBLIC_REVIEW_PHOTO_BUCKET_PROD;
 
-const selectedSupabaseUrl = APP_ENV === 'production' ? prodSupabaseUrl : devSupabaseUrl;
-const selectedSupabaseAnonKey = APP_ENV === 'production' ? prodSupabaseAnonKey : devSupabaseAnonKey;
-const selectedApiBaseUrl = APP_ENV === 'production' ? prodApiUrl : devApiUrl;
-const selectedAppUrl = APP_ENV === 'production' ? prodAppUrl : devAppUrl;
+const selectedSupabaseUrl =
+  APP_ENV === "production" ? prodSupabaseUrl : devSupabaseUrl;
+const selectedSupabaseAnonKey =
+  APP_ENV === "production" ? prodSupabaseAnonKey : devSupabaseAnonKey;
+const selectedApiBaseUrl = APP_ENV === "production" ? prodApiUrl : devApiUrl;
+const selectedAppUrl = APP_ENV === "production" ? prodAppUrl : devAppUrl;
 const selectedReviewPhotoBucket =
-  APP_ENV === 'production' ? prodReviewPhotoBucket : devReviewPhotoBucket;
+  APP_ENV === "production" ? prodReviewPhotoBucket : devReviewPhotoBucket;
 
-if (!selectedSupabaseUrl || !selectedSupabaseAnonKey) {
-  throw new Error(
-    `Missing Supabase config for ${APP_ENV}. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY (or ${APP_ENV === 'production' ? '..._PROD' : '..._DEV'} variants).`,
-  );
+function requireConfig(
+  value: string | undefined,
+  message: string,
+  githubActionsFallback: string,
+): string {
+  if (value) return value;
+
+  if (isGitHubActions) {
+    return githubActionsFallback;
+  }
+
+  throw new Error(message);
 }
 
-if (!selectedApiBaseUrl) {
-  throw new Error(
-    `Missing API base URL for ${APP_ENV}. Set EXPO_PUBLIC_API_URL (or EXPO_PUBLIC_API_URL_${APP_ENV === 'production' ? 'PROD' : 'DEV'}).`,
-  );
-}
+export const REVIEW_PHOTO_BUCKET: string =
+  selectedReviewPhotoBucket ?? "reviewPics";
+export const USE_REVIEWS_BACKEND: boolean =
+  useReviewsBackendRaw === "true" || useReviewsBackendRaw === "1";
 
-if (!selectedAppUrl) {
-  throw new Error(
-    `Missing app URL for ${APP_ENV}. Set EXPO_PUBLIC_APP_URL (or EXPO_PUBLIC_APP_URL_${APP_ENV === 'production' ? 'PROD' : 'DEV'}).`,
-  );
-}
+export const SUPABASE_URL: string = requireConfig(
+  selectedSupabaseUrl,
+  `Missing Supabase config for ${APP_ENV}. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY (or ${APP_ENV === "production" ? "..._PROD" : "..._DEV"} variants).`,
+  "https://ci-placeholder.supabase.co",
+);
 
-export const REVIEW_PHOTO_BUCKET: string = selectedReviewPhotoBucket ?? 'reviewPics';
-export const USE_REVIEWS_BACKEND: boolean = useReviewsBackendRaw === 'true' || useReviewsBackendRaw === '1';
+export const SUPABASE_ANON_KEY: string = requireConfig(
+  selectedSupabaseAnonKey,
+  `Missing Supabase config for ${APP_ENV}. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY (or ${APP_ENV === "production" ? "..._PROD" : "..._DEV"} variants).`,
+  "ci-placeholder-anon-key",
+);
 
-export const SUPABASE_URL: string = selectedSupabaseUrl;
-export const SUPABASE_ANON_KEY: string = selectedSupabaseAnonKey;
-export const API_BASE_URL: string = selectedApiBaseUrl;
-export const APP_URL: string = selectedAppUrl;
+export const API_BASE_URL: string = requireConfig(
+  selectedApiBaseUrl,
+  `Missing API base URL for ${APP_ENV}. Set EXPO_PUBLIC_API_URL (or EXPO_PUBLIC_API_URL_${APP_ENV === "production" ? "PROD" : "DEV"}).`,
+  "https://ci-placeholder-api.example.com",
+);
+
+export const APP_URL: string = requireConfig(
+  selectedAppUrl,
+  `Missing app URL for ${APP_ENV}. Set EXPO_PUBLIC_APP_URL (or EXPO_PUBLIC_APP_URL_${APP_ENV === "production" ? "PROD" : "DEV"}).`,
+  "https://ci-placeholder-app.example.com",
+);

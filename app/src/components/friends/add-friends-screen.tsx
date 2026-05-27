@@ -144,7 +144,7 @@ function SearchResultCard({ user, onAdd, isSending }: SearchResultCardProps) {
             user.requestSent ? `Request sent to ${user.fullName}` : `Add ${user.fullName}`
           }
           style={[styles.addButton, user.requestSent && styles.addButtonSent]}
-          onPress={() => !user.requestSent && onAdd(user)}
+          onPress={(e) => { e.stopPropagation?.(); !user.requestSent && onAdd(user); }}
           disabled={user.requestSent}>
           <Text style={[styles.addButtonText, user.requestSent && styles.addButtonTextSent]}>
             {user.requestSent ? 'Sent' : 'Add'}

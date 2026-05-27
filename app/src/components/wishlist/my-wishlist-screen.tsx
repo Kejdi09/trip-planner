@@ -4,6 +4,7 @@ import React from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AppLoading } from '@/components/common/AppLoading';
 import { PlaceListSection } from '@/components/ui/place-list-section';
 import { SearchHeader } from '@/components/ui/search-header';
 import { StatusMessage } from '@/components/ui/status-message';
@@ -149,7 +150,7 @@ export function MyWishlistScreen() {
             {errorMessage ? (
               <StatusMessage message={errorMessage} style={styles.statusMessage} />
             ) : isLoading ? (
-              <StatusMessage message="Loading your wishlist..." style={styles.statusMessage} />
+              <AppLoading message="Loading your wishlist..." />
             ) : filteredPlaces.length === 0 ? (
               <StatusMessage message={emptyMessage} style={styles.statusMessage} />
             ) : (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { router } from 'expo-router';
 import {
   View,
@@ -10,6 +10,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { fetchIncomingPendingRequestCount, fetchUnreadNotificationCount } from '../../lib/notifications-api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface TrendingDestination {
@@ -189,7 +190,28 @@ const aStyles = StyleSheet.create({
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 const SocialFeedScreen: React.FC = () => {
-  const [notifCount] = useState(3);
+  const [notifCount, setNotifCount] = React.useState(0);
+  const [friendRequestCount, setFriendRequestCount] = React.useState(0);
+
+  React.useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const [notifications, requests] = await Promise.all([
+          fetchUnreadNotificationCount(),
+          fetchIncomingPendingRequestCount(),
+        ]);
+        if (!mounted) return;
+        setNotifCount(notifications);
+        setFriendRequestCount(requests);
+      } catch {
+        if (!mounted) return;
+        setNotifCount(0);
+        setFriendRequestCount(0);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -201,7 +223,7 @@ const SocialFeedScreen: React.FC = () => {
         {/* Header — no logo, just title + bell */}
         <View style={styles.header}>
   <Text style={styles.appName}>TripSync</Text>
-  <TouchableOpacity style={styles.notifBtn} accessibilityLabel="Notifications">
+  <TouchableOpacity style={styles.notifBtn} accessibilityLabel="Notifications" onPress={() => router.push('/notifications')}>
     <Ionicons name="notifications-outline" size={26} color={C.textPrimary} />
     {notifCount > 0 && (
       <View style={styles.notifBadge}>
@@ -235,8 +257,9 @@ const SocialFeedScreen: React.FC = () => {
         <View style={styles.section}>
           <View style={styles.activityHeader}>
             <Text style={styles.sectionTitle}>Friends&apos; Activity</Text>
-            <TouchableOpacity accessibilityLabel="Add friend" onPress={() => router.push('/add-friends')}>
+            <TouchableOpacity accessibilityLabel="Add friend" onPress={() => router.push('/add-friends')} style={{ position: 'relative' }}>
               <Ionicons name="person-add-outline" size={22} color={C.textSecondary} />
+              {friendRequestCount > 0 ? <View style={styles.friendBadge}><Text style={styles.friendBadgeText}>{friendRequestCount > 99 ? '99+' : friendRequestCount}</Text></View> : null}
             </TouchableOpacity>
           </View>
           {ACTIVITY.map((post) => (
@@ -279,6 +302,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
   },
   notifBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
+  friendBadge: { position: 'absolute', top: -6, right: -10, backgroundColor: '#EF4444', borderRadius: 10, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  friendBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
 
   section: { paddingHorizontal: 16, paddingTop: 16 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },

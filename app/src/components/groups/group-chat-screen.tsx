@@ -5,7 +5,6 @@ import {
   ActivityIndicator,
   Dimensions,
   FlatList,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -93,28 +92,13 @@ const styles = StyleSheet.create({
     borderRadius: 1.5,
     backgroundColor: C.mutedText,
   },
-  headerAvatarStack: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: rs(6),
+  headerMembersText: {
+    fontSize: rs(12),
+    color: C.mutedText,
+    fontWeight: '500',
     paddingLeft: rs(46),
+    marginTop: rs(4),
   },
-  headerAvatar: {
-    width: rs(28),
-    height: rs(28),
-    borderRadius: rs(14),
-    backgroundColor: C.primaryLight,
-    borderWidth: 2,
-    borderColor: C.background,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: -rs(6),
-  },
-  headerAvatarFirst: { marginLeft: 0 },
-  headerAvatarImage: { width: rs(28), height: rs(28), borderRadius: rs(14) },
-  headerAvatarText: { fontSize: rs(10), fontWeight: '700', color: C.primary },
-  headerMoreText: { fontSize: rs(12), color: C.mutedText, fontWeight: '600', marginLeft: rs(6) },
 
   // Messages list
   messageList: { flex: 1 },
@@ -206,10 +190,6 @@ const styles = StyleSheet.create({
 // Helpers
 // ---------------------------------------------------------------------------
 
-function initials(name: string) {
-  return name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
-}
-
 function formatChatTime(createdAt: string | Date) {
   const value = createdAt instanceof Date ? createdAt.toISOString() : createdAt;
   const normalized = /z$|[+-]\d{2}:?\d{2}$/i.test(value) ? value : `${value}Z`;
@@ -258,8 +238,8 @@ export function GroupChatScreen() {
               adminId: groupRow.created_by ?? '',
               members: members.map((m) => ({
                 id: m.user_id,
-                fullName: `Member ${m.user_id.slice(0, 4)}`,
-                username: m.user_id.slice(0, 8),
+                fullName: 'Unknown user',
+                username: 'Unknown user',
                 avatarUrl: null,
                 tripCount: 0,
                 role: m.user_id === groupRow.created_by ? 'admin' : 'member',
@@ -273,6 +253,30 @@ export function GroupChatScreen() {
             }
           : null,
       );
+
+      const memberIds = Array.from(new Set(members.map((m) => m.user_id).concat(rows.map((msg) => msg.sender_id))));
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name, username')
+        .in('id', memberIds);
+      const profileById = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
+
+      setGroup((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          members: current.members.map((member) => {
+            const profile = profileById.get(member.id);
+            const displayName = profile?.full_name?.trim() || profile?.username?.trim() || 'Unknown user';
+            return {
+              ...member,
+              fullName: displayName,
+              username: displayName,
+            };
+          }),
+        };
+      });
+
       setMessages(
         rows.map((msg) => ({
           id: msg.id,
@@ -283,6 +287,7 @@ export function GroupChatScreen() {
           dateLabel: null,
         })),
       );
+      await supabase.from('group_chat_reads').upsert({ group_id: groupId, user_id: currentUserId, last_read_at: new Date().toISOString(), updated_at: new Date().toISOString() }, { onConflict: 'group_id,user_id' });
       setLoading(false);
     };
     void load();
@@ -328,10 +333,6 @@ export function GroupChatScreen() {
     );
   }
 
-  // Header avatar stack
-  const visibleMembers = group?.members.slice(0, 3) ?? [];
-  const extraCount = (group?.members.length ?? 0) - visibleMembers.length;
-
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <KeyboardAvoidingView
@@ -364,21 +365,9 @@ export function GroupChatScreen() {
                 )}
               </View>
 
-              <View style={styles.headerAvatarStack}>
-                {visibleMembers.map((m, i) => (
-                  <View
-                    key={m.id}
-                    style={[styles.headerAvatar, i === 0 && styles.headerAvatarFirst]}>
-                    {m.avatarUrl
-                      ? <Image source={{ uri: m.avatarUrl }} style={styles.headerAvatarImage} />
-                      : <Text style={styles.headerAvatarText}>{initials(m.fullName)}</Text>
-                    }
-                  </View>
-                ))}
-                {extraCount > 0 && (
-                  <Text style={styles.headerMoreText}>+{extraCount}</Text>
-                )}
-              </View>
+              <Text style={styles.headerMembersText} numberOfLines={1}>
+                {`Members: ${group.members.map((m) => m.fullName || m.username || 'Unknown user').join(', ')}`}
+              </Text>
             </>
           )}
         </View>
@@ -409,7 +398,7 @@ export function GroupChatScreen() {
                   )}
                   <View style={[styles.bubbleRow, isMe ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
                     <View style={[styles.bubble, isMe ? styles.bubbleMine : styles.bubbleTheirs]}>
-                      {!isMe && sender ? <Text style={{ fontSize: 11, fontWeight: '700', color: '#4B5563', marginBottom: 2 }}>{sender.username}</Text> : null}
+                      <Pressable onPress={() => { if (!isMe && sender?.id) router.push({ pathname: '/user-profile/[userId]', params: { userId: sender.id } }); }}><Text style={{ fontSize: 11, fontWeight: '700', color: '#4B5563', marginBottom: 2 }}>{isMe ? 'You' : (sender?.fullName || sender?.username || 'Unknown user')}</Text></Pressable>
                       <Text style={[styles.bubbleText, isMe ? styles.bubbleTextMine : styles.bubbleTextTheirs]}>
                         {item.text}
                       </Text>

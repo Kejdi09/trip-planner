@@ -12,6 +12,7 @@ import {
 } from 'react-native-safe-area-context';
 
 import { supabase } from '../../../lib/supabase';
+import { AppLoading } from '@/components/common/AppLoading';
 import { styles } from './profile-screen.styles';
 
 type ProfileActionCardProps = {
@@ -155,6 +156,16 @@ export function ProfileScreen() {
   const username = profile?.username ? `@${profile.username}` : '';
   const memberSince = profile?.created_at ? `Joined ${new Date(profile.created_at).toLocaleDateString()}` : null;
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.screen}>
+          <AppLoading message="Loading your profile..." />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <View style={styles.screen}>
@@ -175,7 +186,6 @@ export function ProfileScreen() {
             <Text style={styles.name}>{displayName}</Text>
             {username ? <Text style={styles.username}>{username}</Text> : null}
             {memberSince ? <Text style={styles.username}>{memberSince}</Text> : null}
-            {loading ? <Text style={styles.username}>Loading profile...</Text> : null}
             {errorMessage ? <Text style={styles.logoutMessage}>{errorMessage}</Text> : null}
 
             <View style={styles.statsRow}>
@@ -194,14 +204,12 @@ export function ProfileScreen() {
           </View>
 
           <View style={styles.cardsSection}>
-            <ProfileActionCard icon={<Feather name="bookmark" size={20} color="#D66BC7" />} title="My Wishlist" subtitle={loading ? 'Loading wishlist...' : `${stats.wishlist} saved place${stats.wishlist === 1 ? '' : 's'}`} onPress={() => router.push('/my-wishlist')} />
-            <ProfileActionCard icon={<Feather name="star" size={20} color="#51C98C" />} title="My Reviews" subtitle={loading ? 'Loading reviews...' : `${stats.reviews} review${stats.reviews === 1 ? '' : 's'} written`} onPress={() => router.push('/my-reviews')} />
-            <ProfileActionCard icon={<Ionicons name="people-outline" size={20} color="#16A6C9" />} title="My Friends" subtitle={loading ? 'Loading friends...' : `${stats.friends} friend${stats.friends === 1 ? '' : 's'}`} onPress={() => router.push('/my-friends')} />
+            <ProfileActionCard icon={<Feather name="bookmark" size={20} color="#D66BC7" />} title="My Wishlist" subtitle={`${stats.wishlist} saved place${stats.wishlist === 1 ? '' : 's'}`} onPress={() => router.push('/my-wishlist')} />
+            <ProfileActionCard icon={<Feather name="star" size={20} color="#51C98C" />} title="My Reviews" subtitle={`${stats.reviews} review${stats.reviews === 1 ? '' : 's'} written`} onPress={() => router.push('/my-reviews')} />
+            <ProfileActionCard icon={<Ionicons name="people-outline" size={20} color="#16A6C9" />} title="My Friends" subtitle={`${stats.friends} friend${stats.friends === 1 ? '' : 's'}`} onPress={() => router.push('/my-friends')} />
           </View>
 
           <View style={styles.settingsSection}>
-            <Text style={styles.settingsHeading}>SETTINGS</Text>
-            <SettingsRow icon={<Ionicons name="notifications-outline" size={20} color="#222222" />} label="Notifications" />
             <SettingsRow icon={<MaterialCommunityIcons name="logout" size={20} color="#222222" />} label="Log out" onPress={handleLogout} />
             {statusMessage ? <Text style={styles.logoutMessage}>{statusMessage}</Text> : null}
           </View>

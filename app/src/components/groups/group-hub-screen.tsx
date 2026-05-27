@@ -6,12 +6,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { deleteGroupApi, fetchMyGroups, getActiveUserId } from '../../../lib/groups-api';
 import { supabase } from '../../../lib/supabase';
+import { AppLoading } from '@/components/common/AppLoading';
 
 export function GroupHubScreen() {
   const { groupId } = useLocalSearchParams<{ groupId?: string }>();
   const [groupName, setGroupName] = React.useState('Your Group');
   const [isCreator, setIsCreator] = React.useState(false);
   const [currentUserId, setCurrentUserId] = React.useState(getActiveUserId());
+  const [loading, setLoading] = React.useState(true);
+  const [unreadCount, setUnreadCount] = React.useState(0);
 
   React.useEffect(() => {
     if (!groupId) return;
@@ -24,11 +27,23 @@ export function GroupHubScreen() {
         const match = groups.find((g) => g.id === groupId);
         if (match?.name) setGroupName(match.name);
         setIsCreator(Boolean(match?.created_by && match.created_by === uid));
+        if (groupId) {
+          const { data: readRow } = await supabase.from('group_chat_reads').select('last_read_at').eq('group_id', groupId).eq('user_id', uid).maybeSingle();
+          let q = supabase.from('messages').select('id', { count: 'exact', head: true }).eq('group_id', groupId).neq('sender_id', uid);
+          if (readRow?.last_read_at) q = q.gt('created_at', readRow.last_read_at);
+          const { count } = await q;
+          setUnreadCount(count ?? 0);
+        }
       } catch {}
+      finally { setLoading(false); }
     })();
   }, [groupId]);
 
   const routeParams = groupId ? { groupId } : undefined;
+
+  if (loading) {
+    return <SafeAreaView style={styles.safeArea}><AppLoading message="Loading group details..." /></SafeAreaView>;
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -45,7 +60,7 @@ export function GroupHubScreen() {
         <View style={styles.grid}>
           <Pressable style={styles.card} onPress={() => router.push({ pathname: '/group-chat', params: routeParams })}>
             <Ionicons name="chatbubbles-outline" size={30} color="#008D9B" />
-            <Text style={styles.cardTitle}>Chat</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Text style={styles.cardTitle}>Chat</Text>{unreadCount > 0 ? <View style={{ backgroundColor: '#EF4444', borderRadius: 999, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 }}><Text style={{ color: '#fff', fontWeight: '700', fontSize: 11 }}>{unreadCount > 99 ? '99+' : unreadCount}</Text></View> : null}</View>
             <Text style={styles.cardSub}>Talk with your group</Text>
           </Pressable>
 

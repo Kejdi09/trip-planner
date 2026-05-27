@@ -16,6 +16,29 @@ function parseLimit(value, fallback = 20, max = 100) {
 module.exports = function reviewsRoutes(supabaseAdmin) {
   const router = express.Router();
 
+  async function createNotification(userId, type, title, body, relatedEntityType = null, relatedEntityId = null) {
+    const { data: existing } = await supabaseAdmin
+      .from('notifications')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('type', type)
+      .eq('related_entity_type', relatedEntityType)
+      .eq('related_entity_id', relatedEntityId)
+      .limit(1);
+    if ((existing || []).length > 0) return;
+    const { error } = await supabaseAdmin.from('notifications').insert({
+      user_id: userId,
+      type,
+      title,
+      body,
+      related_entity_type: relatedEntityType,
+      related_entity_id: relatedEntityId,
+      content: JSON.stringify({ title, body }),
+    });
+    if (error) console.error('Notification insert failed:', error.message);
+  }
+
+
   router.get('/places', async (req, res, next) => {
     try {
       const limit = parseLimit(req.query.limit, 100, 300);
@@ -259,6 +282,30 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
             throw wrapped;
           }
         }
+      }
+
+
+      try {
+        const [{ data: reviewerProfile }, { data: place }, { data: friendships }] = await Promise.all([
+          supabaseAdmin.from('profiles').select('full_name, username').eq('id', userId).maybeSingle(),
+          supabaseAdmin.from('places').select('name, city, country').eq('id', placeId).maybeSingle(),
+          supabaseAdmin.from('friendships').select('requester_id, receiver_id').eq('status', 'accepted').or(`requester_id.eq.${userId},receiver_id.eq.${userId}`),
+        ]);
+
+        const reviewerName = reviewerProfile?.full_name || reviewerProfile?.username || 'Unknown user';
+        const placeName = place?.name || [place?.city, place?.country].filter(Boolean).join(', ') || 'a place';
+
+        const recipients = new Set();
+        for (const row of friendships || []) {
+          const other = row.requester_id === userId ? row.receiver_id : row.requester_id;
+          if (other && other !== userId) recipients.add(other);
+        }
+
+        for (const recipientId of recipients) {
+          await createNotification(recipientId, 'review', `New review from ${reviewerName}`, `${reviewerName} reviewed ${placeName}`, 'review', review.id);
+        }
+      } catch (notifyError) {
+        console.error('Review notification fanout failed:', notifyError?.message || notifyError);
       }
 
       return res.status(201).json(review);

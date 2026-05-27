@@ -1,16 +1,18 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { deleteGroupApi, fetchGroupMembers, fetchMyGroups, getActiveUserId, GroupRow } from '../../../lib/groups-api';
 import { supabase } from '../../../lib/supabase';
+import { AppLoading } from '@/components/common/AppLoading';
 import { COLORS, groupsStyles as styles } from './groups-screen.styles';
 
 type GroupMember = { id: string; fullName: string; avatarUrl: string | null; role: 'admin' | 'member' };
 type GroupStatus = 'active' | 'upcoming' | 'completed';
 type Group = {
+  unreadCount?: number;
   id: string;
   name: string;
   adminId: string;
@@ -31,47 +33,6 @@ function mapStatus(row: GroupRow): GroupStatus {
 }
 
 // ---------------------------------------------------------------------------
-// Avatar helpers
-// ---------------------------------------------------------------------------
-
-function MemberAvatar({
-  member,
-  size = 32,
-  first = false,
-  borderColor = COLORS.activeCardBackground,
-}: {
-  member: GroupMember;
-  size?: number;
-  first?: boolean;
-  borderColor?: string;
-}) {
-  const initials = member.fullName
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-
-  return (
-    <View
-      style={[
-        styles.memberAvatar,
-        first && styles.memberAvatarFirst,
-        { width: size, height: size, borderRadius: size / 2, borderColor },
-      ]}>
-      {member.avatarUrl ? (
-        <Image
-          source={{ uri: member.avatarUrl }}
-          style={[styles.memberAvatarImage, { width: size, height: size, borderRadius: size / 2 }]}
-        />
-      ) : (
-        <Text style={[styles.memberAvatarText, { fontSize: size * 0.34 }]}>{initials}</Text>
-      )}
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Active group card
 // ---------------------------------------------------------------------------
 
@@ -80,17 +41,23 @@ function ActiveGroupCard({ group, onInvite, onPress, onPressVoting, onDelete, ca
   const adminLabel = adminMember
     ? adminMember.id === currentUserId
       ? 'Admin: You'
-      : `Admin: ${adminMember.fullName.split(' ')[0]} ${adminMember.fullName.split(' ')[1]?.[0] ?? ''}.`
-    : '';
+      : `Admin: ${adminMember.fullName || 'Unknown user'}`
+    : 'Admin: Unknown user';
 
-  const visibleMembers = group.members.slice(0, 3);
-  const extraCount = group.members.length - visibleMembers.length;
+  const memberNames = group.members.map((m) => m.fullName || 'Unknown user').join(', ');
 
   return (
     <View style={{ position: 'relative' }}>
     <Pressable style={styles.activeCard} onPress={onPress}>
       <View style={styles.activeCardTopRow}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+        {group.unreadCount && group.unreadCount > 0 ? (
+          <View style={{ backgroundColor: '#EF4444', borderRadius: 999, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, marginRight: 6 }}>
+            <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '700' }}>{group.unreadCount > 99 ? '99+' : group.unreadCount}</Text>
+          </View>
+        ) : null}
         <Text style={styles.activeCardName}>{group.name}</Text>
+        </View>
         {group.votingOpen && (
           <Pressable style={styles.votingBadge} onPress={onPressVoting}>
             <Text style={styles.votingBadgeText}>{'Voting\nOpen'}</Text>
@@ -101,14 +68,7 @@ function ActiveGroupCard({ group, onInvite, onPress, onPressVoting, onDelete, ca
       <Text style={styles.adminText}>{adminLabel}</Text>
 
       <View style={styles.memberRow}>
-        <View style={styles.avatarStack}>
-          {visibleMembers.map((m, i) => (
-            <MemberAvatar key={m.id} member={m} first={i === 0} />
-          ))}
-        </View>
-        {extraCount > 0 && (
-          <Text style={styles.moreText}>+{extraCount}</Text>
-        )}
+        <Text style={styles.memberNamesText} numberOfLines={1}>{`Members: ${memberNames}`}</Text>
         <Pressable style={styles.inviteButton} onPress={onInvite}>
           <Text style={styles.inviteButtonText}>Invite</Text>
         </Pressable>
@@ -247,17 +207,27 @@ export function GroupsScreen() {
         const mapped = await Promise.all(
           rows.map(async (row) => {
             const { members } = await fetchGroupMembers(row.id);
+            const memberIds = members.map((m) => m.user_id);
+            const { data: profiles } = await supabase.from('profiles').select('id, full_name, username').in('id', memberIds);
+            const profileById = new Map((profiles ?? []).map((profile) => [profile.id, profile]));
+            const { data: readRow } = await supabase.from('group_chat_reads').select('last_read_at').eq('group_id', row.id).eq('user_id', currentUserId).maybeSingle();
+            let unreadCount = 0;
+            let msgQuery = supabase.from('messages').select('id', { count: 'exact', head: true }).eq('group_id', row.id).neq('sender_id', currentUserId);
+            if (readRow?.last_read_at) msgQuery = msgQuery.gt('created_at', readRow.last_read_at);
+            const { count: unread } = await msgQuery;
+            unreadCount = unread ?? 0;
             return {
               id: row.id,
               name: row.name ?? 'Untitled Group',
               adminId: row.created_by ?? '',
-              members: members.map((m) => ({ id: m.user_id, fullName: `Member ${m.user_id.slice(0, 4)}`, avatarUrl: null, role: m.user_id === row.created_by ? 'admin' : 'member' })),
+              members: members.map((m) => ({ id: m.user_id, fullName: profileById.get(m.user_id)?.full_name?.trim() || profileById.get(m.user_id)?.username?.trim() || 'Unknown user', avatarUrl: null, role: m.user_id === row.created_by ? 'admin' : 'member' })),
               status: mapStatus(row),
               votingOpen: row.status === 'planning',
               places: [],
               dateRange: row.start_date && row.end_date ? `${row.start_date} - ${row.end_date}` : null,
               budgetRange: row.min_budget != null && row.max_budget != null ? `$${row.min_budget}-$${row.max_budget}` : null,
               destination: null,
+              unreadCount,
             } as Group;
           }),
         );
@@ -322,7 +292,7 @@ export function GroupsScreen() {
         </View>
 
         {loading ? (
-          <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} />
+          <AppLoading message="Loading your groups..." />
         ) : (
           <ScrollView
             contentContainerStyle={styles.scrollContent}
