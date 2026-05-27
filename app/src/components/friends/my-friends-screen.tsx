@@ -248,8 +248,24 @@ export function MyFriendsScreen() {
   const removeFriend = async (friend: Friend) => {
     if (removingIds.has(friend.id)) return;
     setRemovingIds((prev) => new Set(prev).add(friend.id));
-    const { error } = await supabase.from('friendships').delete().eq('id', friend.friendshipId);
+    const { data, error } = await supabase
+      .from('friendships')
+      .delete()
+      .eq('id', friend.friendshipId)
+      .select('id');
+
     if (error) {
+      console.error('Failed to delete friendship row', {
+        friendId: friend.id,
+        friendshipId: friend.friendshipId,
+        error,
+      });
+      Alert.alert('Could not remove friend', 'Please try again.');
+    } else if (!data || data.length === 0) {
+      console.error('Delete matched zero friendship rows', {
+        friendId: friend.id,
+        friendshipId: friend.friendshipId,
+      });
       Alert.alert('Could not remove friend', 'Please try again.');
     } else {
       setFriends((prev) => prev.filter((f) => f.id !== friend.id));
