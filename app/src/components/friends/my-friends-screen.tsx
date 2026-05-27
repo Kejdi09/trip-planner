@@ -6,6 +6,7 @@ import {
   Alert,
   Dimensions,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,7 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../../lib/supabase';
 import { AppLoading } from '@/components/common/AppLoading';
 
-type Friend = { id: string; fullName: string; username: string; avatarUrl: string | null; tripCount: number };
+type Friend = { id: string; friendshipId: string; fullName: string; username: string; avatarUrl: string | null; tripCount: number };
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TYPE_SCALE = Math.min(Math.max(SCREEN_WIDTH / 390, 0.9), 1.08);
@@ -203,7 +204,11 @@ export function MyFriendsScreen() {
           .eq('status', 'accepted')
           .or(`requester_id.eq.${me},receiver_id.eq.${me}`);
 
-        const friendIds = (rows ?? []).map((r) => (r.requester_id === me ? r.receiver_id : r.requester_id));
+        const friendships = (rows ?? []).map((r) => ({
+          friendshipId: r.id,
+          profileId: r.requester_id === me ? r.receiver_id : r.requester_id,
+        }));
+        const friendIds = friendships.map((f) => f.profileId);
         if (friendIds.length === 0) {
           setFriends([]);
           return;
@@ -214,13 +219,15 @@ export function MyFriendsScreen() {
           .select('id, full_name, username, avatar_url')
           .in('id', friendIds);
 
+        const friendshipIdByProfileId = new Map(friendships.map((f) => [f.profileId, f.friendshipId]));
         setFriends((profiles ?? []).map((p) => ({
           id: p.id,
+          friendshipId: friendshipIdByProfileId.get(p.id) ?? '',
           fullName: p.full_name ?? p.username ?? 'User',
           username: p.username ?? 'user',
           avatarUrl: p.avatar_url ?? null,
           tripCount: 0,
-        })));
+        })).filter((friend) => friend.friendshipId));
       } finally {
         setLoading(false);
       }
@@ -238,38 +245,31 @@ export function MyFriendsScreen() {
   // Top 3 by tripCount
   const topFriends = [...friends].sort((a, b) => b.tripCount - a.tripCount).slice(0, 3);
 
+  const removeFriend = async (friend: Friend) => {
+    if (removingIds.has(friend.id)) return;
+    setRemovingIds((prev) => new Set(prev).add(friend.id));
+    const { error } = await supabase.from('friendships').delete().eq('id', friend.friendshipId);
+    if (error) {
+      Alert.alert('Could not remove friend', 'Please try again.');
+    } else {
+      setFriends((prev) => prev.filter((f) => f.id !== friend.id));
+    }
+    setRemovingIds((prev) => { const n = new Set(prev); n.delete(friend.id); return n; });
+  };
+
   const handleRemove = (friend: Friend) => {
+    if (Platform.OS === 'web') {
+      const confirmed = globalThis.confirm?.(`Remove ${friend.fullName} as a friend?`) ?? false;
+      if (confirmed) void removeFriend(friend);
+      return;
+    }
+
     Alert.alert(
       'Remove Friend',
       `Remove ${friend.fullName} as a friend?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            console.log('remove friend confirmed', friend.id);
-            setRemovingIds((prev) => new Set(prev).add(friend.id));
-            const { data: auth } = await supabase.auth.getUser();
-            const me = auth.user?.id;
-            if (!me) {
-              Alert.alert('Could not remove friend', 'Please log in again.');
-              setRemovingIds((prev) => { const n = new Set(prev); n.delete(friend.id); return n; });
-              return;
-            }
-            const { error } = await supabase
-              .from('friendships')
-              .delete()
-              .or(`and(requester_id.eq.${me},receiver_id.eq.${friend.id}),and(requester_id.eq.${friend.id},receiver_id.eq.${me})`);
-            if (error) {
-              Alert.alert('Could not remove friend', 'Please try again.');
-            } else {
-              setFriends((prev) => prev.filter((f) => f.id !== friend.id));
-              console.log('friend removed successfully');
-            }
-            setRemovingIds((prev) => { const n = new Set(prev); n.delete(friend.id); return n; });
-          },
-        },
+        { text: 'Remove', style: 'destructive', onPress: () => { void removeFriend(friend); } },
       ],
     );
   };
@@ -353,10 +353,11 @@ export function MyFriendsScreen() {
                     <ActivityIndicator size="small" color={C.primary} />
                   ) : (
                     <Pressable
-                      style={[styles.removeButton, { zIndex: 10, elevation: 10 }]}
-                      onPress={(event) => { console.log('remove friend pressed', friend.id); event.stopPropagation?.(); handleRemove(friend); }}
+                      style={styles.removeButton}
+                      onPress={(event) => { event.stopPropagation?.(); handleRemove(friend); }}
                       accessibilityRole="button"
                       accessibilityLabel={`Remove ${friend.fullName}`}
+                      disabled={removingIds.has(friend.id)}
                       hitSlop={10}>
                       <Feather name="x" size={16} color={C.removeIcon} />
                     </Pressable>
