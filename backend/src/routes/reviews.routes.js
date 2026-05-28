@@ -3,6 +3,7 @@ const { fetchPexelsImageForPlace, hasPexelsApiKey } = require('../lib/place-imag
 const { deepseekApiKey } = require('../config');
 const { callDeepSeekChat } = require('../services/deepseek');
 const { ensureGroupDestinationPlace } = require('../services/destinations');
+const { createNotificationService } = require('../services/notifications');
 
 
 const CONTINENT_COUNTRY_CODES = {
@@ -197,27 +198,8 @@ async function generatePlaceOverview(place) {
 module.exports = function reviewsRoutes(supabaseAdmin) {
   const router = express.Router();
 
-  async function createNotification(userId, type, title, body, relatedEntityType = null, relatedEntityId = null) {
-    const { data: existing } = await supabaseAdmin
-      .from('notifications')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('type', type)
-      .eq('related_entity_type', relatedEntityType)
-      .eq('related_entity_id', relatedEntityId)
-      .limit(1);
-    if ((existing || []).length > 0) return;
-    const { error } = await supabaseAdmin.from('notifications').insert({
-      user_id: userId,
-      type,
-      title,
-      body,
-      related_entity_type: relatedEntityType,
-      related_entity_id: relatedEntityId,
-      content: JSON.stringify({ title, body }),
-    });
-    if (error) console.error('Notification insert failed:', error.message);
-  }
+  const { createNotification } = createNotificationService(supabaseAdmin);
+
 
 
 
@@ -883,7 +865,14 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
         }
 
         for (const recipientId of recipients) {
-          await createNotification(recipientId, 'review', `New review from ${reviewerName}`, `${reviewerName} reviewed ${placeName}`, 'review', review.id);
+          await createNotification({
+            userId: recipientId,
+            type: 'review',
+            title: `${reviewerName} left a review`,
+            body: `Take a look at their review of ${placeName}.`,
+            relatedEntityType: 'review',
+            relatedEntityId: review.id,
+          });
         }
       } catch (notifyError) {
         console.error('Review notification fanout failed:', notifyError?.message || notifyError);

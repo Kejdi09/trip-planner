@@ -1,3 +1,4 @@
+import { createAppNotification } from '../../../lib/notifications-api';
 import { supabase } from '../../../lib/supabase';
 
 export type FriendRequest = {
@@ -18,27 +19,18 @@ export type UserSearchResult = {
 
 
 async function createNotification(userId: string, type: string, title: string, body: string, relatedEntityType?: string, relatedEntityId?: string) {
-  const payload = {
-    user_id: userId,
-    type,
-    title,
-    body,
-    related_entity_type: relatedEntityType ?? null,
-    related_entity_id: relatedEntityId ?? null,
-    content: JSON.stringify({ title, body }),
-  };
-
-  const { data: existing } = await supabase
-    .from('notifications')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('type', type)
-    .eq('related_entity_type', relatedEntityType ?? null)
-    .eq('related_entity_id', relatedEntityId ?? null)
-    .limit(1);
-
-  if ((existing ?? []).length > 0) return;
-  await supabase.from('notifications').insert(payload);
+  try {
+    await createAppNotification({
+      userId,
+      type,
+      title,
+      body,
+      relatedEntityType: relatedEntityType ?? null,
+      relatedEntityId: relatedEntityId ?? null,
+    });
+  } catch (error) {
+    console.warn('Failed to create notification:', error);
+  }
 }
 
 async function currentUserId() {

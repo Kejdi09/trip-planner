@@ -1,6 +1,7 @@
 const express = require('express');
 const { assertUuid, makeError } = require('../utils/http');
 const { resolveDestinationPlaceIdFromName, ensureGroupDestinationPlace } = require('../services/destinations');
+const { createNotificationService, shortPreview } = require('../services/notifications');
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -18,32 +19,8 @@ function parseLimit(value, fallback = 30, max = 100) {
 module.exports = function groupsRoutes(supabaseAdmin) {
   const router = express.Router();
 
-  async function createNotification(userId, type, title, body, relatedEntityType = null, relatedEntityId = null) {
-    const { data: existing } = await supabaseAdmin
-      .from('notifications')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('type', type)
-      .eq('related_entity_type', relatedEntityType)
-      .eq('related_entity_id', relatedEntityId)
-      .limit(1);
+  const { createNotification, notifyAcceptedFriends } = createNotificationService(supabaseAdmin);
 
-    if ((existing || []).length > 0) return;
-
-    const { error } = await supabaseAdmin.from('notifications').insert({
-      user_id: userId,
-      type,
-      title,
-      body,
-      related_entity_type: relatedEntityType,
-      related_entity_id: relatedEntityId,
-      content: JSON.stringify({ title, body }),
-    });
-    if (error) {
-      const wrapped = makeError(error.message || 'Failed to create notification.', 502, 'UPSTREAM_ERROR');
-      throw wrapped;
-    }
-  }
 
   async function getGroup(groupId) {
     const { data, error } = await supabaseAdmin
@@ -265,6 +242,27 @@ module.exports = function groupsRoutes(supabaseAdmin) {
         throw wrapped;
       }
 
+      if (destinationPlaceId) {
+        try {
+          const [{ data: creator }, { data: place }] = await Promise.all([
+            supabaseAdmin.from('profiles').select('full_name, username').eq('id', createdBy).maybeSingle(),
+            supabaseAdmin.from('places').select('name, city, country').eq('id', destinationPlaceId).maybeSingle(),
+          ]);
+          const actorName = creator?.full_name || creator?.username || 'A friend';
+          const placeName = place?.name || place?.city || name;
+          await notifyAcceptedFriends({
+            actorId: createdBy,
+            type: 'planned',
+            title: `${actorName} is planning a trip`,
+            body: `${actorName} started planning a trip to ${placeName}.`,
+            relatedEntityType: 'group',
+            relatedEntityId: group.id,
+          });
+        } catch (notifyError) {
+          console.error('Planned trip notification fanout failed:', notifyError?.message || notifyError);
+        }
+      }
+
       return res.status(201).json(group);
     } catch (error) {
       return next(error);
@@ -414,13 +412,27 @@ module.exports = function groupsRoutes(supabaseAdmin) {
         throw wrapped;
       }
 
-      const [{ data: actorProfile }, { data: groupRow }] = await Promise.all([
+      const [{ data: actorProfile }, { data: newMemberProfile }, { data: groupRow }] = await Promise.all([
         supabaseAdmin.from('profiles').select('full_name, username').eq('id', actorId).maybeSingle(),
+        supabaseAdmin.from('profiles').select('full_name, username').eq('id', newUserId).maybeSingle(),
         supabaseAdmin.from('groups').select('name').eq('id', groupId).maybeSingle(),
       ]);
       const actorName = actorProfile?.full_name || actorProfile?.username || 'Unknown user';
+      const newMemberName = newMemberProfile?.full_name || newMemberProfile?.username || actorName;
       const groupName = groupRow?.name || 'your group';
-      await createNotification(newUserId, 'group_invite', 'New group invite', `${actorName} invited you to ${groupName}`, 'group', groupId);
+      await createNotification({ userId: newUserId, type: 'group_invite', title: 'New group trip', body: `${actorName} added you to ${groupName}.`, relatedEntityType: 'group', relatedEntityId: groupId });
+      const { data: existingMembers } = await supabaseAdmin.from('group_members').select('user_id').eq('group_id', groupId);
+      await Promise.all((existingMembers || [])
+        .map((member) => member.user_id)
+        .filter((recipientId) => recipientId && recipientId !== newUserId)
+        .map((recipientId) => createNotification({
+          userId: recipientId,
+          type: 'group_joined',
+          title: `${newMemberName} joined the trip`,
+          body: `${newMemberName} joined ${groupName}.`,
+          relatedEntityType: 'group_member',
+          relatedEntityId: data.id,
+        })));
       return res.status(201).json(data);
     } catch (error) {
       return next(error);
@@ -534,7 +546,7 @@ module.exports = function groupsRoutes(supabaseAdmin) {
       const preview = content.length > 80 ? `${content.slice(0, 77)}...` : content;
       for (const member of members || []) {
         if (!member?.user_id || member.user_id === userId) continue;
-        await createNotification(member.user_id, 'group_chat_message', chatGroupName, `${senderName}: ${preview}`, 'group_message', data.id);
+        await createNotification({ userId: member.user_id, type: 'group_chat_message', title: `New message in ${chatGroupName}`, body: `${senderName}: ${preview}`, relatedEntityType: 'group_message', relatedEntityId: data.id });
       }
 
       return res.status(201).json(data);
@@ -614,7 +626,7 @@ module.exports = function groupsRoutes(supabaseAdmin) {
         .eq('group_id', groupId);
       const recipients = (members || []).map((m) => m.user_id).filter(Boolean);
       await Promise.all(recipients.map((recipientId) =>
-        createNotification(recipientId, 'itinerary_update', JSON.stringify({ deepLink: `/itinerary?groupId=${groupId}`, groupId, itemId: data.id })),
+        createNotification({ userId: recipientId, type: 'itinerary_update', title: 'Trip itinerary updated', body: shortPreview(title || 'A trip item was added.'), relatedEntityType: 'itinerary_item', relatedEntityId: data.id, push: false }),
       ));
 
       return res.status(201).json(data);
