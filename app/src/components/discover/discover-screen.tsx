@@ -8,7 +8,7 @@ import { FilterSheet } from '@/components/ui/filter-sheet';
 import { PlaceListSection } from '@/components/ui/place-list-section';
 import { SearchHeader } from '@/components/ui/search-header';
 import { StatusMessage } from '@/components/ui/status-message';
-import type { FilterGroup, FilterOption } from '@/components/ui/types';
+import type { FilterGroup } from '@/components/ui/types';
 import type { DiscoverPlace } from '../../../lib/discover-api';
 import { fetchDiscoverPlaces } from '../../../lib/discover-api';
 import { supabase } from '../../../lib/supabase';
@@ -19,63 +19,108 @@ import {
 } from '../../../lib/wishlist-api';
 import { styles } from './discover-screen.styles';
 
-function buildCountryFilterGroups(options: FilterOption[]): FilterGroup[] {
-  return [{ id: 'country', title: 'Country', options, layout: 'wrap' }];
-}
-
 const PAGE_SIZE = 10;
+
+type SortOption = 'relevance' | 'population' | 'name';
+
+type DiscoverFilters = {
+  countryCode: string | null;
+  minPopulation: number | null;
+  sort: SortOption;
+};
+
+const POPULATION_OPTIONS: { id: string; label: string; value: number | null }[] = [
+  { id: 'pop:any', label: 'Any size', value: null },
+  { id: 'pop:50000', label: '50k+', value: 50000 },
+  { id: 'pop:100000', label: '100k+', value: 100000 },
+  { id: 'pop:500000', label: '500k+', value: 500000 },
+  { id: 'pop:1000000', label: '1M+', value: 1000000 },
+];
+
+const SORT_OPTIONS: { id: string; label: string; value: SortOption }[] = [
+  { id: 'sort:relevance', label: 'Best match', value: 'relevance' },
+  { id: 'sort:population', label: 'Biggest cities', value: 'population' },
+  { id: 'sort:name', label: 'A-Z', value: 'name' },
+];
 
 export function DiscoverScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [isFilterOpen, setIsFilterOpen] = React.useState(false);
-  const [selectedFilters, setSelectedFilters] = React.useState<string[]>([]);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [userId, setUserId] = React.useState<string | null>(null);
   const [savedPlaceIds, setSavedPlaceIds] = React.useState<string[]>([]);
   const [places, setPlaces] = React.useState<DiscoverPlace[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
-  const [visibleCount, setVisibleCount] = React.useState(PAGE_SIZE);
+  const [hasMore, setHasMore] = React.useState(true);
 
-  const countryOptions = React.useMemo<FilterOption[]>(() => {
-    const countryMap = new Map<string, string>();
+  const [isFilterOpen, setIsFilterOpen] = React.useState(false);
+  const [filters, setFilters] = React.useState<DiscoverFilters>({ countryCode: null, minPopulation: null, sort: 'relevance' });
+  const [draftFilters, setDraftFilters] = React.useState<DiscoverFilters>(filters);
+
+  const countryOptions = React.useMemo(() => {
+    const map = new Map<string, string>();
     places.forEach((place) => {
-      const country = place.country?.trim();
-      if (!country) return;
-      const key = country.toLowerCase();
-      if (!countryMap.has(key)) countryMap.set(key, country);
+      if (place.countryCode && place.country) map.set(place.countryCode, place.country);
     });
-    return Array.from(countryMap.entries())
-      .map(([id, label]) => ({ id, label }))
-      .sort((a, b) => a.label.localeCompare(b.label));
+    return Array.from(map.entries())
+      .sort((a, b) => a[1].localeCompare(b[1]))
+      .map(([code, name]) => ({ id: `country:${code}`, label: `${name} (${code})`, code }));
   }, [places]);
 
-  const filterGroups = React.useMemo(
-    () => buildCountryFilterGroups(countryOptions),
-    [countryOptions],
-  );
+  const filterGroups = React.useMemo<FilterGroup[]>(() => {
+    const countryGroup: FilterGroup = {
+      id: 'country',
+      title: 'Country',
+      options: [{ id: 'country:any', label: 'Any country' }, ...countryOptions.map((c) => ({ id: c.id, label: c.label }))],
+      layout: 'wrap',
+    };
+
+    return [
+      countryGroup,
+      { id: 'population', title: 'City size', options: POPULATION_OPTIONS.map((x) => ({ id: x.id, label: x.label })), layout: 'wrap' },
+      { id: 'sort', title: 'Sort', options: SORT_OPTIONS.map((x) => ({ id: x.id, label: x.label })), layout: 'wrap' },
+    ];
+  }, [countryOptions]);
+
+  const draftSelectedFilterIds = React.useMemo(() => [
+    draftFilters.countryCode ? `country:${draftFilters.countryCode}` : 'country:any',
+    draftFilters.minPopulation === null ? 'pop:any' : `pop:${draftFilters.minPopulation}`,
+    `sort:${draftFilters.sort}`,
+  ], [draftFilters]);
+
+  const loadPlaces = React.useCallback(async (query: string, offset: number, append: boolean, nextFilters: DiscoverFilters) => {
+    if (append) setIsLoadingMore(true);
+    else setIsLoading(true);
+    setErrorMessage(null);
+    try {
+      const placeRows = await fetchDiscoverPlaces({
+        query,
+        limit: PAGE_SIZE,
+        offset,
+        countryCode: nextFilters.countryCode,
+        minPopulation: nextFilters.minPopulation,
+        sort: nextFilters.sort,
+      });
+      setPlaces((prev) => (append ? [...prev, ...placeRows] : placeRows));
+      setHasMore(placeRows.length === PAGE_SIZE);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to load destinations.';
+      setErrorMessage(message);
+      if (!append) setPlaces([]);
+    } finally {
+      if (append) setIsLoadingMore(false);
+      else setIsLoading(false);
+    }
+  }, []);
 
   React.useEffect(() => {
-    let isMounted = true;
-    const loadPlaces = async () => {
-      setIsLoading(true);
-      setErrorMessage(null);
-      try {
-        const placeRows = await fetchDiscoverPlaces();
-        if (!isMounted) return;
-        setPlaces(placeRows);
-      } catch (error) {
-        if (!isMounted) return;
-        const message = error instanceof Error ? error.message : 'Unable to load destinations.';
-        setErrorMessage(message);
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    };
-    void loadPlaces();
-    return () => { isMounted = false; };
-  }, []);
+    const timer = setTimeout(() => {
+      void loadPlaces(searchQuery.trim(), 0, false, filters);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, filters, loadPlaces]);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -102,30 +147,6 @@ export function DiscoverScreen() {
     void loadWishlist();
     return () => { isMounted = false; };
   }, []);
-
-  const filteredPlaces = React.useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    const activeCountries = selectedFilters;
-    return places.filter((place) => {
-      const matchesSearch = !query
-        ? true
-        : `${place.title} ${place.region} ${place.visited}`.toLowerCase().includes(query);
-      const placeCountry = place.country?.toLowerCase() ?? '';
-      const matchesCountry =
-        activeCountries.length === 0 || (placeCountry && activeCountries.includes(placeCountry));
-      return matchesSearch && matchesCountry;
-    });
-  }, [places, searchQuery, selectedFilters]);
-
-  React.useEffect(() => {
-    setVisibleCount(Math.min(PAGE_SIZE, filteredPlaces.length));
-  }, [filteredPlaces]);
-
-  const toggleFilter = (filterId: string) => {
-    setSelectedFilters((current) =>
-      current.includes(filterId) ? current.filter((id) => id !== filterId) : [...current, filterId],
-    );
-  };
 
   const toggleSavedPlace = async (placeId: string) => {
     if (!userId) {
@@ -158,23 +179,47 @@ export function DiscoverScreen() {
     router.push({ pathname: '/write-review', params: { id: place.id } });
   };
 
-  const visiblePlaces = filteredPlaces.slice(0, visibleCount);
-  const remainingPlaces = Math.max(filteredPlaces.length - visibleCount, 0);
-  const canLoadMore = remainingPlaces > 0;
-
   const handleLoadMore = () => {
-    setVisibleCount((current) => Math.min(current + PAGE_SIZE, filteredPlaces.length));
+    if (isLoadingMore || !hasMore) return;
+    void loadPlaces(searchQuery.trim(), places.length, true, filters);
   };
 
   const statusMessage = isLoading ? 'Loading destinations...' : errorMessage;
   const showStatusMessage = Boolean(statusMessage);
 
-  // BATCH 1: active filter count for badge
-  const activeFilterCount = selectedFilters.length;
+  const activeFilterCount = [filters.countryCode !== null, filters.minPopulation !== null, filters.sort !== 'relevance'].filter(Boolean).length;
 
-  // BATCH 1: no results but data exists
   const showEmptySearch =
-    !isLoading && !errorMessage && filteredPlaces.length === 0 && places.length > 0;
+    !isLoading && !errorMessage && places.length === 0;
+
+  const onToggleDraftFilter = (filterId: string) => {
+    if (filterId.startsWith('country:')) {
+      const code = filterId.split(':')[1];
+      setDraftFilters((prev) => ({ ...prev, countryCode: code === 'any' ? null : code }));
+      return;
+    }
+    if (filterId.startsWith('pop:')) {
+      const raw = filterId.split(':')[1];
+      setDraftFilters((prev) => ({ ...prev, minPopulation: raw === 'any' ? null : Number(raw) }));
+      return;
+    }
+    if (filterId.startsWith('sort:')) {
+      const raw = filterId.split(':')[1] as SortOption;
+      setDraftFilters((prev) => ({ ...prev, sort: raw }));
+    }
+  };
+
+  const applyFilters = () => {
+    setFilters(draftFilters);
+    setIsFilterOpen(false);
+  };
+
+  const clearFilters = () => {
+    const reset: DiscoverFilters = { countryCode: null, minPopulation: null, sort: 'relevance' };
+    setDraftFilters(reset);
+    setFilters(reset);
+    setIsFilterOpen(false);
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -185,7 +230,7 @@ export function DiscoverScreen() {
           onChangeSearchQuery={setSearchQuery}
           searchPlaceholder="Search destinations..."
           activeFilterCount={activeFilterCount}
-          onPressFilter={() => setIsFilterOpen((current) => !current)}
+          onPressFilter={() => { setDraftFilters(filters); setIsFilterOpen(true); }}
         />
 
         <View style={styles.contentArea}>
@@ -193,28 +238,25 @@ export function DiscoverScreen() {
             style={styles.scrollArea}
             contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 124 }]}
             showsVerticalScrollIndicator={false}
-            scrollEnabled={!isFilterOpen}>
+            scrollEnabled>
 
             {isLoading ? (
               <AppLoading message="Loading destinations..." />
             ) : showStatusMessage ? (
               <StatusMessage message={statusMessage!} style={styles.statusMessage} />
             ) : showEmptySearch ? (
-              // BATCH 1: Empty search state
               <View style={emptyStyles.container}>
                 <Text style={emptyStyles.emoji}>🔍</Text>
                 <Text style={emptyStyles.title}>
-                  {searchQuery.trim() ? `No results for "${searchQuery.trim()}"` : 'No destinations match'}
+                  {searchQuery.trim() ? `No destinations found for "${searchQuery.trim()}"` : 'No destinations found'}
                 </Text>
                 <Text style={emptyStyles.body}>
-                  {activeFilterCount > 0
-                    ? 'Try removing some filters or clearing your search.'
-                    : 'Try a different search term.'}
+                  No destinations found. Try clearing filters or changing your search.
                 </Text>
                 {(searchQuery.trim() || activeFilterCount > 0) ? (
                   <Text
                     style={emptyStyles.clearLink}
-                    onPress={() => { setSearchQuery(''); setSelectedFilters([]); }}>
+                    onPress={() => { setSearchQuery(''); clearFilters(); }}>
                     Clear search & filters
                   </Text>
                 ) : null}
@@ -223,17 +265,17 @@ export function DiscoverScreen() {
               <View>
                 <PlaceListSection
                   title="Popular Places"
-                  places={visiblePlaces}
+                  places={places}
                   savedPlaceIds={savedPlaceIds}
                   searchQuery={searchQuery}
                   onToggleSavedPlace={toggleSavedPlace}
                   onPressPlaceDetails={handlePressPlaceDetails}
                   onPressAddPlace={handlePressAddPlace}
                 />
-                {canLoadMore ? (
+                {hasMore ? (
                   <View style={styles.loadMoreWrapper}>
-                    <Pressable style={styles.loadMoreButton} onPress={handleLoadMore}>
-                      <Text style={styles.loadMoreText}>Load more ({remainingPlaces})</Text>
+                    <Pressable style={styles.loadMoreButton} onPress={handleLoadMore} disabled={isLoadingMore}>
+                      <Text style={styles.loadMoreText}>{isLoadingMore ? 'Loading...' : 'Load more'}</Text>
                     </Pressable>
                   </View>
                 ) : null}
@@ -244,10 +286,10 @@ export function DiscoverScreen() {
           <FilterSheet
             isOpen={isFilterOpen}
             groups={filterGroups}
-            selectedFilters={selectedFilters}
-            onToggleFilter={toggleFilter}
-            onApplyFilters={() => setIsFilterOpen(false)}
-            onClearFilters={() => setSelectedFilters([])}
+            selectedFilters={draftSelectedFilterIds}
+            onToggleFilter={onToggleDraftFilter}
+            onApplyFilters={applyFilters}
+            onClearFilters={clearFilters}
           />
         </View>
       </View>

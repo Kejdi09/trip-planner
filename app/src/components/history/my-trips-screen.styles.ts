@@ -4,13 +4,18 @@ import { C, rs } from './theme';
 export const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: C.bg },
   screen: { flex: 1, backgroundColor: C.bg },
+  pageContainer: {
+    width: '100%',
+    maxWidth: 1120,
+    alignSelf: 'center',
+    flex: 1,
+  },
 
-  // ── Header ──────────────────────────────────────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: rs(24),
-    paddingTop: rs(16),
+    paddingTop: rs(18),
     paddingBottom: rs(14),
     gap: rs(12),
   },
@@ -23,152 +28,139 @@ export const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: {
+    fontSize: rs(24),
+    fontWeight: '700',
+    color: C.text,
+    letterSpacing: -0.4,
+  },
+  subtitle: {
+    marginTop: rs(2),
+    fontSize: rs(13),
+    color: C.muted,
+    fontWeight: '500',
+  },
+
+  scrollContent: {
+    paddingTop: rs(8),
+    paddingHorizontal: rs(24),
+    gap: rs(14),
+  },
+  errorMessage: {
+    color: '#BE123C',
+    marginBottom: rs(4),
+  },
+
+  summaryCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: rs(20),
+    borderWidth: 1,
+    borderColor: '#E4EEF3',
+    padding: rs(16),
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
+  },
+  summaryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: rs(10),
+    marginTop: rs(12),
+  },
+  summaryTile: {
+    flexGrow: 1,
+    minWidth: rs(140),
+    backgroundColor: '#F5FAFC',
+    borderRadius: rs(14),
+    borderWidth: 1,
+    borderColor: '#DCEAF1',
+    paddingVertical: rs(12),
+    paddingHorizontal: rs(12),
+  },
+  summaryTileIcon: { marginBottom: rs(6) },
+  summaryTileValue: {
     fontSize: rs(22),
     fontWeight: '700',
     color: C.text,
     letterSpacing: -0.4,
   },
-
-  scrollContent: {
-    paddingBottom: rs(120),
-    paddingTop: rs(8),
+  summaryTileLabel: {
+    marginTop: rs(2),
+    color: C.muted,
+    fontSize: rs(12),
+    fontWeight: '600',
   },
 
-  sectionLabel: {
+  sectionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: rs(20),
+    borderWidth: 1,
+    borderColor: '#E4EEF3',
+    padding: rs(16),
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 1,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: rs(12),
+  },
+  sectionTitle: {
     fontSize: rs(17),
     fontWeight: '700',
     color: C.text,
     letterSpacing: -0.3,
-    paddingHorizontal: rs(24),
+  },
+  sectionCount: {
+    color: '#0F766E',
+    fontSize: rs(12),
+    fontWeight: '700',
+    backgroundColor: '#DCF4F2',
+    borderRadius: rs(999),
+    overflow: 'hidden',
+    paddingHorizontal: rs(10),
+    paddingVertical: rs(5),
+  },
+  emptyMessage: {
+    color: '#64748B',
+    fontSize: rs(13),
     marginBottom: rs(4),
   },
-
-  // ── Timeline list ────────────────────────────────────────────────────────
-  timelineList: {
-    paddingTop: rs(12),
-  },
-  tripRow: {
+  chipsWrap: {
     flexDirection: 'row',
-    paddingHorizontal: rs(24),
-    marginBottom: rs(28),
-  },
-
-  // Left column: dot + line
-  timelineLeft: {
-    width: rs(20),
-    alignItems: 'center',
-    marginRight: rs(14),
-    paddingTop: rs(4),
-  },
-  timelineDot: {
-    width: rs(12),
-    height: rs(12),
-    borderRadius: rs(6),
-  },
-  timelineLine: {
-    flex: 1,
-    width: 2,
-    backgroundColor: '#E8EAED',
-    marginTop: rs(4),
-  },
-
-  // Right column: content
-  tripContent: {
-    flex: 1,
-  },
-  tripDestination: {
-    fontSize: rs(16),
-    fontWeight: '700',
-    color: C.text,
-    letterSpacing: -0.2,
-    marginBottom: rs(2),
-  },
-  tripMeta: {
-    fontSize: rs(13),
-    color: C.muted,
-    fontWeight: '500',
-    marginBottom: rs(10),
-  },
-
-  // Member avatars + photos row
-  tripMediaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
     gap: rs(8),
-    marginBottom: rs(10),
   },
-  memberAvatarGroup: {
-    flexDirection: 'row',
+  countryChip: {
+    backgroundColor: '#D7EDF0',
+    borderRadius: 999,
+    paddingHorizontal: rs(10),
+    paddingVertical: rs(6),
+  },
+  countryChipText: {
+    color: '#0F766E',
+    fontWeight: '700',
+    fontSize: rs(12),
+  },
+
+  mapCard: {
+    marginTop: rs(12),
     alignItems: 'center',
   },
-  memberAvatar: {
-    width: rs(28),
-    height: rs(28),
-    borderRadius: rs(14),
-    backgroundColor: C.primaryLight,
-    borderWidth: 2,
-    borderColor: C.bg,
+  mapFrame: {
+    width: '100%',
+    maxWidth: 1000,
+    aspectRatio: 1000 / 520,
+    borderWidth: 1,
+    borderColor: '#D7EEF0',
+    borderRadius: rs(18),
+    backgroundColor: '#F8FCFF',
     overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: -rs(6),
-  },
-  memberAvatarFirst: { marginLeft: 0 },
-  memberAvatarImage: {
-    width: rs(28),
-    height: rs(28),
-    borderRadius: rs(14),
-  },
-  memberAvatarText: {
-    fontSize: rs(10),
-    fontWeight: '700',
-    color: C.primary,
-  },
-  memberOverflow: {
-    width: rs(28),
-    height: rs(28),
-    borderRadius: rs(14),
-    backgroundColor: C.pillBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: -rs(6),
-    borderWidth: 2,
-    borderColor: C.bg,
-  },
-  memberOverflowText: {
-    fontSize: rs(10),
-    fontWeight: '700',
-    color: C.muted,
-  },
-
-  // Trip photo thumbnails
-  photoStrip: {
-    flexDirection: 'row',
-    gap: rs(6),
-    marginTop: rs(8),
-  },
-  photo: {
-    width: rs(86),
-    height: rs(70),
-    borderRadius: rs(12),
-    backgroundColor: C.pillBg,
-  },
-
-  // ── View all button ──────────────────────────────────────────────────────
-  viewAllButton: {
-    marginHorizontal: rs(24),
-    marginTop: rs(4),
-    height: rs(50),
-    borderRadius: rs(16),
-    borderWidth: 1.5,
-    borderColor: C.cardBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  viewAllText: {
-    fontSize: rs(15),
-    fontWeight: '700',
-    color: C.text,
-    letterSpacing: -0.2,
+    alignSelf: 'center',
   },
 });

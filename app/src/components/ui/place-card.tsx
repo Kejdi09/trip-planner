@@ -55,7 +55,19 @@ export function PlaceCard({
   return (
     <Pressable style={styles.card} onPress={handleCardPress}>
       <View style={styles.imageWrapper}>
-        <Image source={{ uri: place.image }} style={styles.cardImage} />
+        {place.image ? (
+          <Image source={{ uri: place.image }} style={styles.cardImage} />
+        ) : (
+          <View style={styles.imagePlaceholder}>
+            <Feather name="map-pin" size={26} color="#0F766E" />
+            <Text style={styles.imagePlaceholderText} numberOfLines={2}>
+              {place.title}
+            </Text>
+            <Text style={styles.imagePlaceholderSubtext} numberOfLines={1}>
+              {place.region}
+            </Text>
+          </View>
+        )}
         <View style={styles.ratingPill}>
           <View style={styles.ratingIconWrap}>
             <Ionicons name="star" size={12} color="#F4B400" />
@@ -102,6 +114,27 @@ const styles = StyleSheet.create({
   cardImage: {
     width: '100%',
     height: 190,
+  },
+  imagePlaceholder: {
+    width: '100%',
+    height: 190,
+    backgroundColor: '#E8F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing,
+    paddingHorizontal: spacing * 2,
+  },
+  imagePlaceholderText: {
+    color: '#134E4A',
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  imagePlaceholderSubtext: {
+    color: '#0F766E',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   ratingPill: {
     position: 'absolute',
