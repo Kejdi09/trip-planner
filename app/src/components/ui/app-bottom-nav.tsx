@@ -1,7 +1,7 @@
 import { Feather, FontAwesome5, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { View } from 'react-native';
+import { Platform, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BottomNavItem } from '@/components/ui/bottom-nav-item';
@@ -31,11 +31,28 @@ export function AppBottomNav({ activeTab = 'Discover', onPressTab }: AppBottomNa
   };
 
   const navBottom = Math.max(10, insets.bottom + 6);
+  const gradientHeight = navBottom + 132;
+
+  const webGradientStyle = Platform.OS === 'web'
+    ? ({
+        backgroundImage:
+          'linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.10) 32%, rgba(255,255,255,0.34) 62%, rgba(255,255,255,0.78) 100%)',
+      } as ViewStyle)
+    : null;
 
   return (
     <>
-      <View pointerEvents="none" style={[bottomNavStyles.bottomNavScrim, { height: navBottom + 86 }]} />
-      <View pointerEvents="none" style={[bottomNavStyles.bottomNavFade, { bottom: navBottom + 70 }]} />
+      {Platform.OS === 'web' ? (
+        <View pointerEvents="none" style={[bottomNavStyles.bottomNavGradient, { height: gradientHeight }, webGradientStyle]} />
+      ) : (
+        <>
+          <View pointerEvents="none" style={[bottomNavStyles.bottomNavFadeBand, { bottom: navBottom + 104, height: 30, backgroundColor: 'rgba(255,255,255,0.04)' }]} />
+          <View pointerEvents="none" style={[bottomNavStyles.bottomNavFadeBand, { bottom: navBottom + 78, height: 36, backgroundColor: 'rgba(255,255,255,0.09)' }]} />
+          <View pointerEvents="none" style={[bottomNavStyles.bottomNavFadeBand, { bottom: navBottom + 50, height: 46, backgroundColor: 'rgba(255,255,255,0.16)' }]} />
+          <View pointerEvents="none" style={[bottomNavStyles.bottomNavFadeBand, { bottom: navBottom + 20, height: 58, backgroundColor: 'rgba(255,255,255,0.28)' }]} />
+          <View pointerEvents="none" style={[bottomNavStyles.bottomNavFadeBand, { bottom: 0, height: navBottom + 58, backgroundColor: 'rgba(255,255,255,0.48)' }]} />
+        </>
+      )}
       <View style={[bottomNavStyles.bottomNav, { bottom: navBottom }]}>
       <BottomNavItem
         label="Feed"

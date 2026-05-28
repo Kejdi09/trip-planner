@@ -10,21 +10,19 @@ export const BOTTOM_NAV_THEME = {
 } as const;
 
 export const bottomNavStyles = StyleSheet.create({
-  bottomNavScrim: {
+  bottomNavGradient: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.58)',
+    backgroundColor: 'transparent',
     zIndex: 19,
     elevation: 6,
   },
-  bottomNavFade: {
+  bottomNavFadeBand: {
     position: 'absolute',
     left: 0,
     right: 0,
-    height: 26,
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
     zIndex: 19,
     elevation: 6,
   },
