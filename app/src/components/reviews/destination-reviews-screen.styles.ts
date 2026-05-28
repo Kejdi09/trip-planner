@@ -35,7 +35,11 @@ export const styles = StyleSheet.create({
   headerSummary: {
     flex: 1,
   },
+  reviewsScroll: {
+    flex: 1,
+  },
   scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: rs(20),
     paddingBottom: rs(32),
     paddingTop: rs(6),

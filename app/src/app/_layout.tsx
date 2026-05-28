@@ -1,6 +1,6 @@
 import { Stack, usePathname } from 'expo-router';
 import React from 'react';
-import { View } from 'react-native';
+import { Keyboard, View } from 'react-native';
 
 import { AppBottomNav, AppTab } from '@/components/ui/app-bottom-nav';
 import { registerForPushNotificationsOnce } from '../../lib/push-notifications';
@@ -52,7 +52,23 @@ const getActiveTab = (pathname: string): AppTab => {
 export default function TabLayout() {
   const pathname = usePathname();
   const activeTab = getActiveTab(pathname ?? '/');
-  const hideBottomNav = !pathname || pathname === '/' || pathname.startsWith('/index') || pathname.startsWith('/reset-password');
+  const [keyboardVisible, setKeyboardVisible] = React.useState(false);
+  const hideBottomNav =
+    keyboardVisible ||
+    !pathname ||
+    pathname === '/' ||
+    pathname.startsWith('/index') ||
+    pathname.startsWith('/reset-password');
+
+  React.useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   React.useEffect(() => {
     void registerForPushNotificationsOnce().catch((error) => {

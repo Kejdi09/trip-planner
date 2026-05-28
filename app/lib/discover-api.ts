@@ -17,6 +17,7 @@ export type DiscoverPlace = {
   source: string | null;
   visited: string;
   rating: number;
+  reviewCount: number;
 };
 
 type SearchPlaceRow = {
@@ -24,6 +25,7 @@ type SearchPlaceRow = {
   title?: string | null;
   city?: string | null;
   country?: string | null;
+  countryCode?: string | null;
   continent?: string | null;
   description?: string | null;
   image?: string | null;
@@ -32,10 +34,14 @@ type SearchPlaceRow = {
   longitude?: number | null;
   population?: number | null;
   source?: string | null;
+  rating?: number | null;
+  reviewCount?: number | null;
 };
 
 function toDiscoverPlace(row: SearchPlaceRow): DiscoverPlace {
   const image = row.imageUrl || row.image || '';
+  const rating = Number(row.rating ?? 0);
+  const reviewCount = Number(row.reviewCount ?? 0);
   return {
     id: row.id,
     title: row.title?.trim() || row.city?.trim() || 'Untitled destination',
@@ -51,7 +57,8 @@ function toDiscoverPlace(row: SearchPlaceRow): DiscoverPlace {
     population: row.population ?? null,
     source: row.source ?? null,
     visited: 'No friends visited yet',
-    rating: 0,
+    rating: Number.isFinite(rating) ? rating : 0,
+    reviewCount: Number.isFinite(reviewCount) ? reviewCount : 0,
   };
 }
 

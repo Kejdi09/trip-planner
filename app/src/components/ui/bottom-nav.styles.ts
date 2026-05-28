@@ -19,12 +19,13 @@ export const bottomNavStyles = StyleSheet.create({
     zIndex: 19,
     elevation: 6,
   },
-  bottomNavFadeBand: {
+  bottomNavNativeBackdrop: {
     position: 'absolute',
     left: 0,
     right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.48)',
     zIndex: 19,
-    elevation: 6,
   },
   bottomNav: {
     position: 'absolute',
