@@ -24,7 +24,7 @@ const PAGE_SIZE = 10;
 type SortOption = 'relevance' | 'population' | 'name';
 
 type DiscoverFilters = {
-  countryCode: string | null;
+  continent: string | null;
   minPopulation: number | null;
   sort: SortOption;
 };
@@ -37,9 +37,19 @@ const POPULATION_OPTIONS: { id: string; label: string; value: number | null }[] 
   { id: 'pop:1000000', label: '1M+', value: 1000000 },
 ];
 
+const CONTINENT_OPTIONS: { id: string; label: string; value: string | null }[] = [
+  { id: 'continent:any', label: 'Any continent', value: null },
+  { id: 'continent:EU', label: 'Europe', value: 'EU' },
+  { id: 'continent:AS', label: 'Asia', value: 'AS' },
+  { id: 'continent:AF', label: 'Africa', value: 'AF' },
+  { id: 'continent:NA', label: 'North America', value: 'NA' },
+  { id: 'continent:SA', label: 'South America', value: 'SA' },
+  { id: 'continent:OC', label: 'Oceania', value: 'OC' },
+];
+
 const SORT_OPTIONS: { id: string; label: string; value: SortOption }[] = [
   { id: 'sort:relevance', label: 'Best match', value: 'relevance' },
-  { id: 'sort:population', label: 'Biggest cities', value: 'population' },
+  { id: 'sort:population', label: 'Most popular', value: 'population' },
   { id: 'sort:name', label: 'A-Z', value: 'name' },
 ];
 
@@ -56,36 +66,17 @@ export function DiscoverScreen() {
   const [hasMore, setHasMore] = React.useState(true);
 
   const [isFilterOpen, setIsFilterOpen] = React.useState(false);
-  const [filters, setFilters] = React.useState<DiscoverFilters>({ countryCode: null, minPopulation: null, sort: 'relevance' });
+  const [filters, setFilters] = React.useState<DiscoverFilters>({ continent: null, minPopulation: null, sort: 'relevance' });
   const [draftFilters, setDraftFilters] = React.useState<DiscoverFilters>(filters);
 
-  const countryOptions = React.useMemo(() => {
-    const map = new Map<string, string>();
-    places.forEach((place) => {
-      if (place.countryCode && place.country) map.set(place.countryCode, place.country);
-    });
-    return Array.from(map.entries())
-      .sort((a, b) => a[1].localeCompare(b[1]))
-      .map(([code, name]) => ({ id: `country:${code}`, label: `${name} (${code})`, code }));
-  }, [places]);
-
-  const filterGroups = React.useMemo<FilterGroup[]>(() => {
-    const countryGroup: FilterGroup = {
-      id: 'country',
-      title: 'Country',
-      options: [{ id: 'country:any', label: 'Any country' }, ...countryOptions.map((c) => ({ id: c.id, label: c.label }))],
-      layout: 'wrap',
-    };
-
-    return [
-      countryGroup,
-      { id: 'population', title: 'City size', options: POPULATION_OPTIONS.map((x) => ({ id: x.id, label: x.label })), layout: 'wrap' },
-      { id: 'sort', title: 'Sort', options: SORT_OPTIONS.map((x) => ({ id: x.id, label: x.label })), layout: 'wrap' },
-    ];
-  }, [countryOptions]);
+  const filterGroups = React.useMemo<FilterGroup[]>(() => [
+    { id: 'continent', title: 'Continent', options: CONTINENT_OPTIONS.map((x) => ({ id: x.id, label: x.label })), layout: 'wrap' },
+    { id: 'population', title: 'City size', options: POPULATION_OPTIONS.map((x) => ({ id: x.id, label: x.label })), layout: 'wrap' },
+    { id: 'sort', title: 'Sort', options: SORT_OPTIONS.map((x) => ({ id: x.id, label: x.label })), layout: 'wrap' },
+  ], []);
 
   const draftSelectedFilterIds = React.useMemo(() => [
-    draftFilters.countryCode ? `country:${draftFilters.countryCode}` : 'country:any',
+    draftFilters.continent ? `continent:${draftFilters.continent}` : 'continent:any',
     draftFilters.minPopulation === null ? 'pop:any' : `pop:${draftFilters.minPopulation}`,
     `sort:${draftFilters.sort}`,
   ], [draftFilters]);
@@ -99,7 +90,7 @@ export function DiscoverScreen() {
         query,
         limit: PAGE_SIZE,
         offset,
-        countryCode: nextFilters.countryCode,
+        continent: nextFilters.continent,
         minPopulation: nextFilters.minPopulation,
         sort: nextFilters.sort,
       });
@@ -187,15 +178,15 @@ export function DiscoverScreen() {
   const statusMessage = isLoading ? 'Loading destinations...' : errorMessage;
   const showStatusMessage = Boolean(statusMessage);
 
-  const activeFilterCount = [filters.countryCode !== null, filters.minPopulation !== null, filters.sort !== 'relevance'].filter(Boolean).length;
+  const activeFilterCount = [filters.continent !== null, filters.minPopulation !== null, filters.sort !== 'relevance'].filter(Boolean).length;
 
   const showEmptySearch =
     !isLoading && !errorMessage && places.length === 0;
 
   const onToggleDraftFilter = (filterId: string) => {
-    if (filterId.startsWith('country:')) {
+    if (filterId.startsWith('continent:')) {
       const code = filterId.split(':')[1];
-      setDraftFilters((prev) => ({ ...prev, countryCode: code === 'any' ? null : code }));
+      setDraftFilters((prev) => ({ ...prev, continent: code === 'any' ? null : code }));
       return;
     }
     if (filterId.startsWith('pop:')) {
@@ -215,7 +206,7 @@ export function DiscoverScreen() {
   };
 
   const clearFilters = () => {
-    const reset: DiscoverFilters = { countryCode: null, minPopulation: null, sort: 'relevance' };
+    const reset: DiscoverFilters = { continent: null, minPopulation: null, sort: 'relevance' };
     setDraftFilters(reset);
     setFilters(reset);
     setIsFilterOpen(false);

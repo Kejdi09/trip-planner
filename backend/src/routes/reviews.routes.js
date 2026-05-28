@@ -3,6 +3,23 @@ const { fetchPexelsImageForPlace, hasPexelsApiKey } = require('../lib/place-imag
 const { deepseekApiKey } = require('../config');
 const { callDeepSeekChat } = require('../services/deepseek');
 
+
+const CONTINENT_COUNTRY_CODES = {
+  AF: new Set(['DZ','AO','BJ','BW','BF','BI','CM','CV','CF','TD','KM','CG','CD','CI','DJ','EG','GQ','ER','SZ','ET','GA','GM','GH','GN','GW','KE','LS','LR','LY','MG','MW','ML','MR','MU','YT','MA','MZ','NA','NE','NG','RE','RW','SH','ST','SN','SC','SL','SO','ZA','SS','SD','TZ','TG','TN','UG','EH','ZM','ZW']),
+  AS: new Set(['AF','AM','AZ','BH','BD','BT','BN','KH','CN','CY','GE','HK','IN','ID','IR','IQ','IL','JP','JO','KZ','KW','KG','LA','LB','MO','MY','MV','MN','MM','NP','KP','OM','PK','PS','PH','QA','SA','SG','KR','LK','SY','TW','TJ','TH','TL','TR','TM','AE','UZ','VN','YE']),
+  EU: new Set(['AX','AL','AD','AT','BY','BE','BA','BG','HR','CZ','DK','EE','FO','FI','FR','DE','GI','GR','GG','VA','HU','IS','IE','IM','IT','JE','XK','LV','LI','LT','LU','MT','MD','MC','ME','NL','MK','NO','PL','PT','RO','RU','SM','RS','SK','SI','ES','SJ','SE','CH','UA','GB']),
+  NA: new Set(['AI','AG','AW','BS','BB','BZ','BM','BQ','VG','CA','KY','CR','CU','CW','DM','DO','SV','GL','GD','GP','GT','HT','HN','JM','MQ','MX','MS','NI','PA','PR','BL','KN','LC','MF','PM','VC','SX','TT','TC','US','VI']),
+  SA: new Set(['AR','BO','BR','CL','CO','EC','FK','GF','GY','PY','PE','SR','UY','VE']),
+  OC: new Set(['AS','AU','CK','FJ','PF','GU','KI','MH','FM','NR','NC','NZ','NU','NF','MP','PW','PG','PN','WS','SB','TK','TO','TV','UM','VU','WF']),
+  AN: new Set(['AQ','BV','TF','HM','GS']),
+};
+
+function parseContinent(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (!normalized) return null;
+  return CONTINENT_COUNTRY_CODES[normalized] ? normalized : null;
+}
+
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -230,7 +247,7 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
       const q = String(req.query.q || '').trim();
       const limit = parseLimit(req.query.limit, 20, 50);
       const offset = parseOffset(req.query.offset, 0);
-      const countryCode = String(req.query.countryCode || '').trim().toUpperCase() || null;
+      const continent = parseContinent(req.query.continent);
       const minPopulation = Number.isFinite(Number(req.query.minPopulation)) ? Math.max(0, Math.floor(Number(req.query.minPopulation))) : null;
       const sort = parseSort(req.query.sort, Boolean(q));
 
@@ -240,7 +257,7 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
           .select('id, name, description, city, country, country_code, latitude, longitude, population, image_url, image_source, image_author, image_author_url, image_fetched_at, external_source')
           .eq('external_source', 'geonames');
 
-        if (countryCode) query = query.eq('country_code', countryCode);
+        if (continent) query = query.in('country_code', Array.from(CONTINENT_COUNTRY_CODES[continent]));
         if (minPopulation !== null) query = query.gte('population', minPopulation);
 
         if (sort === 'name') {
@@ -265,7 +282,7 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
       const selectCols = 'id, name, description, city, country, country_code, latitude, longitude, population, image_url, image_source, image_author, image_author_url, image_fetched_at, external_source, search_text';
       const buildBaseQuery = () => {
         let query = supabaseAdmin.from('places').select(selectCols).eq('external_source', 'geonames');
-        if (countryCode) query = query.eq('country_code', countryCode);
+        if (continent) query = query.in('country_code', Array.from(CONTINENT_COUNTRY_CODES[continent]));
         if (minPopulation !== null) query = query.gte('population', minPopulation);
         return query;
       };

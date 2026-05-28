@@ -24,7 +24,7 @@ type SearchPlaceRow = {
   title?: string | null;
   city?: string | null;
   country?: string | null;
-  countryCode?: string | null;
+  continent?: string | null;
   description?: string | null;
   image?: string | null;
   imageUrl?: string | null;
@@ -59,7 +59,7 @@ export async function fetchDiscoverPlaces(params?: {
   query?: string;
   limit?: number;
   offset?: number;
-  countryCode?: string | null;
+  continent?: string | null;
   minPopulation?: number | null;
   sort?: 'relevance' | 'population' | 'name';
 }): Promise<DiscoverPlace[]> {
@@ -73,7 +73,7 @@ export async function fetchDiscoverPlaces(params?: {
     offset: String(offset),
   });
   if (query) qs.set('q', query);
-  if (params?.countryCode) qs.set('countryCode', params.countryCode);
+  if (params?.continent) qs.set('continent', params.continent);
   if (Number.isFinite(params?.minPopulation as number) && (params?.minPopulation as number) >= 0) qs.set('minPopulation', String(Math.floor(params!.minPopulation!)));
   if (params?.sort) qs.set('sort', params.sort);
 
