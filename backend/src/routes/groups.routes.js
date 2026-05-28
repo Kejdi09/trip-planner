@@ -1,6 +1,8 @@
 const express = require('express');
 const { assertUuid, makeError } = require('../utils/http');
 const { resolveDestinationPlaceIdFromName, ensureGroupDestinationPlace } = require('../services/destinations');
+const { createNotificationService, shortPreview } = require('../services/notifications');
+const { compareDateOnly, isDateOnly, validateFutureDateRange } = require('../utils/date-only');
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -18,32 +20,8 @@ function parseLimit(value, fallback = 30, max = 100) {
 module.exports = function groupsRoutes(supabaseAdmin) {
   const router = express.Router();
 
-  async function createNotification(userId, type, title, body, relatedEntityType = null, relatedEntityId = null) {
-    const { data: existing } = await supabaseAdmin
-      .from('notifications')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('type', type)
-      .eq('related_entity_type', relatedEntityType)
-      .eq('related_entity_id', relatedEntityId)
-      .limit(1);
+  const { createNotification, notifyAcceptedFriends } = createNotificationService(supabaseAdmin);
 
-    if ((existing || []).length > 0) return;
-
-    const { error } = await supabaseAdmin.from('notifications').insert({
-      user_id: userId,
-      type,
-      title,
-      body,
-      related_entity_type: relatedEntityType,
-      related_entity_id: relatedEntityId,
-      content: JSON.stringify({ title, body }),
-    });
-    if (error) {
-      const wrapped = makeError(error.message || 'Failed to create notification.', 502, 'UPSTREAM_ERROR');
-      throw wrapped;
-    }
-  }
 
   async function getGroup(groupId) {
     const { data, error } = await supabaseAdmin
@@ -90,6 +68,32 @@ module.exports = function groupsRoutes(supabaseAdmin) {
       wrapped.status = 403;
       throw wrapped;
     }
+  }
+
+  async function getNextItinerarySortOrder(groupId, date) {
+    const { data, error } = await supabaseAdmin
+      .from('itinerary_items')
+      .select('sort_order')
+      .eq('group_id', groupId)
+      .eq('date', date)
+      .order('sort_order', { ascending: false, nullsFirst: false })
+      .limit(1);
+
+    if (error) {
+      const wrapped = new Error(error.message || 'Failed to calculate itinerary order.');
+      wrapped.status = 502;
+      throw wrapped;
+    }
+
+    const currentMax = Number(data?.[0]?.sort_order);
+    return Number.isFinite(currentMax) ? currentMax + 1 : 0;
+  }
+
+  function normalizeSortOrder(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 0) return null;
+    return Math.floor(parsed);
   }
 
 
@@ -190,6 +194,7 @@ module.exports = function groupsRoutes(supabaseAdmin) {
       const name = String(req.body?.name || '').trim();
       const description = String(req.body?.description || '').trim() || null;
       const createdBy = String(req.body?.createdBy || req.body?.created_by || '').trim();
+      const requestedDestinationPlaceId = String(req.body?.destinationPlaceId || req.body?.destination_place_id || '').trim();
 
       if (!name || name.length < 3) {
         return res.status(400).json({ error: 'Group name must be at least 3 characters.' });
@@ -225,10 +230,15 @@ module.exports = function groupsRoutes(supabaseAdmin) {
       }
 
       let destinationPlaceId = null;
-      try {
-        destinationPlaceId = await resolveDestinationPlaceIdFromName(supabaseAdmin, name);
-      } catch (error) {
-        console.warn('Mapbox destination lookup failed:', error?.message || error);
+      if (requestedDestinationPlaceId) {
+        assertUuid(requestedDestinationPlaceId, 'destinationPlaceId');
+        destinationPlaceId = requestedDestinationPlaceId;
+      } else {
+        try {
+          destinationPlaceId = await resolveDestinationPlaceIdFromName(supabaseAdmin, name);
+        } catch (error) {
+          console.warn('Mapbox destination lookup failed:', error?.message || error);
+        }
       }
 
       const { data: group, error: groupError } = await supabaseAdmin
@@ -257,6 +267,27 @@ module.exports = function groupsRoutes(supabaseAdmin) {
         const wrapped = new Error(memberError.message || 'Failed to create creator membership.');
         wrapped.status = 502;
         throw wrapped;
+      }
+
+      if (destinationPlaceId) {
+        try {
+          const [{ data: creator }, { data: place }] = await Promise.all([
+            supabaseAdmin.from('profiles').select('full_name, username').eq('id', createdBy).maybeSingle(),
+            supabaseAdmin.from('places').select('name, city, country').eq('id', destinationPlaceId).maybeSingle(),
+          ]);
+          const actorName = creator?.full_name || creator?.username || 'A friend';
+          const placeName = place?.name || place?.city || name;
+          await notifyAcceptedFriends({
+            actorId: createdBy,
+            type: 'planned',
+            title: `${actorName} is planning a trip`,
+            body: `${actorName} started planning a trip to ${placeName}.`,
+            relatedEntityType: 'group',
+            relatedEntityId: group.id,
+          });
+        } catch (notifyError) {
+          console.error('Planned trip notification fanout failed:', notifyError?.message || notifyError);
+        }
       }
 
       return res.status(201).json(group);
@@ -317,8 +348,13 @@ module.exports = function groupsRoutes(supabaseAdmin) {
         max_budget: req.body?.maxBudget ?? group.max_budget,
       };
 
-      if (patch.start_date && patch.end_date && new Date(patch.start_date) > new Date(patch.end_date)) {
-        return res.status(400).json({ error: 'startDate must be before or equal to endDate.' });
+      if (patch.start_date || patch.end_date) {
+        const startDate = patch.start_date || group.start_date;
+        const endDate = patch.end_date || group.end_date;
+        const validation = validateFutureDateRange(startDate, endDate);
+        if (!validation.ok) {
+          return res.status(400).json({ error: validation.error });
+        }
       }
 
       const { data, error } = await supabaseAdmin
@@ -408,13 +444,27 @@ module.exports = function groupsRoutes(supabaseAdmin) {
         throw wrapped;
       }
 
-      const [{ data: actorProfile }, { data: groupRow }] = await Promise.all([
+      const [{ data: actorProfile }, { data: newMemberProfile }, { data: groupRow }] = await Promise.all([
         supabaseAdmin.from('profiles').select('full_name, username').eq('id', actorId).maybeSingle(),
+        supabaseAdmin.from('profiles').select('full_name, username').eq('id', newUserId).maybeSingle(),
         supabaseAdmin.from('groups').select('name').eq('id', groupId).maybeSingle(),
       ]);
       const actorName = actorProfile?.full_name || actorProfile?.username || 'Unknown user';
+      const newMemberName = newMemberProfile?.full_name || newMemberProfile?.username || actorName;
       const groupName = groupRow?.name || 'your group';
-      await createNotification(newUserId, 'group_invite', 'New group invite', `${actorName} invited you to ${groupName}`, 'group', groupId);
+      await createNotification({ userId: newUserId, type: 'group_invite', title: 'New group trip', body: `${actorName} added you to ${groupName}.`, relatedEntityType: 'group', relatedEntityId: groupId });
+      const { data: existingMembers } = await supabaseAdmin.from('group_members').select('user_id').eq('group_id', groupId);
+      await Promise.all((existingMembers || [])
+        .map((member) => member.user_id)
+        .filter((recipientId) => recipientId && recipientId !== newUserId)
+        .map((recipientId) => createNotification({
+          userId: recipientId,
+          type: 'group_joined',
+          title: `${newMemberName} joined the trip`,
+          body: `${newMemberName} joined ${groupName}.`,
+          relatedEntityType: 'group_member',
+          relatedEntityId: data.id,
+        })));
       return res.status(201).json(data);
     } catch (error) {
       return next(error);
@@ -528,7 +578,7 @@ module.exports = function groupsRoutes(supabaseAdmin) {
       const preview = content.length > 80 ? `${content.slice(0, 77)}...` : content;
       for (const member of members || []) {
         if (!member?.user_id || member.user_id === userId) continue;
-        await createNotification(member.user_id, 'group_chat_message', chatGroupName, `${senderName}: ${preview}`, 'group_message', data.id);
+        await createNotification({ userId: member.user_id, type: 'group_chat_message', title: `New message in ${chatGroupName}`, body: `${senderName}: ${preview}`, relatedEntityType: 'group_message', relatedEntityId: data.id });
       }
 
       return res.status(201).json(data);
@@ -549,9 +599,10 @@ module.exports = function groupsRoutes(supabaseAdmin) {
 
       const { data, error } = await supabaseAdmin
         .from('itinerary_items')
-        .select('id, group_id, title, date, time, created_by, created_at')
+        .select('id, group_id, title, date, time, sort_order, created_by, created_at')
         .eq('group_id', groupId)
         .order('date', { ascending: true })
+        .order('sort_order', { ascending: true, nullsFirst: true })
         .order('time', { ascending: true });
 
       if (error) {
@@ -573,27 +624,35 @@ module.exports = function groupsRoutes(supabaseAdmin) {
       const title = String(req.body?.title || '').trim();
       const date = String(req.body?.date || '').trim();
       const time = String(req.body?.time || '').trim() || null;
+      let sortOrder = normalizeSortOrder(req.body?.sortOrder);
 
       assertUuid(groupId, 'groupId');
       assertUuid(userId, 'userId');
       if (!title || !date) {
         return res.status(400).json({ error: 'title and date are required.' });
       }
+      if (!isDateOnly(date)) {
+        return res.status(400).json({ error: 'date must use YYYY-MM-DD format.' });
+      }
 
       await requireMember(groupId, userId);
       const group = await requireGroup(groupId);
 
-      if (group.start_date && new Date(date) < new Date(group.start_date)) {
+      if (group.start_date && compareDateOnly(date, group.start_date) < 0) {
         return res.status(400).json({ error: 'Itinerary date cannot be before group start date.' });
       }
-      if (group.end_date && new Date(date) > new Date(group.end_date)) {
+      if (group.end_date && compareDateOnly(date, group.end_date) > 0) {
         return res.status(400).json({ error: 'Itinerary date cannot be after group end date.' });
+      }
+
+      if (sortOrder === null) {
+        sortOrder = await getNextItinerarySortOrder(groupId, date);
       }
 
       const { data, error } = await supabaseAdmin
         .from('itinerary_items')
-        .insert({ group_id: groupId, title, date, time, created_by: userId })
-        .select('id, group_id, title, date, time, created_by, created_at')
+        .insert({ group_id: groupId, title, date, time, sort_order: sortOrder, created_by: userId })
+        .select('id, group_id, title, date, time, sort_order, created_by, created_at')
         .single();
 
       if (error) {
@@ -608,7 +667,7 @@ module.exports = function groupsRoutes(supabaseAdmin) {
         .eq('group_id', groupId);
       const recipients = (members || []).map((m) => m.user_id).filter(Boolean);
       await Promise.all(recipients.map((recipientId) =>
-        createNotification(recipientId, 'itinerary_update', JSON.stringify({ deepLink: `/itinerary?groupId=${groupId}`, groupId, itemId: data.id })),
+        createNotification({ userId: recipientId, type: 'itinerary_update', title: 'Trip itinerary updated', body: shortPreview(title || 'A trip item was added.'), relatedEntityType: 'itinerary_item', relatedEntityId: data.id, push: false }),
       ));
 
       return res.status(201).json(data);
@@ -633,16 +692,26 @@ module.exports = function groupsRoutes(supabaseAdmin) {
       if (typeof req.body?.title === 'string') patch.title = req.body.title.trim();
       if (typeof req.body?.date === 'string') patch.date = req.body.date.trim();
       if (typeof req.body?.time === 'string') patch.time = req.body.time.trim();
+      if (Object.prototype.hasOwnProperty.call(req.body || {}, 'sortOrder')) {
+        const sortOrder = normalizeSortOrder(req.body.sortOrder);
+        if (sortOrder === null) {
+          return res.status(400).json({ error: 'sortOrder must be a non-negative number.' });
+        }
+        patch.sort_order = sortOrder;
+      }
 
       if (Object.keys(patch).length === 0) {
         return res.status(400).json({ error: 'No updates provided.' });
       }
 
       const group = await requireGroup(groupId);
-      if (patch.date && group.start_date && new Date(patch.date) < new Date(group.start_date)) {
+      if (patch.date && !isDateOnly(patch.date)) {
+        return res.status(400).json({ error: 'date must use YYYY-MM-DD format.' });
+      }
+      if (patch.date && group.start_date && compareDateOnly(patch.date, group.start_date) < 0) {
         return res.status(400).json({ error: 'Itinerary date cannot be before group start date.' });
       }
-      if (patch.date && group.end_date && new Date(patch.date) > new Date(group.end_date)) {
+      if (patch.date && group.end_date && compareDateOnly(patch.date, group.end_date) > 0) {
         return res.status(400).json({ error: 'Itinerary date cannot be after group end date.' });
       }
 
@@ -651,7 +720,7 @@ module.exports = function groupsRoutes(supabaseAdmin) {
         .update(patch)
         .eq('id', itemId)
         .eq('group_id', groupId)
-        .select('id, group_id, title, date, time, created_by, created_at')
+        .select('id, group_id, title, date, time, sort_order, created_by, created_at')
         .single();
 
       if (error) {

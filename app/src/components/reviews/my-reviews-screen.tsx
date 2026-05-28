@@ -1,7 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RatingStars } from '@/components/reviews/rating-stars';
@@ -9,7 +9,7 @@ import { AppBottomNav } from '@/components/ui/app-bottom-nav';
 import { FadeIn } from '@/components/ui/fade-in';
 import { StatusMessage } from '@/components/ui/status-message';
 import type { PlaceRecord } from '../../../lib/reviews-api';
-import { deleteReviewById, fetchPlacesByIds, fetchReviewsByUser } from '../../../lib/reviews-api';
+import { deleteReviewById, fetchPlacesByIds, fetchReviewPhotosByReviewIds, fetchReviewsByUser } from '../../../lib/reviews-api';
 import { supabase } from '../../../lib/supabase';
 import { formatRelativeTime } from '../../../lib/reviews-utils';
 import { REVIEW_COLORS } from './review-theme';
@@ -30,6 +30,7 @@ type ReviewItem = {
   body: string;
   avatarColor: string;
   createdAt: string | null;
+  imageUrl: string | null;
 };
 
 const AVATAR_COLORS = ['#D6EEF1', '#FCE5C8', '#DDEAF9', '#E7EAF3'];
@@ -78,14 +79,24 @@ export function MyReviewsScreen() {
         const placeIds = Array.from(
           new Set(reviewRows.map((review) => review.place_id).filter(Boolean)),
         ) as string[];
-        const placeRows = await fetchPlacesByIds(placeIds);
+        const reviewIds = reviewRows.map((review) => review.id);
+        const [placeRows, reviewPhotos] = await Promise.all([
+          fetchPlacesByIds(placeIds),
+          fetchReviewPhotosByReviewIds(reviewIds),
+        ]);
         const placeMap = placeRows.reduce<Record<string, PlaceRecord>>((acc, place) => {
           acc[place.id] = place;
           return acc;
         }, {});
+        const firstPhotoByReviewId = reviewPhotos.reduce<Record<string, string>>((acc, photo) => {
+          if (photo.review_id && photo.image_url && !acc[photo.review_id]) {
+            acc[photo.review_id] = photo.image_url;
+          }
+          return acc;
+        }, {});
 
         const items = reviewRows.map((review, index) => {
-          const place = review.place_id ? placeMap[review.place_id] : undefined;
+          const place = review.place ?? (review.place_id ? placeMap[review.place_id] : undefined);
           const ratingValue = typeof review.rating === 'number' ? review.rating : 0;
           return {
             id: review.id,
@@ -96,6 +107,7 @@ export function MyReviewsScreen() {
             body: review.review ?? '',
             avatarColor: AVATAR_COLORS[index % AVATAR_COLORS.length],
             createdAt: review.created_at ?? null,
+            imageUrl: place?.image_url || firstPhotoByReviewId[review.id] || null,
           };
         });
 
@@ -234,7 +246,17 @@ export function MyReviewsScreen() {
                     }
                   >
                     <View style={styles.reviewHeader}>
-                      <View style={[styles.avatar, { backgroundColor: review.avatarColor }]} />
+                      {review.imageUrl ? (
+                        <Image
+                          source={{ uri: review.imageUrl }}
+                          style={styles.reviewImage}
+                          accessibilityLabel={`${review.destination} image`}
+                        />
+                      ) : (
+                        <View style={[styles.reviewImagePlaceholder, { backgroundColor: review.avatarColor }]}>
+                          <Feather name="image" size={15} color={REVIEW_COLORS.textSecondary} />
+                        </View>
+                      )}
                       <View style={styles.reviewMeta}>
                         <View style={styles.titleRow}>
                           <Text style={styles.destinationTitle}>{review.destination}</Text>

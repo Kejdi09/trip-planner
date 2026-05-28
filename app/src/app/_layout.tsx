@@ -3,6 +3,7 @@ import React from 'react';
 import { View } from 'react-native';
 
 import { AppBottomNav, AppTab } from '@/components/ui/app-bottom-nav';
+import { registerForPushNotificationsOnce } from '../../lib/push-notifications';
 
 const getActiveTab = (pathname: string): AppTab => {
   if (pathname.startsWith('/feed')) {
@@ -52,6 +53,12 @@ export default function TabLayout() {
   const pathname = usePathname();
   const activeTab = getActiveTab(pathname ?? '/');
   const hideBottomNav = !pathname || pathname === '/' || pathname.startsWith('/index') || pathname.startsWith('/reset-password');
+
+  React.useEffect(() => {
+    void registerForPushNotificationsOnce().catch((error) => {
+      console.warn('Push notification registration skipped:', error?.message || error);
+    });
+  }, []);
 
   return (
     <View style={{ flex: 1 }}>

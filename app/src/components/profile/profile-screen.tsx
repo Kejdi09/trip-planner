@@ -5,7 +5,7 @@ import {
 } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -29,6 +29,8 @@ type ProfileRow = {
   avatar_url: string | null;
   created_at: string | null;
 };
+
+const AVATAR_BUCKET = 'avatars';
 
 type Stats = {
   friends: number;
@@ -65,6 +67,18 @@ function SettingsRow({ icon, label, onPress }: { icon: React.ReactNode; label: s
   );
 }
 
+function getFileExtension(uri: string, fileName?: string | null) {
+  const source = (fileName || uri.split('?')[0] || '').toLowerCase();
+  const extension = source.split('.').pop();
+  return extension && ['jpg', 'jpeg', 'png', 'webp'].includes(extension) ? extension : 'jpg';
+}
+
+function getContentType(extension: string) {
+  if (extension === 'png') return 'image/png';
+  if (extension === 'webp') return 'image/webp';
+  return 'image/jpeg';
+}
+
 function getInitials(name: string) {
   return name
     .split(' ')
@@ -83,6 +97,8 @@ export function ProfileScreen() {
   const [profile, setProfile] = React.useState<ProfileRow | null>(null);
   const [emailFallback, setEmailFallback] = React.useState<string | null>(null);
   const [stats, setStats] = React.useState<Stats>({ friends: 0, reviews: 0, wishlist: 0, trips: 0 });
+  const [isUploadingAvatar, setIsUploadingAvatar] = React.useState(false);
+  const [avatarError, setAvatarError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let mounted = true;
@@ -152,6 +168,69 @@ export function ProfileScreen() {
     router.replace('/');
   };
 
+
+  const handleChangeAvatar = async () => {
+    if (!profile?.id || isUploadingAvatar) return;
+    setAvatarError(null);
+    setStatusMessage(null);
+
+    try {
+      const ImagePicker = await import('expo-image-picker');
+      if (Platform.OS !== 'web') {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          setAvatarError('Photo access is required to update your profile picture.');
+          return;
+        }
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.82,
+        allowsMultipleSelection: false,
+      });
+
+      if (result.canceled || result.assets.length === 0) return;
+
+      const asset = result.assets[0];
+      const extension = getFileExtension(asset.uri, asset.fileName);
+      const filePath = `${profile.id}/profile-${Date.now()}.${extension}`;
+      setIsUploadingAvatar(true);
+
+      const response = await fetch(asset.uri);
+      if (!response.ok) throw new Error('Unable to read the selected image.');
+      const fileData = await response.arrayBuffer();
+
+      const { error: uploadError } = await supabase.storage
+        .from(AVATAR_BUCKET)
+        .upload(filePath, fileData, {
+          contentType: getContentType(extension),
+          upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicData } = supabase.storage.from(AVATAR_BUCKET).getPublicUrl(filePath);
+      if (!publicData?.publicUrl) throw new Error('Unable to resolve uploaded avatar URL.');
+
+      const avatarUrl = `${publicData.publicUrl}?v=${Date.now()}`;
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: avatarUrl })
+        .eq('id', profile.id);
+
+      if (updateError) throw updateError;
+      setProfile((current) => (current ? { ...current, avatar_url: avatarUrl } : current));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to update profile picture.';
+      setAvatarError(message);
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
   const displayName = profile?.full_name || profile?.username || emailFallback || 'Unnamed user';
   const username = profile?.username ? `@${profile.username}` : '';
   const memberSince = profile?.created_at ? `Joined ${new Date(profile.created_at).toLocaleDateString()}` : null;
@@ -175,18 +254,29 @@ export function ProfileScreen() {
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 120 }]}> 
           <View style={styles.profileSection}>
-            {profile?.avatar_url ? (
-              <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
-            ) : (
-              <View style={[styles.avatar, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#E2E8F0' }]}>
-                <Text style={{ fontSize: 28, fontWeight: '700', color: '#334155' }}>{getInitials(displayName)}</Text>
+            <Pressable
+              style={styles.avatarButton}
+              onPress={handleChangeAvatar}
+              accessibilityRole="button"
+              accessibilityLabel="Change profile picture"
+              disabled={isUploadingAvatar}>
+              {profile?.avatar_url ? (
+                <Image source={{ uri: profile.avatar_url }} style={styles.avatar} />
+              ) : (
+                <View style={[styles.avatar, styles.avatarFallback]}>
+                  <Text style={styles.avatarInitials}>{getInitials(displayName)}</Text>
+                </View>
+              )}
+              <View style={styles.avatarEditBadge}>
+                {isUploadingAvatar ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Feather name="camera" size={14} color="#FFFFFF" />}
               </View>
-            )}
+            </Pressable>
 
             <Text style={styles.name}>{displayName}</Text>
             {username ? <Text style={styles.username}>{username}</Text> : null}
             {memberSince ? <Text style={styles.username}>{memberSince}</Text> : null}
             {errorMessage ? <Text style={styles.logoutMessage}>{errorMessage}</Text> : null}
+            {avatarError ? <Text style={styles.logoutMessage}>{avatarError}</Text> : null}
 
             <View style={styles.statsRow}>
               <Pressable style={styles.statBlock} onPress={() => router.push('/my-friends')}>

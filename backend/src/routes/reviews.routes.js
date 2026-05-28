@@ -2,6 +2,25 @@ const express = require('express');
 const { fetchPexelsImageForPlace, hasPexelsApiKey } = require('../lib/place-images');
 const { deepseekApiKey } = require('../config');
 const { callDeepSeekChat } = require('../services/deepseek');
+const { ensureGroupDestinationPlace } = require('../services/destinations');
+const { createNotificationService } = require('../services/notifications');
+
+
+const CONTINENT_COUNTRY_CODES = {
+  AF: new Set(['DZ','AO','BJ','BW','BF','BI','CM','CV','CF','TD','KM','CG','CD','CI','DJ','EG','GQ','ER','SZ','ET','GA','GM','GH','GN','GW','KE','LS','LR','LY','MG','MW','ML','MR','MU','YT','MA','MZ','NA','NE','NG','RE','RW','SH','ST','SN','SC','SL','SO','ZA','SS','SD','TZ','TG','TN','UG','EH','ZM','ZW']),
+  AS: new Set(['AF','AM','AZ','BH','BD','BT','BN','KH','CN','CY','GE','HK','IN','ID','IR','IQ','IL','JP','JO','KZ','KW','KG','LA','LB','MO','MY','MV','MN','MM','NP','KP','OM','PK','PS','PH','QA','SA','SG','KR','LK','SY','TW','TJ','TH','TL','TR','TM','AE','UZ','VN','YE']),
+  EU: new Set(['AX','AL','AD','AT','BY','BE','BA','BG','HR','CZ','DK','EE','FO','FI','FR','DE','GI','GR','GG','VA','HU','IS','IE','IM','IT','JE','XK','LV','LI','LT','LU','MT','MD','MC','ME','NL','MK','NO','PL','PT','RO','RU','SM','RS','SK','SI','ES','SJ','SE','CH','UA','GB']),
+  NA: new Set(['AI','AG','AW','BS','BB','BZ','BM','BQ','VG','CA','KY','CR','CU','CW','DM','DO','SV','GL','GD','GP','GT','HT','HN','JM','MQ','MX','MS','NI','PA','PR','BL','KN','LC','MF','PM','VC','SX','TT','TC','US','VI']),
+  SA: new Set(['AR','BO','BR','CL','CO','EC','FK','GF','GY','PY','PE','SR','UY','VE']),
+  OC: new Set(['AS','AU','CK','FJ','PF','GU','KI','MH','FM','NR','NC','NZ','NU','NF','MP','PW','PG','PN','WS','SB','TK','TO','TV','UM','VU','WF']),
+  AN: new Set(['AQ','BV','TF','HM','GS']),
+};
+
+function parseContinent(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (!normalized) return null;
+  return CONTINENT_COUNTRY_CODES[normalized] ? normalized : null;
+}
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -20,6 +39,12 @@ function parseOffset(value, fallback = 0) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) return fallback;
   return Math.floor(parsed);
+}
+
+function parseSort(value, hasQuery) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'name' || normalized === 'population' || normalized === 'relevance') return normalized;
+  return hasQuery ? 'relevance' : 'population';
 }
 
 function normalizePlaceRow(place) {
@@ -173,28 +198,249 @@ async function generatePlaceOverview(place) {
 module.exports = function reviewsRoutes(supabaseAdmin) {
   const router = express.Router();
 
-  async function createNotification(userId, type, title, body, relatedEntityType = null, relatedEntityId = null) {
-    const { data: existing } = await supabaseAdmin
-      .from('notifications')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('type', type)
-      .eq('related_entity_type', relatedEntityType)
-      .eq('related_entity_id', relatedEntityId)
-      .limit(1);
-    if ((existing || []).length > 0) return;
-    const { error } = await supabaseAdmin.from('notifications').insert({
-      user_id: userId,
-      type,
-      title,
-      body,
-      related_entity_type: relatedEntityType,
-      related_entity_id: relatedEntityId,
-      content: JSON.stringify({ title, body }),
-    });
-    if (error) console.error('Notification insert failed:', error.message);
-  }
+  const { createNotification } = createNotificationService(supabaseAdmin);
 
+
+
+
+  router.get('/feed', async (req, res, next) => {
+    try {
+      const userId = String(req.query.userId || '').trim();
+      if (!isValidUuid(userId)) {
+        return res.status(400).json({ error: 'userId must be a valid UUID.' });
+      }
+
+      const limit = parseLimit(req.query.limit, 20, 50);
+      const offset = parseOffset(req.query.offset, 0);
+      const sourceLimit = offset + limit;
+
+      const { data: friendships, error: friendshipError } = await supabaseAdmin
+        .from('friendships')
+        .select('requester_id, receiver_id')
+        .eq('status', 'accepted')
+        .or(`requester_id.eq.${userId},receiver_id.eq.${userId}`);
+
+      if (friendshipError) {
+        const wrapped = new Error(friendshipError.message || 'Failed to load friends.');
+        wrapped.status = 502;
+        throw wrapped;
+      }
+
+      const friendIds = Array.from(new Set((friendships || [])
+        .map((row) => (row.requester_id === userId ? row.receiver_id : row.requester_id))
+        .filter(Boolean)));
+
+      if (friendIds.length === 0) return res.json({ items: [] });
+
+      const [reviewsRes, wishlistsRes, plannedGroupsRes, membershipsRes] = await Promise.all([
+        supabaseAdmin
+          .from('reviews')
+          .select('id, user_id, place_id, rating, review, created_at')
+          .in('user_id', friendIds)
+          .not('place_id', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(sourceLimit),
+        supabaseAdmin
+          .from('wishlists')
+          .select('id, user_id, place_id, created_at')
+          .in('user_id', friendIds)
+          .not('place_id', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(sourceLimit),
+        supabaseAdmin
+          .from('groups')
+          .select('id, name, created_by, destination_place_id, status, created_at')
+          .in('created_by', friendIds)
+          .order('created_at', { ascending: false })
+          .limit(sourceLimit),
+        supabaseAdmin
+          .from('group_members')
+          .select('id, user_id, group_id, joined_at')
+          .in('user_id', friendIds)
+          .order('joined_at', { ascending: false })
+          .limit(sourceLimit),
+      ]);
+
+      const sourceError = reviewsRes.error || wishlistsRes.error || plannedGroupsRes.error || membershipsRes.error;
+      if (sourceError) {
+        const wrapped = new Error(sourceError.message || 'Failed to load feed activity.');
+        wrapped.status = 502;
+        throw wrapped;
+      }
+
+      const reviews = reviewsRes.data || [];
+      const wishlists = wishlistsRes.data || [];
+      const plannedGroups = plannedGroupsRes.data || [];
+      const memberships = membershipsRes.data || [];
+      const memberGroupIds = Array.from(new Set(memberships.map((membership) => membership.group_id).filter(Boolean)));
+
+      let joinedGroups = [];
+      if (memberGroupIds.length > 0) {
+        const { data: groupsForMemberships, error: joinedGroupsError } = await supabaseAdmin
+          .from('groups')
+          .select('id, name, destination_place_id, created_by, status, created_at')
+          .in('id', memberGroupIds);
+        if (joinedGroupsError) {
+          const wrapped = new Error(joinedGroupsError.message || 'Failed to load joined trip metadata.');
+          wrapped.status = 502;
+          throw wrapped;
+        }
+        joinedGroups = groupsForMemberships || [];
+      }
+
+      const ensureFeedGroupPlace = async (group) => {
+        if (group?.destination_place_id) return group;
+        try {
+          const place = await ensureGroupDestinationPlace(supabaseAdmin, group);
+          if (place?.id) return { ...group, destination_place_id: place.id };
+        } catch (error) {
+          console.warn('[feed] failed to resolve group destination', { groupId: group?.id, error: error?.message || String(error) });
+        }
+        return group;
+      };
+
+      const resolvedPlannedGroups = await Promise.all(plannedGroups.map(ensureFeedGroupPlace));
+      joinedGroups = await Promise.all(joinedGroups.map(ensureFeedGroupPlace));
+
+      const joinedGroupById = new Map(joinedGroups.map((group) => [group.id, group]));
+      const joinedMemberships = memberships.filter((membership) => {
+        const group = joinedGroupById.get(membership.group_id);
+        if (!group?.destination_place_id) return false;
+        if (group.created_by === membership.user_id) return false;
+        return Boolean(membership.joined_at || group.created_at);
+      });
+
+      const actorIds = Array.from(new Set([
+        ...reviews.map((review) => review.user_id),
+        ...wishlists.map((wishlist) => wishlist.user_id),
+        ...resolvedPlannedGroups.map((group) => group.created_by),
+        ...joinedMemberships.map((membership) => membership.user_id),
+      ].filter(Boolean)));
+
+      const placeIds = Array.from(new Set([
+        ...reviews.map((review) => review.place_id),
+        ...wishlists.map((wishlist) => wishlist.place_id),
+        ...resolvedPlannedGroups.map((group) => group.destination_place_id),
+        ...joinedMemberships.map((membership) => joinedGroupById.get(membership.group_id)?.destination_place_id),
+      ].filter(Boolean)));
+
+      const reviewIds = reviews.map((review) => review.id);
+
+      const [profilesRes, placesRes, photosRes] = await Promise.all([
+        actorIds.length
+          ? supabaseAdmin.from('profiles').select('id, full_name, username, avatar_url').in('id', actorIds)
+          : { data: [], error: null },
+        placeIds.length
+          ? supabaseAdmin
+            .from('places')
+            .select('id, name, city, country, image_url, image_source, image_author, image_author_url, image_fetched_at')
+            .in('id', placeIds)
+          : { data: [], error: null },
+        reviewIds.length
+          ? supabaseAdmin.from('review_photos').select('review_id, image_url').in('review_id', reviewIds)
+          : { data: [], error: null },
+      ]);
+
+      if (profilesRes.error || placesRes.error || photosRes.error) {
+        const err = profilesRes.error || placesRes.error || photosRes.error;
+        const wrapped = new Error(err?.message || 'Failed to load feed metadata.');
+        wrapped.status = 502;
+        throw wrapped;
+      }
+
+      const profileById = new Map((profilesRes.data || []).map((profile) => [profile.id, profile]));
+      const hydratedPlaces = await enrichPlacesWithImages(supabaseAdmin, placesRes.data || [], 5);
+      const placeById = new Map(hydratedPlaces.map((place) => [place.id, place]));
+      const firstPhotoByReviewId = new Map();
+      (photosRes.data || []).forEach((photo) => {
+        if (photo.review_id && photo.image_url && !firstPhotoByReviewId.has(photo.review_id)) {
+          firstPhotoByReviewId.set(photo.review_id, photo.image_url);
+        }
+      });
+
+      const normalizeActor = (actorId) => {
+        const actor = profileById.get(actorId) || null;
+        return {
+          id: actorId,
+          fullName: actor?.full_name || null,
+          username: actor?.username || null,
+          avatarUrl: actor?.avatar_url || null,
+        };
+      };
+
+      const normalizePlace = (placeId, reviewPhoto = null) => {
+        const place = placeById.get(placeId) || null;
+        if (!place) {
+          return {
+            id: placeId,
+            title: 'Unknown place',
+            city: null,
+            country: null,
+            imageUrl: reviewPhoto,
+          };
+        }
+        return {
+          id: place.id,
+          title: place.name || place.city || 'Unknown place',
+          city: place.city || null,
+          country: place.country || null,
+          imageUrl: place.image_url || reviewPhoto || null,
+        };
+      };
+
+      const reviewItems = reviews.map((review) => ({
+        id: `review:${review.id}`,
+        type: 'review',
+        actor: normalizeActor(review.user_id),
+        place: normalizePlace(review.place_id, firstPhotoByReviewId.get(review.id) || null),
+        rating: review.rating ?? null,
+        text: review.review || null,
+        createdAt: review.created_at,
+      }));
+
+      const wishlistItems = wishlists.map((wishlist) => ({
+        id: `wishlist:${wishlist.id}`,
+        type: 'wishlist',
+        actor: normalizeActor(wishlist.user_id),
+        place: normalizePlace(wishlist.place_id),
+        rating: null,
+        text: null,
+        createdAt: wishlist.created_at,
+      }));
+
+      const plannedItems = resolvedPlannedGroups.filter((group) => group.destination_place_id).map((group) => ({
+        id: `planned:${group.id}`,
+        type: 'planned',
+        actor: normalizeActor(group.created_by),
+        place: normalizePlace(group.destination_place_id),
+        rating: null,
+        text: group.name || null,
+        createdAt: group.created_at,
+      }));
+
+      const joinedItems = joinedMemberships.map((membership) => {
+        const group = joinedGroupById.get(membership.group_id);
+        return {
+          id: `joined:${membership.id}`,
+          type: 'joined',
+          actor: normalizeActor(membership.user_id),
+          place: normalizePlace(group.destination_place_id),
+          rating: null,
+          text: group.name || null,
+          createdAt: membership.joined_at || group.created_at,
+        };
+      });
+
+      const items = [...reviewItems, ...wishlistItems, ...plannedItems, ...joinedItems]
+        .filter((item) => item.createdAt && item.place?.id)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(offset, offset + limit);
+
+      return res.json({ items });
+    } catch (error) {
+      return next(error);
+    }
+  });
 
   router.get('/places', async (req, res, next) => {
     try {
@@ -224,14 +470,26 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
       const q = String(req.query.q || '').trim();
       const limit = parseLimit(req.query.limit, 20, 50);
       const offset = parseOffset(req.query.offset, 0);
+      const continent = parseContinent(req.query.continent);
+      const minPopulation = Number.isFinite(Number(req.query.minPopulation)) ? Math.max(0, Math.floor(Number(req.query.minPopulation))) : null;
+      const sort = parseSort(req.query.sort, Boolean(q));
 
       if (!q) {
-        const { data, error } = await supabaseAdmin
+        let query = supabaseAdmin
           .from('places')
           .select('id, name, description, city, country, country_code, latitude, longitude, population, image_url, image_source, image_author, image_author_url, image_fetched_at, external_source')
-          .eq('external_source', 'geonames')
-          .order('population', { ascending: false, nullsFirst: false })
-          .range(offset, offset + limit - 1);
+          .eq('external_source', 'geonames');
+
+        if (continent) query = query.in('country_code', Array.from(CONTINENT_COUNTRY_CODES[continent]));
+        if (minPopulation !== null) query = query.gte('population', minPopulation);
+
+        if (sort === 'name') {
+          query = query.order('city', { ascending: true }).order('name', { ascending: true });
+        } else {
+          query = query.order('population', { ascending: false, nullsFirst: false });
+        }
+
+        const { data, error } = await query.range(offset, offset + limit - 1);
 
         if (error) {
           console.error('[places/search] default query failed', error);
@@ -245,12 +503,17 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
       const qLower = q.toLowerCase();
       const escaped = q.replace(/[%_]/g, '\\$&');
       const selectCols = 'id, name, description, city, country, country_code, latitude, longitude, population, image_url, image_source, image_author, image_author_url, image_fetched_at, external_source, search_text';
-      const base = supabaseAdmin.from('places').select(selectCols).eq('external_source', 'geonames');
+      const buildBaseQuery = () => {
+        let query = supabaseAdmin.from('places').select(selectCols).eq('external_source', 'geonames');
+        if (continent) query = query.in('country_code', Array.from(CONTINENT_COUNTRY_CODES[continent]));
+        if (minPopulation !== null) query = query.gte('population', minPopulation);
+        return query;
+      };
 
       const [exactRes, prefixRes, containsRes] = await Promise.all([
-        base.or(`name.ilike.${escaped},city.ilike.${escaped}`).order('population', { ascending: false, nullsFirst: false }).limit(120),
-        base.or(`name.ilike.${escaped}%,city.ilike.${escaped}%`).order('population', { ascending: false, nullsFirst: false }).limit(200),
-        base.or(`name.ilike.%${escaped}%,city.ilike.%${escaped}%,search_text.ilike.%${escaped}%`).order('population', { ascending: false, nullsFirst: false }).limit(300),
+        buildBaseQuery().or(`name.ilike.${escaped},city.ilike.${escaped}`).order('population', { ascending: false, nullsFirst: false }).limit(120),
+        buildBaseQuery().or(`name.ilike.${escaped}%,city.ilike.${escaped}%`).order('population', { ascending: false, nullsFirst: false }).limit(200),
+        buildBaseQuery().or(`name.ilike.%${escaped}%,city.ilike.%${escaped}%,search_text.ilike.%${escaped}%`).order('population', { ascending: false, nullsFirst: false }).limit(300),
       ]);
 
       if (exactRes.error || prefixRes.error || containsRes.error) {
@@ -283,7 +546,11 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
         });
 
       const ranked = Array.from(dedupedByCityCountry.values())
-        .sort((a, b) => b.score - a.score || Number(b.row.population || 0) - Number(a.row.population || 0));
+        .sort((a, b) => {
+          if (sort === 'population') return Number(b.row.population || 0) - Number(a.row.population || 0);
+          if (sort === 'name') return String(a.row.city || a.row.name || '').localeCompare(String(b.row.city || b.row.name || ''));
+          return b.score - a.score || Number(b.row.population || 0) - Number(a.row.population || 0);
+        });
 
       const pageRows = ranked.slice(offset, offset + limit).map((item) => item.row);
       const hydrated = await enrichPlacesWithImages(supabaseAdmin, pageRows);
@@ -403,7 +670,28 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
         throw wrapped;
       }
 
-      return res.json({ reviews: data || [] });
+      const rows = data || [];
+      const placeIds = Array.from(new Set(rows.map((review) => review.place_id).filter(Boolean)));
+      let placeById = new Map();
+      if (placeIds.length > 0) {
+        const { data: places, error: placesError } = await supabaseAdmin
+          .from('places')
+          .select('id, name, description, city, country, image_url, image_source, image_author, image_author_url, image_fetched_at, created_at')
+          .in('id', placeIds);
+        if (placesError) {
+          const wrapped = new Error(placesError.message || 'Failed to load review places.');
+          wrapped.status = 502;
+          throw wrapped;
+        }
+        placeById = new Map((places || []).map((place) => [place.id, place]));
+      }
+
+      return res.json({
+        reviews: rows.map((review) => ({
+          ...review,
+          place: review.place_id ? placeById.get(review.place_id) || null : null,
+        })),
+      });
     } catch (error) {
       return next(error);
     }
@@ -577,7 +865,14 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
         }
 
         for (const recipientId of recipients) {
-          await createNotification(recipientId, 'review', `New review from ${reviewerName}`, `${reviewerName} reviewed ${placeName}`, 'review', review.id);
+          await createNotification({
+            userId: recipientId,
+            type: 'review',
+            title: `${reviewerName} left a review`,
+            body: `Take a look at their review of ${placeName}.`,
+            relatedEntityType: 'review',
+            relatedEntityId: review.id,
+          });
         }
       } catch (notifyError) {
         console.error('Review notification fanout failed:', notifyError?.message || notifyError);

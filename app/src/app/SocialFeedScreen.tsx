@@ -1,92 +1,25 @@
-import React from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import React from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
+  ActivityIndicator,
   Image,
-  StyleSheet,
+  RefreshControl,
   SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+
+import type { FeedItem } from '../../lib/feed-api';
+import { fetchFriendActivityFeed } from '../../lib/feed-api';
 import { fetchIncomingPendingRequestCount, fetchUnreadNotificationCount } from '../../lib/notifications-api';
+import { supabase } from '../../lib/supabase';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-interface TrendingDestination {
-  id: string;
-  name: string;
-  visits: string;
-  image: string;
-}
+const PAGE_SIZE = 20;
 
-interface ActivityPost {
-  id: string;
-  userInitials: string;
-  userColor: string;
-  userName: string;
-  action: string;
-  destination: string;
-  timeAgo: string;
-  image: string;
-}
-
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-const TRENDING: TrendingDestination[] = [
-  {
-    id: 't1',
-    name: 'Bali',
-    visits: '2.3k visits',
-    image: 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=120&h=120&fit=crop',
-  },
-  {
-    id: 't2',
-    name: 'Tokyo',
-    visits: '2.3k visits',
-    image: 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=120&h=120&fit=crop',
-  },
-  {
-    id: 't3',
-    name: 'Paris',
-    visits: '2.3k visits',
-    image: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=120&h=120&fit=crop',
-  },
-];
-
-const ACTIVITY: ActivityPost[] = [
-  {
-    id: 'a1',
-    userInitials: 'SM',
-    userColor: '#6B9E8F',
-    userName: 'Sarah M.',
-    action: 'visited',
-    destination: 'Santorini',
-    timeAgo: '2h ago',
-    image: 'https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?w=400&h=240&fit=crop',
-  },
-  {
-    id: 'a2',
-    userInitials: 'JK',
-    userColor: '#8B7BB5',
-    userName: 'Jake K.',
-    action: 'planning a trip to',
-    destination: 'Kyoto',
-    timeAgo: '4h ago',
-    image: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=400&h=240&fit=crop',
-  },
-  {
-    id: 'a3',
-    userInitials: 'MR',
-    userColor: '#C47E6B',
-    userName: 'Mia R.',
-    action: 'visited',
-    destination: 'Amsterdam',
-    timeAgo: '1d ago',
-    image: 'https://images.unsplash.com/photo-1534351590666-13e3e96b5017?w=400&h=240&fit=crop',
-  },
-];
-
-// ─── Colors ───────────────────────────────────────────────────────────────────
 const C = {
   primary: '#008D9B',
   background: '#F8F9FA',
@@ -95,63 +28,99 @@ const C = {
   textSecondary: '#64748B',
   textMuted: '#94A3B8',
   border: '#E2E8F0',
+  mutedSurface: '#E8F4F5',
+  star: '#F59E0B',
 };
 
-// ─── Trending Card ────────────────────────────────────────────────────────────
-const TrendingCard: React.FC<{ item: TrendingDestination; onPress: () => void }> = ({ item, onPress }) => (
-  <TouchableOpacity style={tStyles.card} activeOpacity={0.85} onPress={onPress}>
-    <View style={tStyles.imageWrapper}>
-      <Image source={{ uri: item.image }} style={tStyles.image} resizeMode="cover" />
-    </View>
-    <Text style={tStyles.name}>{item.name}</Text>
-    <Text style={tStyles.visits}>{item.visits}</Text>
-  </TouchableOpacity>
-);
+function formatPlaceRegion(city: string | null, country: string | null) {
+  return [city, country].filter(Boolean).join(', ');
+}
 
-const tStyles = StyleSheet.create({
-  card: {
-    alignItems: 'center',
-    marginRight: 12,
-    width: 100,
-  },
-  imageWrapper: {
-    width: 90,
-    height: 90,
-    borderRadius: 18,
-    backgroundColor: '#E8F4F5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-    overflow: 'hidden',
-  },
-  image: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-  },
-  name: { fontSize: 13, fontWeight: '600', color: C.textPrimary, textAlign: 'center' },
-  visits: { fontSize: 11, color: C.textMuted, textAlign: 'center', marginTop: 2 },
-});
+function getActorName(item: FeedItem) {
+  return item.actor.fullName || item.actor.username || 'A friend';
+}
 
-// ─── Activity Card ────────────────────────────────────────────────────────────
-const ActivityCard: React.FC<{ post: ActivityPost; onPress: () => void }> = ({ post, onPress }) => (
-  <TouchableOpacity style={aStyles.card} activeOpacity={0.9} onPress={onPress}>
-    <View style={aStyles.header}>
-      <View style={[aStyles.avatar, { backgroundColor: post.userColor }]}>
-        <Text style={aStyles.initials}>{post.userInitials}</Text>
+function getInitials(item: FeedItem) {
+  const name = getActorName(item).trim();
+  const parts = name.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+}
+
+function formatTimeAgo(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const diffMs = Date.now() - date.getTime();
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  if (diffMs < minute) return 'Just now';
+  if (diffMs < hour) return `${Math.max(1, Math.floor(diffMs / minute))}m ago`;
+  if (diffMs < day) return `${Math.max(1, Math.floor(diffMs / hour))}h ago`;
+  if (diffMs < 7 * day) return `${Math.max(1, Math.floor(diffMs / day))}d ago`;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function actionText(item: FeedItem) {
+  if (item.type === 'review') return 'reviewed';
+  if (item.type === 'wishlist') return 'saved';
+  if (item.type === 'planned') return 'is planning a trip to';
+  return 'joined a trip to';
+}
+
+const ActivityCard: React.FC<{ item: FeedItem; onPress: () => void }> = ({ item, onPress }) => {
+  const actorName = getActorName(item);
+  const region = formatPlaceRegion(item.place.city, item.place.country);
+
+  return (
+    <TouchableOpacity style={aStyles.card} activeOpacity={0.9} onPress={onPress}>
+      <View style={aStyles.header}>
+        {item.actor.avatarUrl ? (
+          <Image source={{ uri: item.actor.avatarUrl }} style={aStyles.avatarImage} accessibilityLabel={`${actorName} avatar`} />
+        ) : (
+          <View style={aStyles.avatarPlaceholder}>
+            <Text style={aStyles.initials}>{getInitials(item)}</Text>
+          </View>
+        )}
+        <View style={aStyles.meta}>
+          <Text style={aStyles.userName}>{actorName}</Text>
+          <Text style={aStyles.action}>
+            {actionText(item)} <Text style={aStyles.destination}>{item.place.title}</Text>
+          </Text>
+        </View>
+        <Text style={aStyles.time}>{formatTimeAgo(item.createdAt)}</Text>
       </View>
-      <View style={aStyles.meta}>
-        <Text style={aStyles.userName}>{post.userName}</Text>
-        <Text style={aStyles.action}>
-          {post.action}{' '}
-          <Text style={aStyles.destination}>{post.destination}</Text>
-        </Text>
+
+      {item.place.imageUrl ? (
+        <Image source={{ uri: item.place.imageUrl }} style={aStyles.image} resizeMode="cover" accessibilityLabel={`${item.place.title} image`} />
+      ) : (
+        <View style={aStyles.imagePlaceholder}>
+          <Ionicons name="image-outline" size={28} color={C.textSecondary} />
+          <Text style={aStyles.placeholderText}>{item.place.title}</Text>
+        </View>
+      )}
+
+      <View style={aStyles.body}>
+        <View style={aStyles.placeRow}>
+          <Text style={aStyles.placeTitle}>{item.place.title}</Text>
+          {item.rating != null ? (
+            <View style={aStyles.ratingPill}>
+              <Ionicons name="star" size={12} color={C.star} />
+              <Text style={aStyles.ratingText}>{item.rating.toFixed(1)}</Text>
+            </View>
+          ) : null}
+        </View>
+        {region ? <Text style={aStyles.region}>{region}</Text> : null}
+        {item.text ? (
+          <Text style={item.type === 'review' ? aStyles.reviewText : aStyles.groupText} numberOfLines={2}>
+            {item.type === 'review' ? item.text : `Trip: ${item.text}`}
+          </Text>
+        ) : null}
       </View>
-      <Text style={aStyles.time}>{post.timeAgo}</Text>
-    </View>
-    <Image source={{ uri: post.image }} style={aStyles.image} resizeMode="cover" />
-  </TouchableOpacity>
-);
+    </TouchableOpacity>
+  );
+};
 
 const aStyles = StyleSheet.create({
   card: {
@@ -168,12 +137,19 @@ const aStyles = StyleSheet.create({
     padding: 12,
     gap: 10,
   },
-  avatar: {
+  avatarImage: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: C.mutedSurface,
+  },
+  avatarPlaceholder: {
     width: 38,
     height: 38,
     borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: C.primary,
   },
   initials: { fontSize: 13, fontWeight: '700', color: '#fff' },
   meta: { flex: 1 },
@@ -186,98 +162,172 @@ const aStyles = StyleSheet.create({
     height: 180,
     backgroundColor: C.border,
   },
+  imagePlaceholder: {
+    width: '100%',
+    height: 180,
+    backgroundColor: C.mutedSurface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  placeholderText: { fontSize: 13, fontWeight: '700', color: C.textSecondary },
+  body: { padding: 12, paddingTop: 10 },
+  placeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  placeTitle: { flex: 1, fontSize: 15, fontWeight: '700', color: C.textPrimary },
+  ratingPill: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFF7ED', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 },
+  ratingText: { fontSize: 12, fontWeight: '700', color: C.textPrimary },
+  region: { marginTop: 2, fontSize: 12, color: C.textSecondary },
+  reviewText: { marginTop: 8, fontSize: 13, lineHeight: 18, color: C.textSecondary },
+  groupText: { marginTop: 8, fontSize: 12, lineHeight: 17, fontWeight: '600', color: C.textSecondary },
 });
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
 const SocialFeedScreen: React.FC = () => {
   const [notifCount, setNotifCount] = React.useState(0);
   const [friendRequestCount, setFriendRequestCount] = React.useState(0);
+  const [items, setItems] = React.useState<FeedItem[]>([]);
+  const [userId, setUserId] = React.useState<string | null>(null);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const [isLoadingMore, setIsLoadingMore] = React.useState(false);
+  const [hasMore, setHasMore] = React.useState(true);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+
+  const loadCounts = React.useCallback(async () => {
+    try {
+      const [notifications, requests] = await Promise.all([
+        fetchUnreadNotificationCount(),
+        fetchIncomingPendingRequestCount(),
+      ]);
+      setNotifCount(notifications);
+      setFriendRequestCount(requests);
+    } catch {
+      setNotifCount(0);
+      setFriendRequestCount(0);
+    }
+  }, []);
+
+  const loadFeed = React.useCallback(async (nextUserId: string, offset = 0, append = false) => {
+    if (append) setIsLoadingMore(true);
+    else setIsLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const rows = await fetchFriendActivityFeed({ userId: nextUserId, limit: PAGE_SIZE, offset });
+      setItems((current) => (append ? [...current, ...rows] : rows));
+      setHasMore(rows.length === PAGE_SIZE);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to load friend activity.';
+      setErrorMessage(message);
+      if (!append) setItems([]);
+    } finally {
+      if (append) setIsLoadingMore(false);
+      else setIsLoading(false);
+    }
+  }, []);
 
   React.useEffect(() => {
     let mounted = true;
     (async () => {
-      try {
-        const [notifications, requests] = await Promise.all([
-          fetchUnreadNotificationCount(),
-          fetchIncomingPendingRequestCount(),
-        ]);
-        if (!mounted) return;
-        setNotifCount(notifications);
-        setFriendRequestCount(requests);
-      } catch {
-        if (!mounted) return;
-        setNotifCount(0);
-        setFriendRequestCount(0);
+      await loadCounts();
+      const { data } = await supabase.auth.getUser();
+      const currentUserId = data.user?.id ?? null;
+      if (!mounted) return;
+      setUserId(currentUserId);
+      if (currentUserId) {
+        await loadFeed(currentUserId);
+      } else {
+        setIsLoading(false);
+        setItems([]);
       }
     })();
     return () => { mounted = false; };
-  }, []);
+  }, [loadCounts, loadFeed]);
+
+  const refresh = async () => {
+    if (!userId) return;
+    setIsRefreshing(true);
+    await Promise.all([loadCounts(), loadFeed(userId)]);
+    setIsRefreshing(false);
+  };
+
+  const loadMore = () => {
+    if (!userId || isLoadingMore || !hasMore) return;
+    void loadFeed(userId, items.length, true);
+  };
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={true}
+        showsVerticalScrollIndicator
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={C.primary} />}
       >
-        {/* Header — no logo, just title + bell */}
         <View style={styles.header}>
-  <Text style={styles.appName}>TripSync</Text>
-  <TouchableOpacity style={styles.notifBtn} accessibilityLabel="Notifications" onPress={() => router.push('/notifications')}>
-    <Ionicons name="notifications-outline" size={26} color={C.textPrimary} />
-    {notifCount > 0 && (
-      <View style={styles.notifBadge}>
-        <Text style={styles.notifBadgeText}>{notifCount}</Text>
-      </View>
-    )}
-  </TouchableOpacity>
-</View>
-          
-        {/* Trending Now */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <MaterialCommunityIcons name="trending-up" size={20} color={C.primary} />
-            <Text style={styles.sectionTitle}>Trending Now</Text>
-          </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.trendingRow}
-          >
-            {TRENDING.map((item) => (
-              <TrendingCard key={item.id} item={item} onPress={() => router.push('/destination-overview')} />
-            ))}
-          </ScrollView>
+          <Text style={styles.appName}>TripSync</Text>
+          <TouchableOpacity style={styles.notifBtn} accessibilityLabel="Notifications" onPress={() => router.push('/notifications')}>
+            <Ionicons name="notifications-outline" size={26} color={C.textPrimary} />
+            {notifCount > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>{notifCount > 99 ? '99+' : notifCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
 
-        {/* Divider */}
-        <View style={styles.divider} />
-
-        {/* Friends' Activity */}
         <View style={styles.section}>
           <View style={styles.activityHeader}>
             <Text style={styles.sectionTitle}>Friends&apos; Activity</Text>
-            <TouchableOpacity accessibilityLabel="Add friend" onPress={() => router.push('/add-friends')} style={{ position: 'relative' }}>
+            <TouchableOpacity accessibilityLabel="Add friend" onPress={() => router.push('/add-friends')} style={styles.friendButton}>
               <Ionicons name="person-add-outline" size={22} color={C.textSecondary} />
               {friendRequestCount > 0 ? <View style={styles.friendBadge}><Text style={styles.friendBadgeText}>{friendRequestCount > 99 ? '99+' : friendRequestCount}</Text></View> : null}
             </TouchableOpacity>
           </View>
-          {ACTIVITY.map((post) => (
-            <ActivityCard key={post.id} post={post} onPress={() => router.push('/profile')} />
-          ))}
+
+          {isLoading ? (
+            <View style={styles.statusCard}>
+              <ActivityIndicator color={C.primary} />
+              <Text style={styles.statusText}>Loading friend activity...</Text>
+            </View>
+          ) : errorMessage ? (
+            <View style={styles.statusCard}>
+              <Ionicons name="alert-circle-outline" size={24} color={C.textSecondary} />
+              <Text style={styles.statusText}>{errorMessage}</Text>
+              <TouchableOpacity style={styles.retryButton} onPress={() => userId && loadFeed(userId)}>
+                <Text style={styles.retryText}>Try again</Text>
+              </TouchableOpacity>
+            </View>
+          ) : items.length === 0 ? (
+            <View style={styles.statusCard}>
+              <Ionicons name="people-outline" size={28} color={C.textSecondary} />
+              <Text style={styles.emptyTitle}>No friend activity yet.</Text>
+              <Text style={styles.statusText}>Add friends or start reviewing places.</Text>
+              <TouchableOpacity style={styles.retryButton} onPress={() => router.push('/add-friends')}>
+                <Text style={styles.retryText}>Find friends</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              {items.map((item) => (
+                <ActivityCard key={item.id} item={item} onPress={() => router.push({ pathname: '/destination-overview', params: { id: item.place.id } })} />
+              ))}
+              {hasMore ? (
+                <TouchableOpacity style={styles.loadMoreButton} onPress={loadMore} disabled={isLoadingMore}>
+                  <Text style={styles.loadMoreText}>{isLoadingMore ? 'Loading...' : 'Load more'}</Text>
+                </TouchableOpacity>
+              ) : null}
+            </>
+          )}
         </View>
       </ScrollView>
-
     </SafeAreaView>
   );
 };
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: C.background },
   scroll: { flex: 1 },
-  scrollContent: { paddingBottom: 90 },
-
+  scrollContent: { paddingBottom: 110 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -302,20 +352,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
   },
   notifBadgeText: { color: '#fff', fontSize: 9, fontWeight: '700' },
-  friendBadge: { position: 'absolute', top: -6, right: -10, backgroundColor: '#EF4444', borderRadius: 10, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  friendButton: { position: 'relative', padding: 4 },
+  friendBadge: { position: 'absolute', top: -4, right: -8, backgroundColor: '#EF4444', borderRadius: 10, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
   friendBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
-
   section: { paddingHorizontal: 16, paddingTop: 16 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: C.textPrimary },
-  trendingRow: { paddingBottom: 4 },
-  divider: { height: 1, backgroundColor: C.border, marginTop: 16 },
   activityHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 14,
   },
+  statusCard: {
+    minHeight: 170,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+    gap: 10,
+  },
+  statusText: { fontSize: 13, color: C.textSecondary, textAlign: 'center', lineHeight: 18 },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: C.textPrimary, textAlign: 'center' },
+  retryButton: { marginTop: 4, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 999, backgroundColor: C.primary },
+  retryText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  loadMoreButton: {
+    alignSelf: 'center',
+    marginTop: 4,
+    marginBottom: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: C.primary,
+    backgroundColor: C.surface,
+  },
+  loadMoreText: { color: C.primary, fontSize: 13, fontWeight: '700' },
 });
 
 export default SocialFeedScreen;

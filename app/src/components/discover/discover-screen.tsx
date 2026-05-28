@@ -1,14 +1,17 @@
 import React from 'react';
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppLoading } from '@/components/common/AppLoading';
+import { FilterSheet } from '@/components/ui/filter-sheet';
 import { PlaceListSection } from '@/components/ui/place-list-section';
 import { SearchHeader } from '@/components/ui/search-header';
 import { StatusMessage } from '@/components/ui/status-message';
+import type { FilterGroup } from '@/components/ui/types';
 import type { DiscoverPlace } from '../../../lib/discover-api';
 import { fetchDiscoverPlaces } from '../../../lib/discover-api';
+import { createGroupApi } from '../../../lib/groups-api';
 import { supabase } from '../../../lib/supabase';
 import {
   addWishlistPlace,
@@ -18,6 +21,38 @@ import {
 import { styles } from './discover-screen.styles';
 
 const PAGE_SIZE = 10;
+
+type SortOption = 'relevance' | 'population' | 'name';
+
+type DiscoverFilters = {
+  continent: string | null;
+  minPopulation: number | null;
+  sort: SortOption;
+};
+
+const POPULATION_OPTIONS: { id: string; label: string; value: number | null }[] = [
+  { id: 'pop:any', label: 'Any size', value: null },
+  { id: 'pop:50000', label: '50k+', value: 50000 },
+  { id: 'pop:100000', label: '100k+', value: 100000 },
+  { id: 'pop:500000', label: '500k+', value: 500000 },
+  { id: 'pop:1000000', label: '1M+', value: 1000000 },
+];
+
+const CONTINENT_OPTIONS: { id: string; label: string; value: string | null }[] = [
+  { id: 'continent:any', label: 'Any continent', value: null },
+  { id: 'continent:EU', label: 'Europe', value: 'EU' },
+  { id: 'continent:AS', label: 'Asia', value: 'AS' },
+  { id: 'continent:AF', label: 'Africa', value: 'AF' },
+  { id: 'continent:NA', label: 'North America', value: 'NA' },
+  { id: 'continent:SA', label: 'South America', value: 'SA' },
+  { id: 'continent:OC', label: 'Oceania', value: 'OC' },
+];
+
+const SORT_OPTIONS: { id: string; label: string; value: SortOption }[] = [
+  { id: 'sort:relevance', label: 'Best match', value: 'relevance' },
+  { id: 'sort:population', label: 'Most popular', value: 'population' },
+  { id: 'sort:name', label: 'A-Z', value: 'name' },
+];
 
 export function DiscoverScreen() {
   const insets = useSafeAreaInsets();
@@ -31,12 +66,38 @@ export function DiscoverScreen() {
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [hasMore, setHasMore] = React.useState(true);
 
-  const loadPlaces = React.useCallback(async (query: string, offset: number, append: boolean) => {
+  const [isFilterOpen, setIsFilterOpen] = React.useState(false);
+  const [filters, setFilters] = React.useState<DiscoverFilters>({ continent: null, minPopulation: null, sort: 'relevance' });
+  const [draftFilters, setDraftFilters] = React.useState<DiscoverFilters>(filters);
+  const [tripPlace, setTripPlace] = React.useState<DiscoverPlace | null>(null);
+  const [isCreatingTrip, setIsCreatingTrip] = React.useState(false);
+  const [tripError, setTripError] = React.useState<string | null>(null);
+
+  const filterGroups = React.useMemo<FilterGroup[]>(() => [
+    { id: 'continent', title: 'Continent', options: CONTINENT_OPTIONS.map((x) => ({ id: x.id, label: x.label })), layout: 'wrap' },
+    { id: 'population', title: 'City size', options: POPULATION_OPTIONS.map((x) => ({ id: x.id, label: x.label })), layout: 'wrap' },
+    { id: 'sort', title: 'Sort', options: SORT_OPTIONS.map((x) => ({ id: x.id, label: x.label })), layout: 'wrap' },
+  ], []);
+
+  const draftSelectedFilterIds = React.useMemo(() => [
+    draftFilters.continent ? `continent:${draftFilters.continent}` : 'continent:any',
+    draftFilters.minPopulation === null ? 'pop:any' : `pop:${draftFilters.minPopulation}`,
+    `sort:${draftFilters.sort}`,
+  ], [draftFilters]);
+
+  const loadPlaces = React.useCallback(async (query: string, offset: number, append: boolean, nextFilters: DiscoverFilters) => {
     if (append) setIsLoadingMore(true);
     else setIsLoading(true);
     setErrorMessage(null);
     try {
-      const placeRows = await fetchDiscoverPlaces({ query, limit: PAGE_SIZE, offset });
+      const placeRows = await fetchDiscoverPlaces({
+        query,
+        limit: PAGE_SIZE,
+        offset,
+        continent: nextFilters.continent,
+        minPopulation: nextFilters.minPopulation,
+        sort: nextFilters.sort,
+      });
       setPlaces((prev) => (append ? [...prev, ...placeRows] : placeRows));
       setHasMore(placeRows.length === PAGE_SIZE);
     } catch (error) {
@@ -51,10 +112,10 @@ export function DiscoverScreen() {
 
   React.useEffect(() => {
     const timer = setTimeout(() => {
-      void loadPlaces(searchQuery.trim(), 0, false);
+      void loadPlaces(searchQuery.trim(), 0, false, filters);
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchQuery, loadPlaces]);
+  }, [searchQuery, filters, loadPlaces]);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -110,23 +171,78 @@ export function DiscoverScreen() {
   };
 
   const handlePressAddPlace = (place: DiscoverPlace) => {
-    router.push({ pathname: '/write-review', params: { id: place.id } });
+    setTripPlace(place);
+    setTripError(null);
+  };
+
+  const closeTripModal = () => {
+    if (isCreatingTrip) return;
+    setTripPlace(null);
+    setTripError(null);
+  };
+
+  const confirmStartTrip = async () => {
+    if (!tripPlace || isCreatingTrip) return;
+    setIsCreatingTrip(true);
+    setTripError(null);
+
+    try {
+      const { data } = await supabase.auth.getUser();
+      const activeUserId = data.user?.id;
+      if (!activeUserId) throw new Error('Log in to start a group trip.');
+      const groupName = (tripPlace.city || tripPlace.title).trim();
+      const group = await createGroupApi(groupName, activeUserId, null, tripPlace.id);
+      setTripPlace(null);
+      router.push({ pathname: '/group-hub', params: { groupId: group.id } });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to start this group trip.';
+      setTripError(message);
+    } finally {
+      setIsCreatingTrip(false);
+    }
   };
 
   const handleLoadMore = () => {
     if (isLoadingMore || !hasMore) return;
-    void loadPlaces(searchQuery.trim(), places.length, true);
+    void loadPlaces(searchQuery.trim(), places.length, true, filters);
   };
 
   const statusMessage = isLoading ? 'Loading destinations...' : errorMessage;
   const showStatusMessage = Boolean(statusMessage);
 
-  // BATCH 1: active filter count for badge
-  const activeFilterCount = 0;
+  const activeFilterCount = [filters.continent !== null, filters.minPopulation !== null, filters.sort !== 'relevance'].filter(Boolean).length;
 
-  // BATCH 1: no results but data exists
   const showEmptySearch =
     !isLoading && !errorMessage && places.length === 0;
+
+  const onToggleDraftFilter = (filterId: string) => {
+    if (filterId.startsWith('continent:')) {
+      const code = filterId.split(':')[1];
+      setDraftFilters((prev) => ({ ...prev, continent: code === 'any' ? null : code }));
+      return;
+    }
+    if (filterId.startsWith('pop:')) {
+      const raw = filterId.split(':')[1];
+      setDraftFilters((prev) => ({ ...prev, minPopulation: raw === 'any' ? null : Number(raw) }));
+      return;
+    }
+    if (filterId.startsWith('sort:')) {
+      const raw = filterId.split(':')[1] as SortOption;
+      setDraftFilters((prev) => ({ ...prev, sort: raw }));
+    }
+  };
+
+  const applyFilters = () => {
+    setFilters(draftFilters);
+    setIsFilterOpen(false);
+  };
+
+  const clearFilters = () => {
+    const reset: DiscoverFilters = { continent: null, minPopulation: null, sort: 'relevance' };
+    setDraftFilters(reset);
+    setFilters(reset);
+    setIsFilterOpen(false);
+  };
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -137,7 +253,7 @@ export function DiscoverScreen() {
           onChangeSearchQuery={setSearchQuery}
           searchPlaceholder="Search destinations..."
           activeFilterCount={activeFilterCount}
-          onPressFilter={() => {}}
+          onPressFilter={() => { setDraftFilters(filters); setIsFilterOpen(true); }}
         />
 
         <View style={styles.contentArea}>
@@ -152,20 +268,19 @@ export function DiscoverScreen() {
             ) : showStatusMessage ? (
               <StatusMessage message={statusMessage!} style={styles.statusMessage} />
             ) : showEmptySearch ? (
-              // BATCH 1: Empty search state
               <View style={emptyStyles.container}>
                 <Text style={emptyStyles.emoji}>🔍</Text>
                 <Text style={emptyStyles.title}>
-                  {searchQuery.trim() ? `No results for "${searchQuery.trim()}"` : 'No destinations match'}
+                  {searchQuery.trim() ? `No destinations found for "${searchQuery.trim()}"` : 'No destinations found'}
                 </Text>
                 <Text style={emptyStyles.body}>
-                  Try a different search term.
+                  No destinations found. Try clearing filters or changing your search.
                 </Text>
-                {searchQuery.trim() ? (
+                {(searchQuery.trim() || activeFilterCount > 0) ? (
                   <Text
                     style={emptyStyles.clearLink}
-                    onPress={() => { setSearchQuery(''); }}>
-                    Clear search
+                    onPress={() => { setSearchQuery(''); clearFilters(); }}>
+                    Clear search & filters
                   </Text>
                 ) : null}
               </View>
@@ -190,11 +305,71 @@ export function DiscoverScreen() {
               </View>
             )}
           </ScrollView>
+
+          <FilterSheet
+            isOpen={isFilterOpen}
+            groups={filterGroups}
+            selectedFilters={draftSelectedFilterIds}
+            onToggleFilter={onToggleDraftFilter}
+            onApplyFilters={applyFilters}
+            onClearFilters={clearFilters}
+          />
         </View>
+
+        <Modal visible={Boolean(tripPlace)} transparent animationType="fade" onRequestClose={closeTripModal}>
+          <Pressable style={modalStyles.backdrop} onPress={closeTripModal}>
+            <Pressable style={modalStyles.card} onPress={(event) => event.stopPropagation()}>
+              <Text style={modalStyles.title}>Start a group trip?</Text>
+              <Text style={modalStyles.body}>
+                Do you want to start planning a new group trip to {tripPlace?.region || tripPlace?.title}?
+              </Text>
+              {tripError ? <Text style={modalStyles.errorText}>{tripError}</Text> : null}
+              <View style={modalStyles.actions}>
+                <Pressable style={modalStyles.cancelButton} onPress={closeTripModal} disabled={isCreatingTrip}>
+                  <Text style={modalStyles.cancelText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={[modalStyles.primaryButton, isCreatingTrip && modalStyles.disabledButton]}
+                  onPress={confirmStartTrip}
+                  disabled={isCreatingTrip}>
+                  <Text style={modalStyles.primaryText}>{isCreatingTrip ? 'Creating…' : 'Start trip'}</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
       </View>
     </SafeAreaView>
   );
 }
+
+const modalStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  card: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  title: { fontSize: 17, fontWeight: '800', color: '#0F172A' },
+  body: { marginTop: 8, fontSize: 14, lineHeight: 20, color: '#64748B' },
+  errorText: { marginTop: 10, color: '#BE123C', fontSize: 12, fontWeight: '700' },
+  actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 18 },
+  cancelButton: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: '#F1F5F9' },
+  cancelText: { color: '#0F172A', fontSize: 13, fontWeight: '800' },
+  primaryButton: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: '#008D9B' },
+  primaryText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  disabledButton: { opacity: 0.65 },
+});
 
 const emptyStyles = StyleSheet.create({
   container: {

@@ -24,7 +24,7 @@ type SearchPlaceRow = {
   title?: string | null;
   city?: string | null;
   country?: string | null;
-  countryCode?: string | null;
+  continent?: string | null;
   description?: string | null;
   image?: string | null;
   imageUrl?: string | null;
@@ -59,6 +59,9 @@ export async function fetchDiscoverPlaces(params?: {
   query?: string;
   limit?: number;
   offset?: number;
+  continent?: string | null;
+  minPopulation?: number | null;
+  sort?: 'relevance' | 'population' | 'name';
 }): Promise<DiscoverPlace[]> {
   const base = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
   const query = params?.query?.trim() ?? '';
@@ -70,6 +73,9 @@ export async function fetchDiscoverPlaces(params?: {
     offset: String(offset),
   });
   if (query) qs.set('q', query);
+  if (params?.continent) qs.set('continent', params.continent);
+  if (Number.isFinite(params?.minPopulation as number) && (params?.minPopulation as number) >= 0) qs.set('minPopulation', String(Math.floor(params!.minPopulation!)));
+  if (params?.sort) qs.set('sort', params.sort);
 
   const response = await fetch(`${base}/reviews-api/places/search?${qs.toString()}`, {
     method: 'GET',

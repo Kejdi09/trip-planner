@@ -18,7 +18,7 @@ import {
   fetchTagNamesByReviewIds,
 } from '../../../lib/reviews-api';
 import { supabase } from '../../../lib/supabase';
-import { averageRating, DEFAULT_PLACE_IMAGE, formatPlaceRegion } from '../../../lib/reviews-utils';
+import { averageRating, formatPlaceRegion } from '../../../lib/reviews-utils';
 import { REVIEW_COLORS } from './review-theme';
 import { styles } from './write-review-screen.styles';
 
@@ -32,7 +32,7 @@ export function WriteReviewScreen() {
 
   const [place, setPlace] = React.useState<PlaceRecord | null>(null);
   const [destinationRating, setDestinationRating] = React.useState(0);
-  const [destinationImage, setDestinationImage] = React.useState(DEFAULT_PLACE_IMAGE);
+  const [destinationImage, setDestinationImage] = React.useState<string | null>(null);
   const [popularTags, setPopularTags] = React.useState<string[]>([]);
 
   const [userRating, setUserRating] = React.useState(0);
@@ -74,7 +74,7 @@ export function WriteReviewScreen() {
           setIsEmpty(true);
           setPlace(null);
           setDestinationRating(0);
-          setDestinationImage(DEFAULT_PLACE_IMAGE);
+          setDestinationImage(null);
           return;
         }
 
@@ -103,7 +103,7 @@ export function WriteReviewScreen() {
         setIsEmpty(false);
         setPlace(placeRecord);
         setDestinationRating(averageRating(reviews));
-        setDestinationImage(headerPhoto ?? DEFAULT_PLACE_IMAGE);
+        setDestinationImage(placeRecord.image_url || headerPhoto || null);
         setPopularTags(topTags);
       } catch (error) {
         if (!isMounted) return;

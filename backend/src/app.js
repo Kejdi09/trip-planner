@@ -7,6 +7,7 @@ const votingRoutes = require("./routes/voting.routes");
 const groupsRoutes = require("./routes/groups.routes");
 const reviewsRoutes = require("./routes/reviews.routes");
 const notificationsRoutes = require("./routes/notifications.routes");
+const { createNotificationService } = require("./services/notifications");
 require("dotenv").config();
 
 const required = ["SUPABASE_URL", "SUPABASE_SERVICE_KEY"];
@@ -22,6 +23,8 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_KEY,
 );
+
+const { notifyAcceptedFriends } = createNotificationService(supabaseAdmin);
 
 const USERNAME_REGEX = /^[a-z0-9_]{3,24}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -313,6 +316,25 @@ app.post("/wishlists", ensureClientEnvMatches, async (req, res, next) => {
       );
       wrappedError.status = 502;
       throw wrappedError;
+    }
+
+    try {
+      const [{ data: actor }, { data: place }] = await Promise.all([
+        supabaseAdmin.from("profiles").select("full_name, username").eq("id", userId).maybeSingle(),
+        supabaseAdmin.from("places").select("name, city, country").eq("id", placeId).maybeSingle(),
+      ]);
+      const actorName = actor?.full_name || actor?.username || "A friend";
+      const placeName = place?.name || place?.city || "a place";
+      await notifyAcceptedFriends({
+        actorId: userId,
+        type: "wishlist",
+        title: `${actorName} saved ${placeName}`,
+        body: "Check out this place on TripSync.",
+        relatedEntityType: "wishlist",
+        relatedEntityId: data.id,
+      });
+    } catch (notifyError) {
+      console.error("Wishlist notification fanout failed:", notifyError?.message || notifyError);
     }
 
     return res.status(201).json(data);

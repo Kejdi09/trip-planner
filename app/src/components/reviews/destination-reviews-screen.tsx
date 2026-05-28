@@ -159,7 +159,8 @@ export function DestinationReviewsScreen() {
         setProfiles(profileMap);
         setTagsByReviewId(tagMap);
         setPhotosByReviewId(photoMap);
-        setHeaderImage(headerPhoto ?? DEFAULT_PLACE_IMAGE);
+        const resolvedHeaderImage = placeRecord.image_url || headerPhoto || DEFAULT_PLACE_IMAGE;
+        setHeaderImage(resolvedHeaderImage);
         setRating(averageRating(reviewRows));
       } catch (error) {
         if (!isMounted) {
