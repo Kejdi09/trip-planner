@@ -24,15 +24,30 @@ const C = {
   danger: '#BE123C',
 };
 
-const parseContent = (content: string | null, title?: string | null, body?: string | null) => {
-  if (title || body) return { title: title ?? 'Notification', body: body ?? '' };
-  if (!content) return { title: 'Notification', body: '' };
+const isJsonLike = (value: string) => {
+  const trimmed = value.trim();
+  return (trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'));
+};
+
+const safePlainText = (value?: string | null) => {
+  const trimmed = String(value ?? '').trim();
+  if (!trimmed) return null;
+  if (!isJsonLike(trimmed)) return trimmed;
   try {
-    const parsed = JSON.parse(content) as { title?: string; body?: string };
-    return { title: parsed.title ?? 'Notification', body: parsed.body ?? '' };
+    const parsed = JSON.parse(trimmed) as { title?: unknown; body?: unknown; message?: unknown };
+    const text = parsed.title ?? parsed.body ?? parsed.message;
+    return typeof text === 'string' && !isJsonLike(text) ? text.trim() || null : null;
   } catch {
-    return { title: 'Notification', body: content };
+    return null;
   }
+};
+
+const parseContent = (content: string | null, title?: string | null, body?: string | null) => {
+  const contentText = safePlainText(content);
+  return {
+    title: safePlainText(title) ?? contentText ?? 'Notification',
+    body: safePlainText(body) ?? (!safePlainText(title) ? null : contentText) ?? '',
+  };
 };
 
 const formatTime = (value: string) => {

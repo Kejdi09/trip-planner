@@ -6,6 +6,17 @@ function shortPreview(value, max = 120) {
   return `${text.slice(0, Math.max(0, max - 1))}…`;
 }
 
+function isJsonLike(value) {
+  const text = String(value || '').trim();
+  return (text.startsWith('{') && text.endsWith('}')) || (text.startsWith('[') && text.endsWith(']'));
+}
+
+function safeNotificationText(value, fallback = '') {
+  const text = String(value || '').trim();
+  if (!text || isJsonLike(text)) return fallback;
+  return text;
+}
+
 function notificationContent(title, body) {
   return JSON.stringify({ title, body });
 }
@@ -71,6 +82,8 @@ function createNotificationService(supabaseAdmin) {
     push = true,
   }) {
     if (!userId || !type || !title) return null;
+    const safeTitle = safeNotificationText(title, 'Notification');
+    const safeBody = safeNotificationText(body, '');
 
     if (relatedEntityId) {
       const { data: existing, error: existingError } = await dedupeQuery(
@@ -88,11 +101,11 @@ function createNotificationService(supabaseAdmin) {
       .insert({
         user_id: userId,
         type,
-        title,
-        body: body || '',
+        title: safeTitle,
+        body: safeBody,
         related_entity_type: relatedEntityType,
         related_entity_id: relatedEntityId,
-        content: notificationContent(title, body || ''),
+        content: notificationContent(safeTitle, safeBody),
       })
       .select('id, user_id, type, title, body, related_entity_type, related_entity_id, content, is_read, created_at')
       .single();
@@ -103,7 +116,7 @@ function createNotificationService(supabaseAdmin) {
     }
 
     if (push) {
-      void sendPushNotification({ userId, type, title, body: body || '', relatedEntityType, relatedEntityId });
+      void sendPushNotification({ userId, type, title: safeTitle, body: safeBody, relatedEntityType, relatedEntityId });
     }
 
     return data;
