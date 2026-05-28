@@ -447,7 +447,28 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
         throw wrapped;
       }
 
-      return res.json({ reviews: data || [] });
+      const rows = data || [];
+      const placeIds = Array.from(new Set(rows.map((review) => review.place_id).filter(Boolean)));
+      let placeById = new Map();
+      if (placeIds.length > 0) {
+        const { data: places, error: placesError } = await supabaseAdmin
+          .from('places')
+          .select('id, name, description, city, country, image_url, image_source, image_author, image_author_url, image_fetched_at, created_at')
+          .in('id', placeIds);
+        if (placesError) {
+          const wrapped = new Error(placesError.message || 'Failed to load review places.');
+          wrapped.status = 502;
+          throw wrapped;
+        }
+        placeById = new Map((places || []).map((place) => [place.id, place]));
+      }
+
+      return res.json({
+        reviews: rows.map((review) => ({
+          ...review,
+          place: review.place_id ? placeById.get(review.place_id) || null : null,
+        })),
+      });
     } catch (error) {
       return next(error);
     }

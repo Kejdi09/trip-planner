@@ -92,10 +92,18 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     gap: rs(12),
   },
-  avatar: {
-    width: rs(32),
-    height: rs(32),
-    borderRadius: rs(16),
+  reviewImage: {
+    width: rs(42),
+    height: rs(42),
+    borderRadius: rs(12),
+    backgroundColor: REVIEW_COLORS.surfaceMuted,
+  },
+  reviewImagePlaceholder: {
+    width: rs(42),
+    height: rs(42),
+    borderRadius: rs(12),
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   reviewMeta: {
     flex: 1,

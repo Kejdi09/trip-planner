@@ -26,6 +26,7 @@ type ReviewRecord = {
   rating: number | null;
   review: string | null;
   created_at: string | null;
+  place?: PlaceRecord | null;
 };
 
 type ProfileRecord = {
@@ -164,7 +165,7 @@ export async function fetchPlacesByIds(placeIds: string[]): Promise<PlaceRecord[
   if (placeIds.length === 0) return [];
   const { data, error } = await supabase
     .from('places')
-    .select('id, name, description, city, country, created_at')
+    .select('id, name, description, city, country, image_url, image_source, image_author, image_author_url, image_fetched_at, created_at')
     .in('id', placeIds);
 
   if (error) throw error;
