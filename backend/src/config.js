@@ -45,4 +45,7 @@ module.exports = {
   supabaseUrl: selectedConfig.supabaseUrl,
   supabaseServiceKey: selectedConfig.supabaseServiceKey,
   pexelsApiKey: process.env.PEXELS_API_KEY ?? null,
+  deepseekApiKey: process.env.DEEPSEEK_API_KEY ?? null,
+  deepseekApiUrl: process.env.DEEPSEEK_API_URL ?? 'https://api.deepseek.com/chat/completions',
+  deepseekModel: process.env.DEEPSEEK_MODEL ?? 'deepseek-chat',
 };

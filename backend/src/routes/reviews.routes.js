@@ -1,5 +1,6 @@
 const express = require('express');
 const { fetchPexelsImageForPlace, hasPexelsApiKey } = require('../lib/place-images');
+const { deepseekApiKey, deepseekApiUrl, deepseekModel } = require('../config');
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -21,13 +22,14 @@ function parseOffset(value, fallback = 0) {
 }
 
 function normalizePlaceRow(place) {
+  const description = isValidPlaceDescription(place.description, place) ? place.description : null;
   return {
     id: place.id,
     title: place.name || place.city || 'Unknown place',
     city: place.city || null,
     country: place.country || null,
     countryCode: place.country_code || null,
-    description: place.description || null,
+    description,
     image: place.image_url || null,
     imageUrl: place.image_url || null,
     latitude: place.latitude ?? null,
@@ -35,6 +37,26 @@ function normalizePlaceRow(place) {
     population: place.population ?? null,
     source: place.external_source || null,
   };
+}
+
+function isValidPlaceDescription(text, place) {
+  const normalized = String(text || '').trim();
+  if (!normalized) return false;
+  if (!/[.!?]$/.test(normalized)) return false;
+  if (/[*#`_]/.test(normalized)) return false;
+  const words = normalized.split(/\s+/).filter(Boolean);
+  if (words.length < 8 || words.length > 35) return false;
+  const lowered = normalized.toLowerCase();
+  const badEndings = [
+    'offering visitors', 'offering', 'featuring', 'including', 'with', 'known for', 'home to',
+    'and', 'or', 'to', 'for',
+  ];
+  if (badEndings.some((ending) => lowered.endsWith(ending) || lowered.endsWith(`${ending}.`))) return false;
+  const city = String(place.city || place.name || '').trim().toLowerCase();
+  const country = String(place.country || '').trim().toLowerCase();
+  if (city && !lowered.includes(city)) return false;
+  if (country && !lowered.includes(country)) return false;
+  return true;
 }
 
 async function enrichPlacesWithImages(supabaseAdmin, rows, maxFetches = 5) {
@@ -102,9 +124,7 @@ async function enrichPlacesWithImages(supabaseAdmin, rows, maxFetches = 5) {
 }
 
 async function generatePlaceOverview(place) {
-  const apiKey = process.env.DEEPSEEK_API_KEY;
-  const model = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
-  if (!apiKey) return null;
+  if (!deepseekApiKey) return null;
   const city = String(place.city || place.name || '').trim();
   const country = String(place.country || '').trim();
   if (!city || !country) return null;
@@ -112,11 +132,11 @@ async function generatePlaceOverview(place) {
   const systemPrompt = 'You are a concise travel copywriter. Return exactly one complete sentence.';
   const userPrompt = `Write exactly one complete, factual travel overview sentence for ${city}, ${country}. Keep it between 22 and 30 words. No markdown. No emojis. No hashtags. No unfinished clauses. The sentence must end with punctuation.`;
 
-  const response = await fetch('https://api.deepseek.com/chat/completions', {
+  const response = await fetch(deepseekApiUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${deepseekApiKey}` },
     body: JSON.stringify({
-      model,
+      model: deepseekModel,
       messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
       temperature: 0.2,
       max_tokens: 100,
@@ -129,38 +149,6 @@ async function generatePlaceOverview(place) {
   const unquoted = rawContent.replace(/^["']+|["']+$/g, '').trim();
   const singleLine = unquoted.replace(/\s+/g, ' ');
   return singleLine;
-}
-
-function isValidOverviewDescription(text, place) {
-  const normalized = String(text || '').trim();
-  if (!normalized) return false;
-  if (!/[.!?]$/.test(normalized)) return false;
-  if (/[*#`_]/.test(normalized)) return false;
-  const words = normalized.split(/\s+/).filter(Boolean);
-  if (words.length < 8 || words.length > 35) return false;
-  const lowered = normalized.toLowerCase();
-  const badEndings = [
-    'offering',
-    'offering visitors',
-    'featuring',
-    'including',
-    'with',
-    'and',
-    'or',
-    'but',
-    'to',
-    'for',
-    'where',
-    'while',
-    'known for',
-    'home to',
-  ];
-  if (badEndings.some((ending) => lowered.endsWith(ending) || lowered.endsWith(`${ending}.`))) return false;
-  const city = String(place.city || place.name || '').trim().toLowerCase();
-  const country = String(place.country || '').trim().toLowerCase();
-  if (city && !lowered.includes(city)) return false;
-  if (country && !lowered.includes(country)) return false;
-  return true;
 }
 
 module.exports = function reviewsRoutes(supabaseAdmin) {
@@ -309,30 +297,43 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
       if (!data) return res.status(404).json({ error: 'Place not found.' });
 
       const existingDescription = String(data.description || '').trim();
-      const hasCompleteDescription = isValidOverviewDescription(existingDescription, data);
+      const hasCompleteDescription = isValidPlaceDescription(existingDescription, data);
       if (hasCompleteDescription) return res.json(data);
+      console.log('[place-description] invalid cached description', { placeId, city: data.city, country: data.country });
 
       try {
+        if (!deepseekApiKey) {
+          console.log('[place-description] generation skipped because missing DeepSeek config', { placeId, city: data.city, country: data.country });
+          return res.json({ ...data, description: null });
+        }
+        console.log('[place-description] attempting generation', { placeId, city: data.city, country: data.country });
         let overview = null;
         for (let attempt = 0; attempt < 2; attempt += 1) {
           const generated = await generatePlaceOverview(data);
-          if (isValidOverviewDescription(generated, data)) {
+          if (isValidPlaceDescription(generated, data)) {
             overview = generated;
             break;
           }
         }
-        if (!overview) return res.json({ ...data, description: null });
+        if (!overview) {
+          console.log('[place-description] generation failed', { placeId, city: data.city, country: data.country, reason: 'invalid-ai-output' });
+          return res.json({ ...data, description: null });
+        }
         const { data: updated, error: updateError } = await supabaseAdmin
           .from('places')
           .update({ description: overview })
           .eq('id', placeId)
           .select('id, name, description, city, country, image_url, image_source, image_author, image_author_url, image_fetched_at, created_at')
           .maybeSingle();
-        if (updateError || !updated) return res.json(data);
+        if (updateError || !updated) {
+          console.log('[place-description] generation failed', { placeId, city: data.city, country: data.country, reason: updateError?.message || 'update-failed' });
+          return res.json({ ...data, description: null });
+        }
+        console.log('[place-description] generation success', { placeId, city: updated.city, country: updated.country });
         return res.json(updated);
       } catch (aiError) {
-        console.error('[places/:placeId] overview generation failed', aiError);
-        return res.json(data);
+        console.error('[place-description] generation failed', { placeId, city: data.city, country: data.country, error: aiError?.message || String(aiError) });
+        return res.json({ ...data, description: null });
       }
     } catch (error) {
       return next(error);
