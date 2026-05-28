@@ -190,6 +190,7 @@ module.exports = function groupsRoutes(supabaseAdmin) {
       const name = String(req.body?.name || '').trim();
       const description = String(req.body?.description || '').trim() || null;
       const createdBy = String(req.body?.createdBy || req.body?.created_by || '').trim();
+      const requestedDestinationPlaceId = String(req.body?.destinationPlaceId || req.body?.destination_place_id || '').trim();
 
       if (!name || name.length < 3) {
         return res.status(400).json({ error: 'Group name must be at least 3 characters.' });
@@ -225,10 +226,15 @@ module.exports = function groupsRoutes(supabaseAdmin) {
       }
 
       let destinationPlaceId = null;
-      try {
-        destinationPlaceId = await resolveDestinationPlaceIdFromName(supabaseAdmin, name);
-      } catch (error) {
-        console.warn('Mapbox destination lookup failed:', error?.message || error);
+      if (requestedDestinationPlaceId) {
+        assertUuid(requestedDestinationPlaceId, 'destinationPlaceId');
+        destinationPlaceId = requestedDestinationPlaceId;
+      } else {
+        try {
+          destinationPlaceId = await resolveDestinationPlaceIdFromName(supabaseAdmin, name);
+        } catch (error) {
+          console.warn('Mapbox destination lookup failed:', error?.message || error);
+        }
       }
 
       const { data: group, error: groupError } = await supabaseAdmin

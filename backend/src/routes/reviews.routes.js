@@ -2,6 +2,7 @@ const express = require('express');
 const { fetchPexelsImageForPlace, hasPexelsApiKey } = require('../lib/place-images');
 const { deepseekApiKey } = require('../config');
 const { callDeepSeekChat } = require('../services/deepseek');
+const { ensureGroupDestinationPlace } = require('../services/destinations');
 
 
 const CONTINENT_COUNTRY_CODES = {
@@ -268,7 +269,6 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
           .from('groups')
           .select('id, name, created_by, destination_place_id, status, created_at')
           .in('created_by', friendIds)
-          .not('destination_place_id', 'is', null)
           .order('created_at', { ascending: false })
           .limit(sourceLimit),
         supabaseAdmin
@@ -297,8 +297,7 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
         const { data: groupsForMemberships, error: joinedGroupsError } = await supabaseAdmin
           .from('groups')
           .select('id, name, destination_place_id, created_by, status, created_at')
-          .in('id', memberGroupIds)
-          .not('destination_place_id', 'is', null);
+          .in('id', memberGroupIds);
         if (joinedGroupsError) {
           const wrapped = new Error(joinedGroupsError.message || 'Failed to load joined trip metadata.');
           wrapped.status = 502;
@@ -306,6 +305,20 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
         }
         joinedGroups = groupsForMemberships || [];
       }
+
+      const ensureFeedGroupPlace = async (group) => {
+        if (group?.destination_place_id) return group;
+        try {
+          const place = await ensureGroupDestinationPlace(supabaseAdmin, group);
+          if (place?.id) return { ...group, destination_place_id: place.id };
+        } catch (error) {
+          console.warn('[feed] failed to resolve group destination', { groupId: group?.id, error: error?.message || String(error) });
+        }
+        return group;
+      };
+
+      const resolvedPlannedGroups = await Promise.all(plannedGroups.map(ensureFeedGroupPlace));
+      joinedGroups = await Promise.all(joinedGroups.map(ensureFeedGroupPlace));
 
       const joinedGroupById = new Map(joinedGroups.map((group) => [group.id, group]));
       const joinedMemberships = memberships.filter((membership) => {
@@ -318,14 +331,14 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
       const actorIds = Array.from(new Set([
         ...reviews.map((review) => review.user_id),
         ...wishlists.map((wishlist) => wishlist.user_id),
-        ...plannedGroups.map((group) => group.created_by),
+        ...resolvedPlannedGroups.map((group) => group.created_by),
         ...joinedMemberships.map((membership) => membership.user_id),
       ].filter(Boolean)));
 
       const placeIds = Array.from(new Set([
         ...reviews.map((review) => review.place_id),
         ...wishlists.map((wishlist) => wishlist.place_id),
-        ...plannedGroups.map((group) => group.destination_place_id),
+        ...resolvedPlannedGroups.map((group) => group.destination_place_id),
         ...joinedMemberships.map((membership) => joinedGroupById.get(membership.group_id)?.destination_place_id),
       ].filter(Boolean)));
 
@@ -338,7 +351,7 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
         placeIds.length
           ? supabaseAdmin
             .from('places')
-            .select('id, name, city, country, image_url, image_source, image_author, image_author_url')
+            .select('id, name, city, country, image_url, image_source, image_author, image_author_url, image_fetched_at')
             .in('id', placeIds)
           : { data: [], error: null },
         reviewIds.length
@@ -354,7 +367,8 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
       }
 
       const profileById = new Map((profilesRes.data || []).map((profile) => [profile.id, profile]));
-      const placeById = new Map((placesRes.data || []).map((place) => [place.id, place]));
+      const hydratedPlaces = await enrichPlacesWithImages(supabaseAdmin, placesRes.data || [], 5);
+      const placeById = new Map(hydratedPlaces.map((place) => [place.id, place]));
       const firstPhotoByReviewId = new Map();
       (photosRes.data || []).forEach((photo) => {
         if (photo.review_id && photo.image_url && !firstPhotoByReviewId.has(photo.review_id)) {
@@ -412,7 +426,7 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
         createdAt: wishlist.created_at,
       }));
 
-      const plannedItems = plannedGroups.map((group) => ({
+      const plannedItems = resolvedPlannedGroups.filter((group) => group.destination_place_id).map((group) => ({
         id: `planned:${group.id}`,
         type: 'planned',
         actor: normalizeActor(group.created_by),

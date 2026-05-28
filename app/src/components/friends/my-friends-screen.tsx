@@ -3,10 +3,9 @@ import { router } from 'expo-router';
 import React from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   Image,
-  Platform,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -162,6 +161,34 @@ const styles = StyleSheet.create({
   emptyStateText: { fontSize: rs(14), color: C.mutedText, fontWeight: '500', marginTop: rs(8), textAlign: 'center' },
 });
 
+const modalStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: rs(24),
+  },
+  card: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: rs(18),
+    backgroundColor: '#FFFFFF',
+    padding: rs(18),
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  title: { fontSize: rs(17), fontWeight: '800', color: C.text },
+  body: { marginTop: rs(8), fontSize: rs(14), lineHeight: rs(20), color: C.mutedText },
+  errorText: { marginTop: rs(10), color: '#BE123C', fontSize: rs(12), fontWeight: '700' },
+  actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: rs(10), marginTop: rs(18) },
+  cancelButton: { paddingHorizontal: rs(14), paddingVertical: rs(10), borderRadius: rs(12), backgroundColor: C.removeButton },
+  cancelText: { color: C.text, fontSize: rs(13), fontWeight: '800' },
+  removeConfirmButton: { paddingHorizontal: rs(14), paddingVertical: rs(10), borderRadius: rs(12), backgroundColor: '#BE123C' },
+  removeConfirmText: { color: '#FFFFFF', fontSize: rs(13), fontWeight: '800' },
+  disabledButton: { opacity: 0.65 },
+});
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -191,6 +218,7 @@ export function MyFriendsScreen() {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [removingIds, setRemovingIds] = React.useState<Set<string>>(new Set());
   const [removeError, setRemoveError] = React.useState<string | null>(null);
+  const [friendToRemove, setFriendToRemove] = React.useState<Friend | null>(null);
 
   React.useEffect(() => {
     (async () => {
@@ -254,7 +282,7 @@ export function MyFriendsScreen() {
   const topFriends = [...friends].sort((a, b) => b.tripCount - a.tripCount).slice(0, 3);
 
   const removeFriend = async (friend: Friend) => {
-    if (removingIds.has(friend.id)) return;
+    if (removingIds.has(friend.id)) return false;
     setRemoveError(null);
     setRemovingIds((prev) => new Set(prev).add(friend.id));
     const { data: authData } = await supabase.auth.getUser();
@@ -279,7 +307,6 @@ export function MyFriendsScreen() {
         error,
       });
       setRemoveError('Could not remove friend. Please try again.');
-      Alert.alert('Could not remove friend', 'Please try again.');
     } else if (!data || data.length === 0) {
       console.error('Delete matched zero friendship rows', {
         friendId: friend.id,
@@ -291,28 +318,30 @@ export function MyFriendsScreen() {
         .eq('id', friend.friendshipId);
       console.log('[friends] row after failed delete', { existingRows, existingError });
       setRemoveError('Could not remove friend. No friendship row was deleted.');
-      Alert.alert('Could not remove friend', 'Could not remove friend. No friendship row was deleted.');
     } else {
       setFriends((prev) => prev.filter((f) => f.id !== friend.id));
+      setFriendToRemove(null);
+      setRemovingIds((prev) => { const n = new Set(prev); n.delete(friend.id); return n; });
+      return true;
     }
     setRemovingIds((prev) => { const n = new Set(prev); n.delete(friend.id); return n; });
+    return false;
   };
 
   const handleRemove = (friend: Friend) => {
-    if (Platform.OS === 'web') {
-      const confirmed = globalThis.confirm?.(`Remove ${friend.fullName} as a friend?`) ?? false;
-      if (confirmed) void removeFriend(friend);
-      return;
-    }
+    setRemoveError(null);
+    setFriendToRemove(friend);
+  };
 
-    Alert.alert(
-      'Remove Friend',
-      `Remove ${friend.fullName} as a friend?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Remove', style: 'destructive', onPress: () => { void removeFriend(friend); } },
-      ],
-    );
+  const closeRemoveModal = () => {
+    if (friendToRemove && removingIds.has(friendToRemove.id)) return;
+    setFriendToRemove(null);
+    setRemoveError(null);
+  };
+
+  const confirmRemoveFriend = () => {
+    if (!friendToRemove) return;
+    void removeFriend(friendToRemove);
   };
 
   return (
@@ -410,6 +439,28 @@ export function MyFriendsScreen() {
           </ScrollView>
         )}
 
+        <Modal visible={Boolean(friendToRemove)} transparent animationType="fade" onRequestClose={closeRemoveModal}>
+          <Pressable style={modalStyles.backdrop} onPress={closeRemoveModal}>
+            <Pressable style={modalStyles.card} onPress={(event) => event.stopPropagation()}>
+              <Text style={modalStyles.title}>Remove friend?</Text>
+              <Text style={modalStyles.body}>
+                Remove {friendToRemove?.fullName ?? 'this friend'} from your friends? You can always add them again later.
+              </Text>
+              {removeError ? <Text style={modalStyles.errorText}>{removeError}</Text> : null}
+              <View style={modalStyles.actions}>
+                <Pressable style={modalStyles.cancelButton} onPress={closeRemoveModal} disabled={Boolean(friendToRemove && removingIds.has(friendToRemove.id))}>
+                  <Text style={modalStyles.cancelText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={[modalStyles.removeConfirmButton, friendToRemove && removingIds.has(friendToRemove.id) && modalStyles.disabledButton]}
+                  onPress={confirmRemoveFriend}
+                  disabled={Boolean(friendToRemove && removingIds.has(friendToRemove.id))}>
+                  <Text style={modalStyles.removeConfirmText}>{friendToRemove && removingIds.has(friendToRemove.id) ? 'Removing…' : 'Remove'}</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
       </View>
     </SafeAreaView>
   );

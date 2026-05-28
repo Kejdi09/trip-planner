@@ -86,11 +86,16 @@ export async function fetchMyGroups(userId?: string) {
   return request<{ groups: GroupRow[] }>(`/api/groups?${params.toString()}`, { method: 'GET' });
 }
 
-export async function createGroupApi(name: string, createdBy?: string, description?: string) {
+export async function createGroupApi(name: string, createdBy?: string, description?: string, destinationPlaceId?: string | null) {
   const resolvedUserId = await resolveActiveUserId(createdBy);
   return request<GroupRow>('/api/groups', {
     method: 'POST',
-    body: JSON.stringify({ name, createdBy: resolvedUserId, description: description ?? null }),
+    body: JSON.stringify({
+      name,
+      createdBy: resolvedUserId,
+      description: description ?? null,
+      destinationPlaceId: destinationPlaceId ?? null,
+    }),
   });
 }
 

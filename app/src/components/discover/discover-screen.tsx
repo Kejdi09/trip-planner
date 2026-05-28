@@ -1,6 +1,6 @@
 import React from 'react';
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppLoading } from '@/components/common/AppLoading';
@@ -11,6 +11,7 @@ import { StatusMessage } from '@/components/ui/status-message';
 import type { FilterGroup } from '@/components/ui/types';
 import type { DiscoverPlace } from '../../../lib/discover-api';
 import { fetchDiscoverPlaces } from '../../../lib/discover-api';
+import { createGroupApi } from '../../../lib/groups-api';
 import { supabase } from '../../../lib/supabase';
 import {
   addWishlistPlace,
@@ -68,6 +69,9 @@ export function DiscoverScreen() {
   const [isFilterOpen, setIsFilterOpen] = React.useState(false);
   const [filters, setFilters] = React.useState<DiscoverFilters>({ continent: null, minPopulation: null, sort: 'relevance' });
   const [draftFilters, setDraftFilters] = React.useState<DiscoverFilters>(filters);
+  const [tripPlace, setTripPlace] = React.useState<DiscoverPlace | null>(null);
+  const [isCreatingTrip, setIsCreatingTrip] = React.useState(false);
+  const [tripError, setTripError] = React.useState<string | null>(null);
 
   const filterGroups = React.useMemo<FilterGroup[]>(() => [
     { id: 'continent', title: 'Continent', options: CONTINENT_OPTIONS.map((x) => ({ id: x.id, label: x.label })), layout: 'wrap' },
@@ -167,7 +171,35 @@ export function DiscoverScreen() {
   };
 
   const handlePressAddPlace = (place: DiscoverPlace) => {
-    router.push({ pathname: '/write-review', params: { id: place.id } });
+    setTripPlace(place);
+    setTripError(null);
+  };
+
+  const closeTripModal = () => {
+    if (isCreatingTrip) return;
+    setTripPlace(null);
+    setTripError(null);
+  };
+
+  const confirmStartTrip = async () => {
+    if (!tripPlace || isCreatingTrip) return;
+    setIsCreatingTrip(true);
+    setTripError(null);
+
+    try {
+      const { data } = await supabase.auth.getUser();
+      const activeUserId = data.user?.id;
+      if (!activeUserId) throw new Error('Log in to start a group trip.');
+      const groupName = (tripPlace.city || tripPlace.title).trim();
+      const group = await createGroupApi(groupName, activeUserId, null, tripPlace.id);
+      setTripPlace(null);
+      router.push({ pathname: '/group-hub', params: { groupId: group.id } });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to start this group trip.';
+      setTripError(message);
+    } finally {
+      setIsCreatingTrip(false);
+    }
   };
 
   const handleLoadMore = () => {
@@ -283,10 +315,61 @@ export function DiscoverScreen() {
             onClearFilters={clearFilters}
           />
         </View>
+
+        <Modal visible={Boolean(tripPlace)} transparent animationType="fade" onRequestClose={closeTripModal}>
+          <Pressable style={modalStyles.backdrop} onPress={closeTripModal}>
+            <Pressable style={modalStyles.card} onPress={(event) => event.stopPropagation()}>
+              <Text style={modalStyles.title}>Start a group trip?</Text>
+              <Text style={modalStyles.body}>
+                Do you want to start planning a new group trip to {tripPlace?.region || tripPlace?.title}?
+              </Text>
+              {tripError ? <Text style={modalStyles.errorText}>{tripError}</Text> : null}
+              <View style={modalStyles.actions}>
+                <Pressable style={modalStyles.cancelButton} onPress={closeTripModal} disabled={isCreatingTrip}>
+                  <Text style={modalStyles.cancelText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={[modalStyles.primaryButton, isCreatingTrip && modalStyles.disabledButton]}
+                  onPress={confirmStartTrip}
+                  disabled={isCreatingTrip}>
+                  <Text style={modalStyles.primaryText}>{isCreatingTrip ? 'Creating…' : 'Start trip'}</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
       </View>
     </SafeAreaView>
   );
 }
+
+const modalStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  card: {
+    width: '100%',
+    maxWidth: 420,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  title: { fontSize: 17, fontWeight: '800', color: '#0F172A' },
+  body: { marginTop: 8, fontSize: 14, lineHeight: 20, color: '#64748B' },
+  errorText: { marginTop: 10, color: '#BE123C', fontSize: 12, fontWeight: '700' },
+  actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 18 },
+  cancelButton: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: '#F1F5F9' },
+  cancelText: { color: '#0F172A', fontSize: 13, fontWeight: '800' },
+  primaryButton: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, backgroundColor: '#008D9B' },
+  primaryText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  disabledButton: { opacity: 0.65 },
+});
 
 const emptyStyles = StyleSheet.create({
   container: {
