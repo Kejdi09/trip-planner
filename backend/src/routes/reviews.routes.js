@@ -85,6 +85,34 @@ async function enrichPlacesWithImages(supabaseAdmin, rows, maxFetches = 5) {
   return result;
 }
 
+async function generatePlaceOverview(place) {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  const model = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+  if (!apiKey) return null;
+  const city = String(place.city || place.name || '').trim();
+  const country = String(place.country || '').trim();
+  if (!city || !country) return null;
+
+  const systemPrompt = 'You are a concise travel copywriter. Output one factual sentence only.';
+  const userPrompt = `Write one short, factual travel overview sentence for ${city}, ${country}. Max 30 words. No markdown. No emojis. Do not invent specific events or statistics.`;
+
+  const response = await fetch('https://api.deepseek.com/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+      temperature: 0.2,
+      max_tokens: 90,
+    }),
+  });
+  if (!response.ok) return null;
+  const payload = await response.json().catch(() => null);
+  const content = String(payload?.choices?.[0]?.message?.content || '').trim();
+  if (!content) return null;
+  return content.split(/\s+/).slice(0, 35).join(' ');
+}
+
 module.exports = function reviewsRoutes(supabaseAdmin) {
   const router = express.Router();
 
@@ -211,7 +239,7 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
 
       const { data, error } = await supabaseAdmin
         .from('places')
-        .select('id, name, description, city, country, created_at')
+        .select('id, name, description, city, country, image_url, image_source, image_author, image_author_url, image_fetched_at, created_at')
         .eq('id', placeId)
         .maybeSingle();
 
@@ -222,7 +250,25 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
       }
 
       if (!data) return res.status(404).json({ error: 'Place not found.' });
-      return res.json(data);
+
+      const existingDescription = String(data.description || '').trim();
+      if (existingDescription) return res.json(data);
+
+      try {
+        const overview = await generatePlaceOverview(data);
+        if (!overview) return res.json(data);
+        const { data: updated, error: updateError } = await supabaseAdmin
+          .from('places')
+          .update({ description: overview })
+          .eq('id', placeId)
+          .select('id, name, description, city, country, image_url, image_source, image_author, image_author_url, image_fetched_at, created_at')
+          .maybeSingle();
+        if (updateError || !updated) return res.json(data);
+        return res.json(updated);
+      } catch (aiError) {
+        console.error('[places/:placeId] overview generation failed', aiError);
+        return res.json(data);
+      }
     } catch (error) {
       return next(error);
     }

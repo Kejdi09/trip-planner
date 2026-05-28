@@ -11,6 +11,11 @@ type PlaceRecord = {
   description: string | null;
   city: string | null;
   country: string | null;
+  image_url?: string | null;
+  image_source?: string | null;
+  image_author?: string | null;
+  image_author_url?: string | null;
+  image_fetched_at?: string | null;
   created_at: string | null;
 };
 
@@ -61,7 +66,7 @@ export async function fetchPlaceById(placeId: string): Promise<PlaceRecord | nul
 
   const { data, error } = await supabase
     .from('places')
-    .select('id, name, description, city, country, created_at')
+    .select('id, name, description, city, country, image_url, image_source, image_author, image_author_url, image_fetched_at, created_at')
     .eq('id', placeId)
     .maybeSingle();
 
@@ -86,7 +91,7 @@ export async function fetchFirstPlace(): Promise<PlaceRecord | null> {
 
   const { data, error } = await supabase
     .from('places')
-    .select('id, name, description, city, country, created_at')
+    .select('id, name, description, city, country, image_url, image_source, image_author, image_author_url, image_fetched_at, created_at')
     .order('created_at', { ascending: false })
     .limit(1);
 

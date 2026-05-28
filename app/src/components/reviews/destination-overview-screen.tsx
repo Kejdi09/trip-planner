@@ -20,8 +20,6 @@ import { averageRating, DEFAULT_PLACE_IMAGE, formatPlaceRegion } from '../../../
 import { REVIEW_COLORS } from './review-theme';
 import { styles } from './destination-overview-screen.styles';
 
-const FALLBACK_DESCRIPTION =
-  "Kyoto, Japan's cultural heart, offers tranquil temples, moss gardens, and traditional wooden houses.";
 
 type PhotoItem = {
   id: string;
@@ -165,9 +163,11 @@ export function DestinationOverviewScreen() {
   const destinationRegion = hasDestination
     ? formatPlaceRegion(place?.city ?? null, place?.country ?? null)
     : '';
-  const summaryImage = hasDestination ? photos[0]?.url ?? DEFAULT_PLACE_IMAGE : DEFAULT_PLACE_IMAGE;
+  const summaryImage = hasDestination
+    ? place?.image_url || photos[0]?.url || DEFAULT_PLACE_IMAGE
+    : DEFAULT_PLACE_IMAGE;
   const summaryDescription = hasDestination
-    ? place?.description?.trim() || FALLBACK_DESCRIPTION
+    ? place?.description?.trim() || 'No overview available yet.'
     : '';
   const displayTags = hasDestination ? tags.filter(isValidTag) : [];
   const displayPhotos = hasDestination ? photos : [];
