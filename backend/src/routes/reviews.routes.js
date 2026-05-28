@@ -93,8 +93,8 @@ async function generatePlaceOverview(place) {
   const country = String(place.country || '').trim();
   if (!city || !country) return null;
 
-  const systemPrompt = 'You are a concise travel copywriter. Output one factual sentence only.';
-  const userPrompt = `Write one short, factual travel overview sentence for ${city}, ${country}. Max 30 words. No markdown. No emojis. Do not invent specific events or statistics.`;
+  const systemPrompt = 'You are a concise travel copywriter. Return exactly one complete sentence.';
+  const userPrompt = `Write exactly one complete, factual travel overview sentence for ${city}, ${country}. Keep it between 22 and 30 words. No markdown. No emojis. No hashtags. No unfinished clauses. The sentence must end with punctuation.`;
 
   const response = await fetch('https://api.deepseek.com/chat/completions', {
     method: 'POST',
@@ -103,14 +103,21 @@ async function generatePlaceOverview(place) {
       model,
       messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
       temperature: 0.2,
-      max_tokens: 90,
+      max_tokens: 100,
     }),
   });
   if (!response.ok) return null;
   const payload = await response.json().catch(() => null);
-  const content = String(payload?.choices?.[0]?.message?.content || '').trim();
-  if (!content) return null;
-  return content.split(/\s+/).slice(0, 35).join(' ');
+  const rawContent = String(payload?.choices?.[0]?.message?.content || '').trim();
+  if (!rawContent) return null;
+  const unquoted = rawContent.replace(/^["']+|["']+$/g, '').trim();
+  const singleLine = unquoted.replace(/\s+/g, ' ');
+  const sentence = singleLine.split(/[.!?](?=\s|$)/)[0]?.trim() || singleLine;
+  if (!sentence) return null;
+  const wordBounded = sentence.split(/\s+/).slice(0, 35).join(' ').trim();
+  if (!wordBounded) return null;
+  const finalized = /[.!?]$/.test(wordBounded) ? wordBounded : `${wordBounded}.`;
+  return finalized;
 }
 
 module.exports = function reviewsRoutes(supabaseAdmin) {
@@ -252,7 +259,8 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
       if (!data) return res.status(404).json({ error: 'Place not found.' });
 
       const existingDescription = String(data.description || '').trim();
-      if (existingDescription) return res.json(data);
+      const hasCompleteDescription = Boolean(existingDescription) && /[.!?]$/.test(existingDescription);
+      if (hasCompleteDescription) return res.json(data);
 
       try {
         const overview = await generatePlaceOverview(data);

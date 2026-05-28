@@ -126,11 +126,13 @@ export const styles = StyleSheet.create({
   descriptionCard: {
     backgroundColor: REVIEW_COLORS.surfaceMuted,
     borderRadius: rs(14),
-    padding: rs(14),
+    paddingHorizontal: rs(14),
+    paddingVertical: rs(16),
+    minHeight: rs(72),
   },
   descriptionText: {
-    fontSize: rs(13),
-    lineHeight: rs(18),
+    fontSize: rs(14),
+    lineHeight: rs(21),
     color: REVIEW_COLORS.textSecondary,
   },
   sectionHint: {
