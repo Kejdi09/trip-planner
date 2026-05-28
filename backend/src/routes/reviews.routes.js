@@ -219,6 +219,125 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
   }
 
 
+
+  router.get('/feed', async (req, res, next) => {
+    try {
+      const userId = String(req.query.userId || '').trim();
+      if (!isValidUuid(userId)) {
+        return res.status(400).json({ error: 'userId must be a valid UUID.' });
+      }
+
+      const limit = parseLimit(req.query.limit, 20, 50);
+      const offset = parseOffset(req.query.offset, 0);
+
+      const { data: friendships, error: friendshipError } = await supabaseAdmin
+        .from('friendships')
+        .select('requester_id, receiver_id')
+        .eq('status', 'accepted')
+        .or(`requester_id.eq.${userId},receiver_id.eq.${userId}`);
+
+      if (friendshipError) {
+        const wrapped = new Error(friendshipError.message || 'Failed to load friends.');
+        wrapped.status = 502;
+        throw wrapped;
+      }
+
+      const friendIds = Array.from(new Set((friendships || [])
+        .map((row) => (row.requester_id === userId ? row.receiver_id : row.requester_id))
+        .filter(Boolean)));
+
+      if (friendIds.length === 0) return res.json({ items: [] });
+
+      const { data: reviews, error: reviewError } = await supabaseAdmin
+        .from('reviews')
+        .select('id, user_id, place_id, rating, review, created_at')
+        .in('user_id', friendIds)
+        .not('place_id', 'is', null)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (reviewError) {
+        const wrapped = new Error(reviewError.message || 'Failed to load feed reviews.');
+        wrapped.status = 502;
+        throw wrapped;
+      }
+
+      const rows = reviews || [];
+      if (rows.length === 0) return res.json({ items: [] });
+
+      const actorIds = Array.from(new Set(rows.map((review) => review.user_id).filter(Boolean)));
+      const placeIds = Array.from(new Set(rows.map((review) => review.place_id).filter(Boolean)));
+      const reviewIds = rows.map((review) => review.id);
+
+      const [profilesRes, placesRes, photosRes] = await Promise.all([
+        actorIds.length
+          ? supabaseAdmin.from('profiles').select('id, full_name, username, avatar_url').in('id', actorIds)
+          : { data: [], error: null },
+        placeIds.length
+          ? supabaseAdmin
+            .from('places')
+            .select('id, name, city, country, image_url, image_source, image_author, image_author_url')
+            .in('id', placeIds)
+          : { data: [], error: null },
+        reviewIds.length
+          ? supabaseAdmin.from('review_photos').select('review_id, image_url').in('review_id', reviewIds)
+          : { data: [], error: null },
+      ]);
+
+      if (profilesRes.error || placesRes.error || photosRes.error) {
+        const err = profilesRes.error || placesRes.error || photosRes.error;
+        const wrapped = new Error(err?.message || 'Failed to load feed metadata.');
+        wrapped.status = 502;
+        throw wrapped;
+      }
+
+      const profileById = new Map((profilesRes.data || []).map((profile) => [profile.id, profile]));
+      const placeById = new Map((placesRes.data || []).map((place) => [place.id, place]));
+      const firstPhotoByReviewId = new Map();
+      (photosRes.data || []).forEach((photo) => {
+        if (photo.review_id && photo.image_url && !firstPhotoByReviewId.has(photo.review_id)) {
+          firstPhotoByReviewId.set(photo.review_id, photo.image_url);
+        }
+      });
+
+      return res.json({
+        items: rows.map((review) => {
+          const actor = profileById.get(review.user_id) || null;
+          const place = placeById.get(review.place_id) || null;
+          const reviewPhoto = firstPhotoByReviewId.get(review.id) || null;
+          return {
+            id: `review:${review.id}`,
+            type: 'review',
+            actor: {
+              id: review.user_id,
+              fullName: actor?.full_name || null,
+              username: actor?.username || null,
+              avatarUrl: actor?.avatar_url || null,
+            },
+            place: place ? {
+              id: place.id,
+              title: place.name || place.city || 'Unknown place',
+              city: place.city || null,
+              country: place.country || null,
+              imageUrl: place.image_url || reviewPhoto || null,
+            } : {
+              id: review.place_id,
+              title: 'Unknown place',
+              city: null,
+              country: null,
+              imageUrl: reviewPhoto,
+            },
+            rating: review.rating ?? null,
+            text: review.review || null,
+            createdAt: review.created_at,
+          };
+        }),
+      });
+    } catch (error) {
+      return next(error);
+    }
+  });
+
   router.get('/places', async (req, res, next) => {
     try {
       const limit = parseLimit(req.query.limit, 100, 300);
