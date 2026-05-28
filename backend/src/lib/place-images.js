@@ -16,7 +16,7 @@ async function fetchPexelsImageForPlace(place) {
   const url = new URL(PEXELS_ENDPOINT);
   url.searchParams.set('query', query);
   url.searchParams.set('orientation', 'landscape');
-  url.searchParams.set('per_page', '1');
+  url.searchParams.set('per_page', '10');
 
   const response = await fetch(url.toString(), {
     method: 'GET',
@@ -25,15 +25,15 @@ async function fetchPexelsImageForPlace(place) {
 
   if (!response.ok) return null;
   const payload = await response.json().catch(() => null);
-  const photo = payload?.photos?.[0];
-  if (!photo) return null;
-
-  return {
-    image_url: photo.src?.large2x || photo.src?.large || photo.src?.original || null,
-    image_source: 'pexels',
-    image_author: photo.photographer || null,
-    image_author_url: photo.photographer_url || null,
-  };
+  const photos = Array.isArray(payload?.photos) ? payload.photos : [];
+  return photos
+    .map((photo) => ({
+      image_url: photo?.src?.large2x || photo?.src?.large || photo?.src?.original || null,
+      image_source: 'pexels',
+      image_author: photo?.photographer || null,
+      image_author_url: photo?.photographer_url || null,
+    }))
+    .filter((item) => Boolean(item.image_url));
 }
 
 module.exports = {

@@ -49,17 +49,33 @@ async function enrichPlacesWithImages(supabaseAdmin, rows, maxFetches = 5) {
     if (fetches >= maxFetches) break;
 
     try {
-      const imageData = await fetchPexelsImageForPlace(place);
+      const imageCandidates = await fetchPexelsImageForPlace(place);
       fetches += 1;
-      if (!imageData?.image_url) continue;
+      if (!Array.isArray(imageCandidates) || imageCandidates.length === 0) continue;
+
+      let chosen = null;
+      for (const candidate of imageCandidates) {
+        if (!candidate?.image_url) continue;
+        const { data: existing } = await supabaseAdmin
+          .from('places')
+          .select('id, city, country')
+          .eq('image_url', candidate.image_url)
+          .limit(1)
+          .maybeSingle();
+        if (!existing || existing.id === place.id) {
+          chosen = candidate;
+          break;
+        }
+      }
+      if (!chosen?.image_url) continue;
 
       const { data: updated, error } = await supabaseAdmin
         .from('places')
         .update({
-          image_url: imageData.image_url,
-          image_source: imageData.image_source,
-          image_author: imageData.image_author,
-          image_author_url: imageData.image_author_url,
+          image_url: chosen.image_url,
+          image_source: chosen.image_source,
+          image_author: chosen.image_author,
+          image_author_url: chosen.image_author_url,
           image_fetched_at: new Date().toISOString(),
         })
         .eq('id', place.id)
@@ -112,12 +128,39 @@ async function generatePlaceOverview(place) {
   if (!rawContent) return null;
   const unquoted = rawContent.replace(/^["']+|["']+$/g, '').trim();
   const singleLine = unquoted.replace(/\s+/g, ' ');
-  const sentence = singleLine.split(/[.!?](?=\s|$)/)[0]?.trim() || singleLine;
-  if (!sentence) return null;
-  const wordBounded = sentence.split(/\s+/).slice(0, 35).join(' ').trim();
-  if (!wordBounded) return null;
-  const finalized = /[.!?]$/.test(wordBounded) ? wordBounded : `${wordBounded}.`;
-  return finalized;
+  return singleLine;
+}
+
+function isValidOverviewDescription(text, place) {
+  const normalized = String(text || '').trim();
+  if (!normalized) return false;
+  if (!/[.!?]$/.test(normalized)) return false;
+  if (/[*#`_]/.test(normalized)) return false;
+  const words = normalized.split(/\s+/).filter(Boolean);
+  if (words.length < 8 || words.length > 35) return false;
+  const lowered = normalized.toLowerCase();
+  const badEndings = [
+    'offering',
+    'offering visitors',
+    'featuring',
+    'including',
+    'with',
+    'and',
+    'or',
+    'but',
+    'to',
+    'for',
+    'where',
+    'while',
+    'known for',
+    'home to',
+  ];
+  if (badEndings.some((ending) => lowered.endsWith(ending) || lowered.endsWith(`${ending}.`))) return false;
+  const city = String(place.city || place.name || '').trim().toLowerCase();
+  const country = String(place.country || '').trim().toLowerCase();
+  if (city && !lowered.includes(city)) return false;
+  if (country && !lowered.includes(country)) return false;
+  return true;
 }
 
 module.exports = function reviewsRoutes(supabaseAdmin) {
@@ -194,38 +237,45 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
 
       const qLower = q.toLowerCase();
       const escaped = q.replace(/[%_]/g, '\\$&');
+      const selectCols = 'id, name, description, city, country, country_code, latitude, longitude, population, image_url, image_source, image_author, image_author_url, image_fetched_at, external_source, search_text';
+      const base = supabaseAdmin.from('places').select(selectCols).eq('external_source', 'geonames');
 
-      const { data, error } = await supabaseAdmin
-        .from('places')
-        .select('id, name, description, city, country, country_code, latitude, longitude, population, image_url, image_source, image_author, image_author_url, image_fetched_at, external_source, search_text')
-        .eq('external_source', 'geonames')
-        .or(
-          `name.ilike.%${escaped}%,city.ilike.%${escaped}%,country.ilike.%${escaped}%,country_code.ilike.%${escaped}%,search_text.ilike.%${escaped}%`,
-        )
-        .limit(300);
+      const [exactRes, prefixRes, containsRes] = await Promise.all([
+        base.or(`name.ilike.${escaped},city.ilike.${escaped}`).order('population', { ascending: false, nullsFirst: false }).limit(120),
+        base.or(`name.ilike.${escaped}%,city.ilike.${escaped}%`).order('population', { ascending: false, nullsFirst: false }).limit(200),
+        base.or(`name.ilike.%${escaped}%,city.ilike.%${escaped}%,search_text.ilike.%${escaped}%`).order('population', { ascending: false, nullsFirst: false }).limit(300),
+      ]);
 
-      if (error) {
-        console.error('[places/search] text query failed', { q, error });
+      if (exactRes.error || prefixRes.error || containsRes.error) {
+        console.error('[places/search] staged query failed', { q, exact: exactRes.error, prefix: prefixRes.error, contains: containsRes.error });
         return res.status(500).json({ error: 'Failed to search places.' });
       }
 
-      const ranked = (data || [])
-        .map((row) => {
+      const byId = new Map();
+      const pushRanked = (rows, tierBase) => {
+        (rows || []).forEach((row) => {
           const name = String(row.name || '').toLowerCase();
           const city = String(row.city || '').toLowerCase();
-          const country = String(row.country || '').toLowerCase();
-          const countryCode = String(row.country_code || '').toLowerCase();
-          let score = 0;
+          let score = tierBase + Math.min(Number(row.population || 0) / 1_000_000, 50);
+          if (city === qLower || name === qLower) score += 60;
+          if (city.startsWith(qLower) || name.startsWith(qLower)) score += 20;
+          const existing = byId.get(row.id);
+          if (!existing || score > existing.score) byId.set(row.id, { row, score });
+        });
+      };
+      pushRanked(exactRes.data, 300);
+      pushRanked(prefixRes.data, 200);
+      pushRanked(containsRes.data, 100);
 
-          if (city === qLower || name === qLower) score += 200;
-          if (city.startsWith(qLower) || name.startsWith(qLower)) score += 120;
-          if (country === qLower || countryCode === qLower) score += 80;
-          if (country.startsWith(qLower) || countryCode.startsWith(qLower)) score += 40;
-          if (name.includes(qLower) || city.includes(qLower)) score += 20;
-          score += Math.min(Number(row.population || 0) / 1_000_000, 30);
+      const dedupedByCityCountry = new Map();
+      Array.from(byId.values())
+        .sort((a, b) => b.score - a.score || Number(b.row.population || 0) - Number(a.row.population || 0))
+        .forEach((item) => {
+          const key = `${String(item.row.city || item.row.name || '').trim().toLowerCase()}|${String(item.row.country || '').trim().toLowerCase()}`;
+          if (!dedupedByCityCountry.has(key)) dedupedByCityCountry.set(key, item);
+        });
 
-          return { row, score };
-        })
+      const ranked = Array.from(dedupedByCityCountry.values())
         .sort((a, b) => b.score - a.score || Number(b.row.population || 0) - Number(a.row.population || 0));
 
       const pageRows = ranked.slice(offset, offset + limit).map((item) => item.row);
@@ -259,12 +309,19 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
       if (!data) return res.status(404).json({ error: 'Place not found.' });
 
       const existingDescription = String(data.description || '').trim();
-      const hasCompleteDescription = Boolean(existingDescription) && /[.!?]$/.test(existingDescription);
+      const hasCompleteDescription = isValidOverviewDescription(existingDescription, data);
       if (hasCompleteDescription) return res.json(data);
 
       try {
-        const overview = await generatePlaceOverview(data);
-        if (!overview) return res.json(data);
+        let overview = null;
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          const generated = await generatePlaceOverview(data);
+          if (isValidOverviewDescription(generated, data)) {
+            overview = generated;
+            break;
+          }
+        }
+        if (!overview) return res.json({ ...data, description: null });
         const { data: updated, error: updateError } = await supabaseAdmin
           .from('places')
           .update({ description: overview })

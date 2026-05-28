@@ -1,4 +1,4 @@
-import { DEFAULT_PLACE_IMAGE, formatPlaceRegion } from './reviews-utils';
+import { formatPlaceRegion } from './reviews-utils';
 import { API_BASE_URL, APP_ENV } from './app-config';
 
 export type DiscoverPlace = {
@@ -35,7 +35,7 @@ type SearchPlaceRow = {
 };
 
 function toDiscoverPlace(row: SearchPlaceRow): DiscoverPlace {
-  const image = row.imageUrl || row.image || DEFAULT_PLACE_IMAGE;
+  const image = row.imageUrl || row.image || '';
   return {
     id: row.id,
     title: row.title?.trim() || row.city?.trim() || 'Untitled destination',
