@@ -14,9 +14,9 @@ alter table places
   add column if not exists image_fetched_at timestamptz,
   add column if not exists search_text text;
 
+drop index if exists places_external_source_external_id_unique_idx;
 create unique index if not exists places_external_source_external_id_unique_idx
-  on places (external_source, external_id)
-  where external_source is not null and external_id is not null;
+  on places (external_source, external_id);
 
 create index if not exists places_city_lower_idx
   on places (lower(city));

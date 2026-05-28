@@ -13,6 +13,29 @@ function parseLimit(value, fallback = 20, max = 100) {
   return Math.min(max, Math.floor(parsed));
 }
 
+function parseOffset(value, fallback = 0) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+  return Math.floor(parsed);
+}
+
+function normalizePlaceRow(place) {
+  return {
+    id: place.id,
+    title: place.name || place.city || 'Unknown place',
+    city: place.city || null,
+    country: place.country || null,
+    countryCode: place.country_code || null,
+    description: place.description || null,
+    image: place.image_url || null,
+    imageUrl: place.image_url || null,
+    latitude: place.latitude ?? null,
+    longitude: place.longitude ?? null,
+    population: place.population ?? null,
+    source: place.external_source || null,
+  };
+}
+
 module.exports = function reviewsRoutes(supabaseAdmin) {
   const router = express.Router();
 
@@ -59,6 +82,72 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
       return res.json({ places: data || [] });
     } catch (error) {
       return next(error);
+    }
+  });
+
+  router.get('/places/search', async (req, res) => {
+    try {
+      const q = String(req.query.q || '').trim();
+      const limit = parseLimit(req.query.limit, 20, 50);
+      const offset = parseOffset(req.query.offset, 0);
+
+      if (!q) {
+        const { data, error } = await supabaseAdmin
+          .from('places')
+          .select('id, name, description, city, country, country_code, latitude, longitude, population, image_url, external_source')
+          .eq('external_source', 'geonames')
+          .order('population', { ascending: false, nullsFirst: false })
+          .range(offset, offset + limit - 1);
+
+        if (error) {
+          console.error('[places/search] default query failed', error);
+          return res.status(500).json({ error: 'Failed to search places.' });
+        }
+
+        return res.json({ places: (data || []).map(normalizePlaceRow) });
+      }
+
+      const qLower = q.toLowerCase();
+      const escaped = q.replace(/[%_]/g, '\\$&');
+
+      const { data, error } = await supabaseAdmin
+        .from('places')
+        .select('id, name, description, city, country, country_code, latitude, longitude, population, image_url, external_source, search_text')
+        .eq('external_source', 'geonames')
+        .or(
+          `name.ilike.%${escaped}%,city.ilike.%${escaped}%,country.ilike.%${escaped}%,country_code.ilike.%${escaped}%,search_text.ilike.%${escaped}%`,
+        )
+        .limit(300);
+
+      if (error) {
+        console.error('[places/search] text query failed', { q, error });
+        return res.status(500).json({ error: 'Failed to search places.' });
+      }
+
+      const ranked = (data || [])
+        .map((row) => {
+          const name = String(row.name || '').toLowerCase();
+          const city = String(row.city || '').toLowerCase();
+          const country = String(row.country || '').toLowerCase();
+          const countryCode = String(row.country_code || '').toLowerCase();
+          let score = 0;
+
+          if (city === qLower || name === qLower) score += 200;
+          if (city.startsWith(qLower) || name.startsWith(qLower)) score += 120;
+          if (country === qLower || countryCode === qLower) score += 80;
+          if (country.startsWith(qLower) || countryCode.startsWith(qLower)) score += 40;
+          if (name.includes(qLower) || city.includes(qLower)) score += 20;
+          score += Math.min(Number(row.population || 0) / 1_000_000, 30);
+
+          return { row, score };
+        })
+        .sort((a, b) => b.score - a.score || Number(b.row.population || 0) - Number(a.row.population || 0));
+
+      const page = ranked.slice(offset, offset + limit).map((item) => normalizePlaceRow(item.row));
+      return res.json({ places: page });
+    } catch (error) {
+      console.error('[places/search] unexpected error', error);
+      return res.status(500).json({ error: 'Failed to search places.' });
     }
   });
 
