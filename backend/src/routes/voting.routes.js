@@ -1,5 +1,6 @@
 const express = require('express');
 const { assertUuid, makeError } = require('../utils/http');
+const { validateFutureDateRange } = require('../utils/date-only');
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -269,6 +270,10 @@ module.exports = function votingRoutes(supabaseAdmin) {
         const endDate = String(req.body?.endDate || '').trim();
         if (!startDate || !endDate) {
           return res.status(400).json({ error: 'startDate and endDate are required.' });
+        }
+        const validation = validateFutureDateRange(startDate, endDate);
+        if (!validation.ok) {
+          return res.status(400).json({ error: validation.error });
         }
 
         const { data, error } = await supabaseAdmin

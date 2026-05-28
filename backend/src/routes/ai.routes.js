@@ -1,14 +1,133 @@
 const express = require('express');
 const { ensureGroupDestinationPlace } = require('../services/destinations');
 const { callDeepSeekChat } = require('../services/deepseek');
+const { dateOnlyDiff, daysInclusive, isDateOnly } = require('../utils/date-only');
 
-function daysInclusive(startDate, endDate) {
-  if (!startDate || !endDate) return null;
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
-  const ms = end.getTime() - start.getTime();
-  return ms >= 0 ? Math.floor(ms / 86400000) + 1 : null;
+const ALLOWED_INTERESTS = new Set([
+  'History',
+  'Food',
+  'Nature',
+  'Beaches',
+  'Museums',
+  'Nightlife',
+  'Shopping',
+  'Architecture',
+  'Local culture',
+  'Adventure',
+  'Relaxation',
+  'Family friendly',
+  'Budget friendly',
+]);
+
+function sanitizeInterests(value) {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.map((item) => String(item || '').trim()).filter((item) => ALLOWED_INTERESTS.has(item)))].slice(0, 8);
+}
+
+
+function compactExistingItems(items) {
+  if (!Array.isArray(items)) return [];
+  return items
+    .map((item) => String(item?.title || item?.name || '').trim())
+    .filter(Boolean)
+    .slice(0, 30);
+}
+
+function buildCompactPromptContext(tripContext, interests, totalDays) {
+  const destination = tripContext.destination || {};
+  return {
+    destination: {
+      city: destination.city || tripContext.city || tripContext.groupName || null,
+      country: destination.country || tripContext.country || null,
+    },
+    dates: {
+      startDate: tripContext.dates?.startDate || null,
+      endDate: tripContext.dates?.endDate || null,
+      totalDays,
+    },
+    budget: {
+      minBudget: tripContext.budget?.minBudget ?? null,
+      maxBudget: tripContext.budget?.maxBudget ?? null,
+      currency: tripContext.budget?.currency || 'EUR',
+    },
+    interests,
+    existingPlaceNames: compactExistingItems(tripContext.existingItems),
+  };
+}
+
+function extractJsonObject(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('{') && raw.endsWith('}')) return raw;
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) {
+    const cleaned = fenced[1].trim();
+    if (cleaned.startsWith('{') && cleaned.endsWith('}')) return cleaned;
+  }
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if (start >= 0 && end > start) return raw.slice(start, end + 1);
+  return raw;
+}
+
+function buildItineraryPrompts({ city, country, totalDays, interests, compactContext }) {
+  const destinationLabel = `${city}${country ? `, ${country}` : ''}`;
+  const interestsLine = interests.length
+    ? `Prioritize these interests without ignoring must-see places: ${interests.join(', ')}.`
+    : 'No interests were selected, so create a balanced first-time visitor plan.';
+
+  const systemPrompt = [
+    'You are a fast travel itinerary JSON generator.',
+    'Return only valid minified JSON.',
+    'Do not include markdown, comments, explanation, or prose outside JSON.',
+  ].join(' ');
+
+  const userPrompt = [
+    `Create a ${totalDays}-day itinerary for ${destinationLabel}.`,
+    interestsLine,
+    'Use real, well-known places in or very near the destination.',
+    'Avoid duplicate places and avoid places already listed in existingPlaceNames.',
+    'Each day must have exactly 2 places: one morning and one afternoon.',
+    'Keep descriptions under 12 words each.',
+    'Use this exact shape:',
+    '{"destination":"City, Country","summary":"short summary","days":[{"day":1,"title":"short title","places":[{"name":"place name","timeBlock":"morning","startTime":"09:00","endTime":"11:00","description":"short text"},{"name":"place name","timeBlock":"afternoon","startTime":"14:00","endTime":"16:00","description":"short text"}]}]}',
+    `Context JSON: ${JSON.stringify(compactContext)}`,
+  ].join('\n');
+
+  return { systemPrompt, userPrompt };
+}
+
+function normalizeGeneratedItinerary(itinerary, totalDays) {
+  if (!Array.isArray(itinerary?.days)) return itinerary;
+  const seenPlaces = new Set();
+  const normalizedDays = [];
+  for (let index = 0; index < itinerary.days.length; index += 1) {
+    const rawDay = itinerary.days[index] || {};
+    const dayNumber = Math.min(totalDays, Math.max(1, Number(rawDay.day || index + 1) || index + 1));
+    const rawPlaces = Array.isArray(rawDay.places) ? rawDay.places : [];
+    const places = [];
+    for (const rawPlace of rawPlaces) {
+      const name = String(rawPlace?.name || rawPlace?.place || rawPlace?.title || '').trim();
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (seenPlaces.has(key)) continue;
+      seenPlaces.add(key);
+      places.push({
+        name,
+        timeBlock: rawPlace.timeBlock || rawPlace.period || 'unscheduled',
+        startTime: rawPlace.startTime || rawPlace.time || null,
+        endTime: rawPlace.endTime || null,
+        description: rawPlace.description || rawPlace.notes || '',
+      });
+      if (places.length >= 2) break;
+    }
+    normalizedDays.push({
+      day: dayNumber,
+      title: rawDay.title || `Day ${dayNumber}`,
+      places,
+    });
+  }
+  return { ...itinerary, days: normalizedDays.filter((day) => day.day >= 1 && day.day <= totalDays) };
 }
 
 module.exports = function aiRoutes(supabaseAdmin) {
@@ -77,6 +196,9 @@ module.exports = function aiRoutes(supabaseAdmin) {
       if (!tripContext) return res.status(404).json({ error: { code: 'GROUP_NOT_FOUND', message: 'Group not found' } });
       if (tripContext.error) return res.status(403).json({ error: tripContext.error });
       if (!tripContext.dates.startDate || !tripContext.dates.endDate) return res.status(400).json({ error: { code: 'MISSING_DATE_RANGE', message: 'Trip needs a selected date range before generating itinerary.' } });
+      if (!isDateOnly(tripContext.dates.startDate) || !isDateOnly(tripContext.dates.endDate) || dateOnlyDiff(tripContext.dates.startDate, tripContext.dates.endDate) < 0) {
+        return res.status(400).json({ error: { code: 'INVALID_DATE_RANGE', message: 'Trip dates are invalid.' } });
+      }
       return res.json(tripContext);
     } catch (error) { return next(error); }
   });
@@ -93,16 +215,24 @@ module.exports = function aiRoutes(supabaseAdmin) {
         if (!tripContext) return res.status(404).json({ error: { code: 'GROUP_NOT_FOUND', message: 'Group not found' } });
         if (tripContext.error) return res.status(403).json({ error: tripContext.error });
         if (!tripContext.dates.startDate || !tripContext.dates.endDate) return res.status(400).json({ error: { code: 'MISSING_DATE_RANGE', message: 'Trip needs a selected date range before generating itinerary.' } });
+        if (!isDateOnly(tripContext.dates.startDate) || !isDateOnly(tripContext.dates.endDate) || dateOnlyDiff(tripContext.dates.startDate, tripContext.dates.endDate) < 0) {
+          return res.status(400).json({ error: { code: 'INVALID_DATE_RANGE', message: 'Trip dates are invalid.' } });
+        }
       } else {
         tripContext = req.body;
       }
 
       const totalDays = Number(tripContext.dates?.totalDays || tripContext.days || tripContext.totalDays || 1);
+      if (!Number.isFinite(totalDays) || totalDays < 1) {
+        return res.status(400).json({ error: { code: 'INVALID_DATE_RANGE', message: 'Trip date range must include at least one day.' } });
+      }
       const city = tripContext.destination?.city || tripContext.city || tripContext.groupName || 'the destination';
       const country = tripContext.destination?.country || tripContext.country || '';
+      const interests = sanitizeInterests(req.body?.interests);
+      tripContext = { ...tripContext, interests };
 
-      const systemPrompt = `You are a travel itinerary planner.\nReturn only valid JSON.\nNo markdown.\nNo explanation.\nNo comments.`;
-      const userPrompt = `Create a realistic travel itinerary as JSON.\n\nTrip data:\n${JSON.stringify(tripContext, null, 2)}\n\nRules:\n- Create exactly ${totalDays} days.\n- Each day must have exactly 2 places.\n- Use real, popular places in ${city}${country ? `, ${country}` : ''}.\n- Avoid repeating places.\n- Keep descriptions short.\n- Use morning and afternoon time blocks.\n- Budget ${tripContext.budget.minBudget != null && tripContext.budget.maxBudget != null ? `range is EUR ${tripContext.budget.minBudget}-${tripContext.budget.maxBudget}` : 'is unspecified'}.\n- Return JSON in this exact structure:\n\n{\n  "destination": "City, Country",\n  "summary": "short summary",\n  "days": [\n    {\n      "day": 1,\n      "title": "short day title",\n      "places": [\n        {\n          "name": "place name",\n          "timeBlock": "morning",\n          "startTime": "09:00",\n          "endTime": "11:00",\n          "description": "short description"\n        },\n        {\n          "name": "place name",\n          "timeBlock": "afternoon",\n          "startTime": "14:00",\n          "endTime": "16:00",\n          "description": "short description"\n        }\n      ]\n    }\n  ]\n}`;
+      const compactContext = buildCompactPromptContext(tripContext, interests, totalDays);
+      const { systemPrompt, userPrompt } = buildItineraryPrompts({ city, country, totalDays, interests, compactContext });
 
       let content;
       try {
@@ -110,16 +240,16 @@ module.exports = function aiRoutes(supabaseAdmin) {
           purpose: 'generate-itinerary',
           messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
           responseFormat: { type: 'json_object' },
-          temperature: 0.4,
-          maxTokens: 4000,
-          timeoutMs: 15000,
+          temperature: 0.25,
+          maxTokens: Math.max(6000, Math.min(12000, totalDays * 1200)),
+          timeoutMs: 90000,
         });
       } catch (error) {
         if (error?.code === 'MISSING_DEEPSEEK_KEY') {
           return res.status(500).json({ error: { code: 'MISSING_DEEPSEEK_KEY', message: 'Missing DEEPSEEK_API_KEY' } });
         }
         if (error?.code === 'DEEPSEEK_TIMEOUT') {
-          return res.status(504).json({ error: { code: 'DEEPSEEK_TIMEOUT', message: 'DeepSeek request timed out' } });
+          return res.status(504).json({ error: { code: 'DEEPSEEK_TIMEOUT', message: 'AI itinerary generation took too long. Please try again.' } });
         }
         if (error?.code === 'DEEPSEEK_EMPTY') {
           return res.status(502).json({ error: { code: 'DEEPSEEK_EMPTY', message: 'DeepSeek returned empty content' } });
@@ -133,7 +263,7 @@ module.exports = function aiRoutes(supabaseAdmin) {
 
       let itinerary;
       try {
-        itinerary = JSON.parse(content);
+        itinerary = JSON.parse(extractJsonObject(content));
       } catch (error) {
         console.error('[ai/generate-itinerary] invalid json from deepseek', { content });
         return res.status(500).json({ error: { code: 'DEEPSEEK_INVALID_JSON', message: 'DeepSeek returned invalid JSON' } });
@@ -143,7 +273,12 @@ module.exports = function aiRoutes(supabaseAdmin) {
         return res.status(500).json({ error: { code: 'DEEPSEEK_INVALID_SHAPE', message: 'DeepSeek returned invalid itinerary shape' } });
       }
 
-      return res.json(itinerary);
+      const normalizedItinerary = normalizeGeneratedItinerary(itinerary, totalDays);
+      if (!Array.isArray(normalizedItinerary.days) || normalizedItinerary.days.length === 0) {
+        return res.status(500).json({ error: { code: 'DEEPSEEK_INVALID_SHAPE', message: 'DeepSeek returned no usable itinerary days' } });
+      }
+
+      return res.json(normalizedItinerary);
     } catch (error) { return next(error); }
   });
 

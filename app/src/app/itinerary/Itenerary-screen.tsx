@@ -17,8 +17,9 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { createItineraryItem, deleteItineraryItem, fetchItinerary, getActiveUserId } from "../../../lib/groups-api";
+import { createItineraryItem, deleteItineraryItem, fetchItinerary, getActiveUserId, updateItineraryItem } from "../../../lib/groups-api";
 import { API_BASE_URL, APP_ENV } from "../../../lib/app-config";
+import { addDaysToDateOnly, dateOnlyDiff, parseDateOnly } from "../../../lib/date-utils";
 
 
 type TimeBlock = "morning" | "afternoon" | "evening" | "unscheduled";
@@ -33,6 +34,8 @@ type TripPlace = {
   startTime?: string;
   endTime?: string;
   description?: string;
+  sortOrder?: number;
+  pending?: boolean;
 };
 
 type AddPlaceInput = {
@@ -44,7 +47,27 @@ type AddPlaceInput = {
   startTime?: string;
   endTime?: string;
   description?: string;
+  sortOrder?: number;
+  pending?: boolean;
 };
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const INTEREST_OPTIONS = [
+  "History",
+  "Food",
+  "Nature",
+  "Beaches",
+  "Museums",
+  "Nightlife",
+  "Shopping",
+  "Architecture",
+  "Local culture",
+  "Adventure",
+  "Relaxation",
+  "Family friendly",
+  "Budget friendly",
+];
 
 
 function createId() {
@@ -52,13 +75,22 @@ function createId() {
 }
 
 function getDayDateLabel(startDate: string, dayNumber: number) {
-  const date = new Date(startDate);
-  date.setDate(date.getDate() + dayNumber - 1);
+  const dateOnly = addDaysToDateOnly(startDate, dayNumber - 1);
+  const date = dateOnly ? parseDateOnly(dateOnly) : null;
+
+  if (!date) {
+    return { month: "", day: String(dayNumber) };
+  }
 
   return {
     month: date.toLocaleDateString("en-US", { month: "short" }),
     day: date.getDate().toString(),
   };
+}
+
+function clampDay(day: number, totalDays: number) {
+  if (!Number.isFinite(day)) return 1;
+  return Math.min(Math.max(1, Math.floor(day)), Math.max(1, totalDays));
 }
 
 export default function TripDetailScreen() {
@@ -107,7 +139,11 @@ export default function TripDetailScreen() {
   ).current;
   const [selectedDay, setSelectedDay] = useState(1);
   const [places, setPlaces] = useState<TripPlace[]>([]);
+  const [draggingPlaceId, setDraggingPlaceId] = useState<string | null>(null);
+  const dragYRef = useRef<number | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isInterestsModalVisible, setIsInterestsModalVisible] = useState(false);
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [placeName, setPlaceName] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -135,34 +171,97 @@ export default function TripDetailScreen() {
     void loadContext();
   }, [groupId, currentUserId]);
 
-  React.useEffect(() => {
+  const loadItineraryItems = useCallback(async () => {
     if (!groupId) return;
-    const load = async () => {
-      try {
-        const { items } = await fetchItinerary(groupId, currentUserId);
-        setPlaces(items.map((item) => ({
-          id: item.id,
-          name: item.title,
-          city: trip.city,
-          country: trip.country,
-          day: Math.max(1, Math.floor((new Date(item.date).getTime() - new Date(trip.startDate).getTime()) / 86400000) + 1),
-          timeBlock: 'unscheduled',
-          startTime: item.time ?? undefined,
-          description: undefined,
-        })));
-      } catch {
-        // ignore for local fallback mode
-      }
-    };
-    void load();
-  }, [groupId]);
+    try {
+      const { items } = await fetchItinerary(groupId, currentUserId);
+      const mapped = items.map((item, index) => ({
+        id: item.id,
+        name: item.title,
+        city: trip.city,
+        country: trip.country,
+        day: clampDay((dateOnlyDiff(trip.startDate, item.date) ?? 0) + 1, trip.totalDays),
+        timeBlock: 'unscheduled' as TimeBlock,
+        startTime: item.time ?? undefined,
+        description: undefined,
+        sortOrder: item.sort_order ?? index,
+        pending: false,
+      }));
+      setPlaces(mapped);
+    } catch (error) {
+      console.warn('[itinerary] failed to load saved itinerary', error);
+    }
+  }, [groupId, currentUserId, trip.city, trip.country, trip.startDate, trip.totalDays]);
+
+  React.useEffect(() => {
+    void loadItineraryItems();
+  }, [loadItineraryItems]);
 
   const selectedDayPlaces = useMemo(() => {
-    return places.filter((place) => place.day === selectedDay);
+    return places
+      .filter((place) => place.day === selectedDay)
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   }, [places, selectedDay]);
 
+  const getNextSortOrderForDay = useCallback((day: number) => {
+    const dayPlaces = places.filter((place) => place.day === day);
+    if (dayPlaces.length === 0) return 0;
+    return Math.max(...dayPlaces.map((place) => place.sortOrder ?? 0)) + 1;
+  }, [places]);
+
+  const persistDayOrder = useCallback((orderedPlaces: TripPlace[]) => {
+    if (!groupId) return;
+    orderedPlaces.forEach((place, index) => {
+      if (!UUID_RE.test(place.id)) return;
+      void updateItineraryItem(groupId, place.id, { sortOrder: index }, currentUserId).catch((error) => {
+        console.warn('[itinerary] failed to persist item order', error);
+      });
+    });
+  }, [groupId, currentUserId]);
+
+  const movePlaceWithinDay = useCallback((placeId: string, direction: -1 | 1) => {
+    const ordered = places
+      .filter((place) => place.day === selectedDay)
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    const index = ordered.findIndex((place) => place.id === placeId);
+    const nextIndex = index + direction;
+    if (index < 0 || nextIndex < 0 || nextIndex >= ordered.length) return;
+
+    const reordered = [...ordered];
+    const [moved] = reordered.splice(index, 1);
+    reordered.splice(nextIndex, 0, moved);
+    const orderById = new Map(reordered.map((place, sortOrder) => [place.id, sortOrder]));
+
+    setPlaces((current) => current.map((place) => (
+      orderById.has(place.id) ? { ...place, sortOrder: orderById.get(place.id) } : place
+    )));
+    persistDayOrder(reordered);
+  }, [places, selectedDay, persistDayOrder]);
+
+  const handleDragMove = useCallback((placeId: string, pageY?: number) => {
+    if (draggingPlaceId !== placeId || typeof pageY !== 'number') return;
+    if (dragYRef.current === null) {
+      dragYRef.current = pageY;
+      return;
+    }
+
+    const delta = pageY - dragYRef.current;
+    if (delta > 74) {
+      movePlaceWithinDay(placeId, 1);
+      dragYRef.current = pageY;
+    } else if (delta < -74) {
+      movePlaceWithinDay(placeId, -1);
+      dragYRef.current = pageY;
+    }
+  }, [draggingPlaceId, movePlaceWithinDay]);
+
+  const stopDraggingPlace = useCallback(() => {
+    setDraggingPlaceId(null);
+    dragYRef.current = null;
+  }, []);
+
   const addPlaceToItinerary = useCallback(
-    (input: AddPlaceInput) => {
+    async (input: AddPlaceInput) => {
       const cleanedName = input.name.trim();
 
       if (!cleanedName) {
@@ -170,47 +269,65 @@ export default function TripDetailScreen() {
         return null;
       }
 
+      const day = clampDay(input.day ?? selectedDay, trip.totalDays);
+      const sortOrder = input.day ? getNextSortOrderForDay(day) : getNextSortOrderForDay(selectedDay);
+      const localId = createId();
       const newPlace: TripPlace = {
-        id: createId(),
+        id: localId,
         name: cleanedName,
         city: input.city ?? trip.city,
         country: input.country ?? trip.country,
-        day: input.day ?? selectedDay,
+        day,
         timeBlock: input.timeBlock ?? "unscheduled",
         startTime: input.startTime,
         endTime: input.endTime,
         description: input.description,
+        sortOrder,
+        pending: Boolean(groupId && trip.startDate),
       };
 
       setPlaces((current) => [...current, newPlace]);
 
-      if (groupId && trip.startDate && !Number.isNaN(new Date(trip.startDate).getTime())) {
-        const dayDate = new Date(trip.startDate);
-        dayDate.setDate(dayDate.getDate() + (newPlace.day - 1));
-        const date = dayDate.toISOString().slice(0, 10);
-        void createItineraryItem(groupId, newPlace.name, date, newPlace.startTime ?? null, currentUserId);
+      if (groupId && trip.startDate) {
+        const date = addDaysToDateOnly(trip.startDate, newPlace.day - 1);
+        if (date) {
+          try {
+            const saved = await createItineraryItem(groupId, newPlace.name, date, newPlace.startTime ?? null, currentUserId, sortOrder);
+            setPlaces((current) => current.map((place) => (
+              place.id === localId
+                ? { ...place, id: saved.id, sortOrder: saved.sort_order ?? sortOrder, pending: false }
+                : place
+            )));
+            return saved.id;
+          } catch (error) {
+            setPlaces((current) => current.filter((place) => place.id !== localId));
+            Alert.alert("Could not save place", error instanceof Error ? error.message : "Please try again.");
+            return null;
+          }
+        }
       }
 
-      return newPlace.id;
+      return localId;
     },
-    [groupId, selectedDay, trip.city, trip.country, trip.startDate, currentUserId],
+    [groupId, selectedDay, trip.city, trip.country, trip.startDate, trip.totalDays, currentUserId, getNextSortOrderForDay],
   );
 
-  const removePlaceFromItinerary = useCallback((placeId: string) => {
+
+  const removePlaceFromItinerary = useCallback(async (placeId: string) => {
+    const previous = places;
     setPlaces((current) => current.filter((place) => place.id !== placeId));
-    if (groupId) {
-      void deleteItineraryItem(groupId, placeId, currentUserId);
-    }
-  }, [groupId]);
 
-  const addPlacesFromAI = useCallback(
-    (aiPlaces: AddPlaceInput[]) => {
-      aiPlaces.forEach((place) => {
-        addPlaceToItinerary(place);
-      });
-    },
-    [addPlaceToItinerary],
-  );
+    if (!groupId || !UUID_RE.test(placeId)) {
+      return;
+    }
+
+    try {
+      await deleteItineraryItem(groupId, placeId, currentUserId);
+    } catch (error) {
+      setPlaces(previous);
+      Alert.alert("Could not delete place", error instanceof Error ? error.message : "Please try again.");
+    }
+  }, [groupId, currentUserId, places]);
 
   const handleConfirmAddPlace = () => {
     const cleanedName = placeName.trim();
@@ -223,14 +340,28 @@ export default function TripDetailScreen() {
     setIsModalVisible(false);
     setPlaceName("");
 
-    addPlaceToItinerary({
+    void addPlaceToItinerary({
       name: cleanedName,
       day: selectedDay,
       timeBlock: "unscheduled",
     });
   };
 
-  const generateItineraryFromAI = async () => {
+  const toggleInterest = (interest: string) => {
+    setSelectedInterests((current) =>
+      current.includes(interest) ? current.filter((item) => item !== interest) : [...current, interest],
+    );
+  };
+
+  const openInterestsModal = () => {
+    if (!trip.startDate || !trip.endDate) {
+      Alert.alert("Missing dates", "Select trip dates in voting before generating an itinerary.");
+      return;
+    }
+    setIsInterestsModalVisible(true);
+  };
+
+  const generateItineraryFromAI = async (interests: string[]) => {
     try {
       setIsGenerating(true);
 
@@ -244,15 +375,23 @@ export default function TripDetailScreen() {
           body: JSON.stringify({
             groupId,
             userId: currentUserId,
+            interests,
           }),
         },
       );
 
-      if (!response.ok) {
-        throw new Error("Failed to generate itinerary");
+      const rawBody = await response.text();
+      let itinerary: any = null;
+      try {
+        itinerary = rawBody ? JSON.parse(rawBody) : null;
+      } catch {
+        throw new Error(`AI itinerary returned an invalid response (${response.status}).`);
       }
 
-      const itinerary = await response.json();
+      if (!response.ok) {
+        const apiMessage = itinerary?.error?.message || itinerary?.message || "Failed to generate itinerary";
+        throw new Error(apiMessage);
+      }
       console.log("AI itinerary:", itinerary);
 
       const aiPlaces: AddPlaceInput[] = [];
@@ -264,7 +403,7 @@ export default function TripDetailScreen() {
       const days = Array.isArray(itinerary.days) ? itinerary.days : [];
 
       days.forEach((day: any, index: number) => {
-        const dayNumber = Number(day.day ?? index + 1);
+        const dayNumber = clampDay(Number(day.day ?? index + 1), trip.totalDays);
 
         const placesForDay =
           day.places || day.items || day.activities || day.schedule || [];
@@ -299,19 +438,47 @@ export default function TripDetailScreen() {
         return;
       }
 
-      console.log("AI places parsed:", aiPlaces);
-      setPlaces((current) => [...current, ...aiPlaces.map((place) => ({ id: createId(), name: place.name, city: place.city || trip.city, country: place.country || trip.country, day: place.day || 1, timeBlock: place.timeBlock || "unscheduled", startTime: place.startTime, endTime: place.endTime, description: place.description }))]);
-      if (groupId && trip.startDate && !Number.isNaN(new Date(trip.startDate).getTime())) {
-        for (const place of aiPlaces) {
-          const d = new Date(trip.startDate);
-          d.setDate(d.getDate() + ((place.day || 1) - 1));
-          const date = d.toISOString().slice(0, 10);
-          void createItineraryItem(groupId, place.name, date, place.startTime ?? null, currentUserId);
-        }
+      const existingNames = new Set(places.map((place) => place.name.trim().toLowerCase()));
+      const uniquePlaces = aiPlaces.filter((place) => {
+        const key = place.name.trim().toLowerCase();
+        if (!key || existingNames.has(key)) return false;
+        existingNames.add(key);
+        return true;
+      });
+
+      if (uniquePlaces.length === 0) {
+        Alert.alert("No new places", "The AI suggestions were duplicates of places already in this itinerary.");
+        return;
       }
-      setSelectedDay(aiPlaces[0].day ?? 1);
-    } catch {
-      Alert.alert("AI error", "Could not generate itinerary.");
+
+      if (groupId && trip.startDate) {
+        const nextSortOrderByDay = new Map<number, number>();
+        for (const place of uniquePlaces) {
+          const day = clampDay(place.day || 1, trip.totalDays);
+          const date = addDaysToDateOnly(trip.startDate, day - 1);
+          if (!date) continue;
+          const sortOrder = nextSortOrderByDay.get(day) ?? getNextSortOrderForDay(day);
+          await createItineraryItem(groupId, place.name, date, place.startTime ?? null, currentUserId, sortOrder);
+          nextSortOrderByDay.set(day, sortOrder + 1);
+        }
+        await loadItineraryItems();
+      } else {
+        setPlaces((current) => [...current, ...uniquePlaces.map((place, index) => ({
+          id: createId(),
+          name: place.name,
+          city: place.city || trip.city,
+          country: place.country || trip.country,
+          day: clampDay(place.day || 1, trip.totalDays),
+          timeBlock: place.timeBlock || "unscheduled",
+          startTime: place.startTime,
+          endTime: place.endTime,
+          description: place.description,
+          sortOrder: index,
+        }))]);
+      }
+      setSelectedDay(clampDay(uniquePlaces[0].day ?? 1, trip.totalDays));
+    } catch (error) {
+      Alert.alert("AI error", error instanceof Error ? error.message : "Could not generate itinerary.");
     } finally {
       setIsGenerating(false);
     }
@@ -380,8 +547,27 @@ export default function TripDetailScreen() {
   };
 
   const renderPlaceCard = (place: TripPlace) => {
+    const orderedIndex = selectedDayPlaces.findIndex((item) => item.id === place.id);
+    const canMoveUp = orderedIndex > 0;
+    const canMoveDown = orderedIndex >= 0 && orderedIndex < selectedDayPlaces.length - 1;
+
     return (
-      <View key={place.id} style={styles.placeCard}>
+      <Pressable
+        key={place.id}
+        delayLongPress={260}
+        onLongPress={(event) => {
+          setDraggingPlaceId(place.id);
+          dragYRef.current = event.nativeEvent.pageY;
+        }}
+        onTouchMove={(event) => handleDragMove(place.id, event.nativeEvent.pageY)}
+        onTouchEnd={stopDraggingPlace}
+        onTouchCancel={stopDraggingPlace}
+        style={[
+          styles.placeCard,
+          place.pending && styles.placeCardPending,
+          draggingPlaceId === place.id && styles.placeCardDragging,
+        ]}
+      >
         <View style={styles.placeIconWrap}>
           <Feather name="map-pin" size={22} color="#008D9B" />
         </View>
@@ -396,25 +582,42 @@ export default function TripDetailScreen() {
               {place.startTime} - {place.endTime}
             </Text>
           ) : (
-            <Text style={styles.placeTime}></Text>
+            <Text style={styles.placeTime}>{place.pending ? 'Saving...' : ''}</Text>
           )}
 
           {!!place.description && (
-            <Text style={styles.placeDescription} numberOfLines={2}>
+            <Text style={styles.placeDescription} numberOfLines={3}>
               {place.description}
             </Text>
           )}
         </View>
 
-        <Pressable
-          style={styles.removePlaceButton}
-          onPress={() => removePlaceFromItinerary(place.id)}
-        >
-          <Feather name="x" size={16} color="#F15474" />
-        </Pressable>
-      </View>
+        <View style={styles.placeActions}>
+          <Pressable
+            style={[styles.reorderButton, !canMoveUp && styles.reorderButtonDisabled]}
+            onPress={() => canMoveUp && movePlaceWithinDay(place.id, -1)}
+            disabled={!canMoveUp}
+          >
+            <Feather name="chevron-up" size={15} color={canMoveUp ? '#008D9B' : '#B8C0C5'} />
+          </Pressable>
+          <Pressable
+            style={[styles.reorderButton, !canMoveDown && styles.reorderButtonDisabled]}
+            onPress={() => canMoveDown && movePlaceWithinDay(place.id, 1)}
+            disabled={!canMoveDown}
+          >
+            <Feather name="chevron-down" size={15} color={canMoveDown ? '#008D9B' : '#B8C0C5'} />
+          </Pressable>
+          <Pressable
+            style={styles.removePlaceButton}
+            onPress={() => void removePlaceFromItinerary(place.id)}
+          >
+            <Feather name="x" size={16} color="#F15474" />
+          </Pressable>
+        </View>
+      </Pressable>
     );
   };
+
 
   const renderEmptyItinerary = () => {
     return (
@@ -507,7 +710,7 @@ export default function TripDetailScreen() {
 
           <Pressable
             style={styles.aiButton}
-            onPress={generateItineraryFromAI}
+            onPress={openInterestsModal}
             disabled={isGenerating}
           >
             <Text style={styles.aiButtonText}>
@@ -568,11 +771,74 @@ export default function TripDetailScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <Modal
+        visible={isInterestsModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !isGenerating && setIsInterestsModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalIcon}>
+              <Feather name="sliders" size={22} color="#008D9B" />
+            </View>
+
+            <Text style={styles.modalTitle}>What are you into?</Text>
+            <Text style={styles.modalSubtitle}>
+              Pick a few interests so the AI can tailor your trip.
+            </Text>
+
+            <View style={styles.interestGrid}>
+              {INTEREST_OPTIONS.map((interest) => {
+                const selected = selectedInterests.includes(interest);
+                return (
+                  <Pressable
+                    key={interest}
+                    style={[styles.interestChip, selected && styles.interestChipSelected]}
+                    onPress={() => toggleInterest(interest)}
+                    disabled={isGenerating}
+                  >
+                    <Text style={[styles.interestChipText, selected && styles.interestChipTextSelected]}>
+                      {interest}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={styles.modalActions}>
+              <Pressable
+                style={styles.cancelButton}
+                disabled={isGenerating}
+                onPress={() => setIsInterestsModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </Pressable>
+
+              <Pressable
+                style={[styles.confirmButton, isGenerating && styles.confirmButtonDisabled]}
+                disabled={isGenerating}
+                onPress={() => {
+                  setIsInterestsModalVisible(false);
+                  void generateItineraryFromAI(selectedInterests);
+                }}
+              >
+                <Text style={styles.confirmButtonText}>{isGenerating ? "Generating..." : "Generate"}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+  },
   screen: {
     flex: 1,
     backgroundColor: "#FFFFFF",
@@ -868,6 +1134,14 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
+  placeCardPending: {
+    opacity: 0.65,
+  },
+  placeCardDragging: {
+    borderColor: "#008D9B",
+    backgroundColor: "#F3FCFD",
+    transform: [{ scale: 1.01 }],
+  },
   placeIconWrap: {
     width: 48,
     height: 48,
@@ -904,6 +1178,22 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: "#CBEFF2",
     marginLeft: 8,
+  },
+  placeActions: {
+    marginLeft: 8,
+    alignItems: "center",
+    gap: 5,
+  },
+  reorderButton: {
+    width: 28,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#E7FAFC",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reorderButtonDisabled: {
+    backgroundColor: "#F1F4F5",
   },
   addPlaceButton: {
     height: 48,
@@ -1038,6 +1328,36 @@ const styles = StyleSheet.create({
     backgroundColor: "#008D9B",
     alignItems: "center",
     justifyContent: "center",
+  },
+  confirmButtonDisabled: {
+    opacity: 0.65,
+  },
+  interestGrid: {
+    width: "100%",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 18,
+  },
+  interestChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 999,
+    backgroundColor: "#EEF2F3",
+    borderWidth: 1,
+    borderColor: "#DCE5E8",
+  },
+  interestChipSelected: {
+    backgroundColor: "#008D9B",
+    borderColor: "#008D9B",
+  },
+  interestChipText: {
+    color: "#374151",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  interestChipTextSelected: {
+    color: "#FFFFFF",
   },
   confirmButtonText: {
     color: "#FFFFFF",

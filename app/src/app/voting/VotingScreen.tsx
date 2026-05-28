@@ -6,6 +6,7 @@ import { VotingTab } from './_types';
 import DateVotingScreen from './DateVotingScreen';
 import BudgetVotingScreen from './BudgetVotingScreen';
 import { castVote, createBudgetOption, createDateOption, deleteBudgetOption, deleteDateOption, fetchVotingState, finalizeVoting, VotingStatePayload } from '../../../lib/voting-api';
+import { formatDateOnly, isAfterDateOnly, isBeforeDateOnly, startOfTodayDateOnly } from '../../../lib/date-utils';
 
 const VotingScreen: React.FC = () => {
   const params = useLocalSearchParams<{ groupId?: string; userId?: string }>();
@@ -37,7 +38,12 @@ const VotingScreen: React.FC = () => {
   };
   const handleCreateDateOption = async (start: Date, end: Date) => {
     if (votingFinished) return;
-    try { await createDateOption(groupId, userId, start.toISOString().slice(0,10), end.toISOString().slice(0,10)); await loadState(); } catch (error) { Alert.alert('Date option', error instanceof Error ? error.message : 'Unable to create date option.'); }
+    const startDate = formatDateOnly(start);
+    const endDate = formatDateOnly(end);
+    const today = startOfTodayDateOnly();
+    if (isBeforeDateOnly(startDate, today)) { Alert.alert('Date option', 'Trip dates cannot be before today.'); return; }
+    if (isAfterDateOnly(startDate, endDate)) { Alert.alert('Date option', 'Start date must be before or equal to end date.'); return; }
+    try { await createDateOption(groupId, userId, startDate, endDate); await loadState(); } catch (error) { Alert.alert('Date option', error instanceof Error ? error.message : 'Unable to create date option.'); }
   };
   const handleFinalize = async () => {
     if (votingFinished) return;
@@ -47,7 +53,7 @@ const VotingScreen: React.FC = () => {
   const canManageOptions = Boolean(state?.group.createdBy && state.group.createdBy === userId);
   const sharedProps = { tripName: state?.group.id ? 'Group Voting' : 'Voting', onTabChange: setActiveTab, onBack: () => router.push({ pathname: '/group-hub', params: { groupId } }), votingFinished, canManageOptions };
 
-  const dateOptions = state?.dates.options.map((o) => ({ id: o.id, label: o.label, startDate: new Date(o.startDate), endDate: new Date(o.endDate), votedCount: o.votedCount, totalMembers: o.totalMembers, voters: o.voters.map((v) => ({ id: v.id, initials: v.id.slice(0,1).toUpperCase(), avatarColor: '#94A3B8' })), selected: o.selected })) || [];
+  const dateOptions = state?.dates.options.map((o) => ({ id: o.id, label: o.label, startDate: new Date(`${o.startDate}T00:00:00`), endDate: new Date(`${o.endDate}T00:00:00`), votedCount: o.votedCount, totalMembers: o.totalMembers, voters: o.voters.map((v) => ({ id: v.id, initials: v.id.slice(0,1).toUpperCase(), avatarColor: '#94A3B8' })), selected: o.selected })) || [];
   const budgetOptions = state?.budget.options.map((o) => ({ id: o.id, label: `€${o.min} - €${o.max}`, min: o.min, max: o.max, votedCount: o.votedCount, totalMembers: o.totalMembers, voters: o.voters.map((v) => ({ id: v.id, initials: v.id.slice(0,1).toUpperCase(), avatarColor: '#94A3B8' })), selected: o.selected })) || [];
 
   return <View style={{ flex:1 }}>

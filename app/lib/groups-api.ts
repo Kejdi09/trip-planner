@@ -78,7 +78,7 @@ export type GroupRow = {
 };
 export type GroupMemberRow = { id: string; group_id: string; user_id: string; joined_at: string | null };
 export type GroupMessageRow = { id: string; group_id: string; sender_id: string; content: string; created_at: string };
-export type ItineraryItemRow = { id: string; group_id: string; title: string; date: string; time: string | null; created_by: string; created_at: string };
+export type ItineraryItemRow = { id: string; group_id: string; title: string; date: string; time: string | null; sort_order: number | null; created_by: string; created_at: string };
 
 export async function fetchMyGroups(userId?: string) {
   const resolvedUserId = await resolveActiveUserId(userId);
@@ -133,11 +133,34 @@ export async function fetchItinerary(groupId: string, userId?: string) {
   return request<{ items: ItineraryItemRow[] }>(`/api/groups/${groupId}/itinerary?${params.toString()}`, { method: 'GET' });
 }
 
-export async function createItineraryItem(groupId: string, title: string, date: string, time?: string | null, userId?: string) {
+export async function createItineraryItem(
+  groupId: string,
+  title: string,
+  date: string,
+  time?: string | null,
+  userId?: string,
+  sortOrder?: number | null,
+) {
   const resolvedUserId = await resolveActiveUserId(userId);
   return request<ItineraryItemRow>(`/api/groups/${groupId}/itinerary`, {
     method: 'POST',
-    body: JSON.stringify({ userId: resolvedUserId, title, date, time: time ?? null }),
+    body: JSON.stringify({ userId: resolvedUserId, title, date, time: time ?? null, sortOrder: sortOrder ?? null }),
+  });
+}
+
+export async function updateItineraryItem(
+  groupId: string,
+  itemId: string,
+  patch: { title?: string; date?: string; time?: string | null; sortOrder?: number | null },
+  userId?: string,
+) {
+  const resolvedUserId = await resolveActiveUserId(userId);
+  return request<ItineraryItemRow>(`/api/groups/${groupId}/itinerary/${itemId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      userId: resolvedUserId,
+      ...patch,
+    }),
   });
 }
 

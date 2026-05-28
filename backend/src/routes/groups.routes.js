@@ -2,6 +2,7 @@ const express = require('express');
 const { assertUuid, makeError } = require('../utils/http');
 const { resolveDestinationPlaceIdFromName, ensureGroupDestinationPlace } = require('../services/destinations');
 const { createNotificationService, shortPreview } = require('../services/notifications');
+const { compareDateOnly, isDateOnly, validateFutureDateRange } = require('../utils/date-only');
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -67,6 +68,32 @@ module.exports = function groupsRoutes(supabaseAdmin) {
       wrapped.status = 403;
       throw wrapped;
     }
+  }
+
+  async function getNextItinerarySortOrder(groupId, date) {
+    const { data, error } = await supabaseAdmin
+      .from('itinerary_items')
+      .select('sort_order')
+      .eq('group_id', groupId)
+      .eq('date', date)
+      .order('sort_order', { ascending: false, nullsFirst: false })
+      .limit(1);
+
+    if (error) {
+      const wrapped = new Error(error.message || 'Failed to calculate itinerary order.');
+      wrapped.status = 502;
+      throw wrapped;
+    }
+
+    const currentMax = Number(data?.[0]?.sort_order);
+    return Number.isFinite(currentMax) ? currentMax + 1 : 0;
+  }
+
+  function normalizeSortOrder(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed < 0) return null;
+    return Math.floor(parsed);
   }
 
 
@@ -321,8 +348,13 @@ module.exports = function groupsRoutes(supabaseAdmin) {
         max_budget: req.body?.maxBudget ?? group.max_budget,
       };
 
-      if (patch.start_date && patch.end_date && new Date(patch.start_date) > new Date(patch.end_date)) {
-        return res.status(400).json({ error: 'startDate must be before or equal to endDate.' });
+      if (patch.start_date || patch.end_date) {
+        const startDate = patch.start_date || group.start_date;
+        const endDate = patch.end_date || group.end_date;
+        const validation = validateFutureDateRange(startDate, endDate);
+        if (!validation.ok) {
+          return res.status(400).json({ error: validation.error });
+        }
       }
 
       const { data, error } = await supabaseAdmin
@@ -567,9 +599,10 @@ module.exports = function groupsRoutes(supabaseAdmin) {
 
       const { data, error } = await supabaseAdmin
         .from('itinerary_items')
-        .select('id, group_id, title, date, time, created_by, created_at')
+        .select('id, group_id, title, date, time, sort_order, created_by, created_at')
         .eq('group_id', groupId)
         .order('date', { ascending: true })
+        .order('sort_order', { ascending: true, nullsFirst: true })
         .order('time', { ascending: true });
 
       if (error) {
@@ -591,27 +624,35 @@ module.exports = function groupsRoutes(supabaseAdmin) {
       const title = String(req.body?.title || '').trim();
       const date = String(req.body?.date || '').trim();
       const time = String(req.body?.time || '').trim() || null;
+      let sortOrder = normalizeSortOrder(req.body?.sortOrder);
 
       assertUuid(groupId, 'groupId');
       assertUuid(userId, 'userId');
       if (!title || !date) {
         return res.status(400).json({ error: 'title and date are required.' });
       }
+      if (!isDateOnly(date)) {
+        return res.status(400).json({ error: 'date must use YYYY-MM-DD format.' });
+      }
 
       await requireMember(groupId, userId);
       const group = await requireGroup(groupId);
 
-      if (group.start_date && new Date(date) < new Date(group.start_date)) {
+      if (group.start_date && compareDateOnly(date, group.start_date) < 0) {
         return res.status(400).json({ error: 'Itinerary date cannot be before group start date.' });
       }
-      if (group.end_date && new Date(date) > new Date(group.end_date)) {
+      if (group.end_date && compareDateOnly(date, group.end_date) > 0) {
         return res.status(400).json({ error: 'Itinerary date cannot be after group end date.' });
+      }
+
+      if (sortOrder === null) {
+        sortOrder = await getNextItinerarySortOrder(groupId, date);
       }
 
       const { data, error } = await supabaseAdmin
         .from('itinerary_items')
-        .insert({ group_id: groupId, title, date, time, created_by: userId })
-        .select('id, group_id, title, date, time, created_by, created_at')
+        .insert({ group_id: groupId, title, date, time, sort_order: sortOrder, created_by: userId })
+        .select('id, group_id, title, date, time, sort_order, created_by, created_at')
         .single();
 
       if (error) {
@@ -651,16 +692,26 @@ module.exports = function groupsRoutes(supabaseAdmin) {
       if (typeof req.body?.title === 'string') patch.title = req.body.title.trim();
       if (typeof req.body?.date === 'string') patch.date = req.body.date.trim();
       if (typeof req.body?.time === 'string') patch.time = req.body.time.trim();
+      if (Object.prototype.hasOwnProperty.call(req.body || {}, 'sortOrder')) {
+        const sortOrder = normalizeSortOrder(req.body.sortOrder);
+        if (sortOrder === null) {
+          return res.status(400).json({ error: 'sortOrder must be a non-negative number.' });
+        }
+        patch.sort_order = sortOrder;
+      }
 
       if (Object.keys(patch).length === 0) {
         return res.status(400).json({ error: 'No updates provided.' });
       }
 
       const group = await requireGroup(groupId);
-      if (patch.date && group.start_date && new Date(patch.date) < new Date(group.start_date)) {
+      if (patch.date && !isDateOnly(patch.date)) {
+        return res.status(400).json({ error: 'date must use YYYY-MM-DD format.' });
+      }
+      if (patch.date && group.start_date && compareDateOnly(patch.date, group.start_date) < 0) {
         return res.status(400).json({ error: 'Itinerary date cannot be before group start date.' });
       }
-      if (patch.date && group.end_date && new Date(patch.date) > new Date(group.end_date)) {
+      if (patch.date && group.end_date && compareDateOnly(patch.date, group.end_date) > 0) {
         return res.status(400).json({ error: 'Itinerary date cannot be after group end date.' });
       }
 
@@ -669,7 +720,7 @@ module.exports = function groupsRoutes(supabaseAdmin) {
         .update(patch)
         .eq('id', itemId)
         .eq('group_id', groupId)
-        .select('id, group_id, title, date, time, created_by, created_at')
+        .select('id, group_id, title, date, time, sort_order, created_by, created_at')
         .single();
 
       if (error) {
