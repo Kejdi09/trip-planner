@@ -6,10 +6,10 @@ type AppLoadingProps = {
   message?: string;
 };
 
-const GLOBE_SIZE = 104;
-const ORBIT_SIZE = 144;
-const ORBIT_RADIUS = ORBIT_SIZE / 2;
-const PLANE_SIZE = 18;
+const GLOBE_SIZE = 108;
+const ORBIT_SIZE = 154;
+const PLANE_BADGE_SIZE = 34;
+const PLANE_SIZE = 17;
 
 export function AppLoading({ message = 'Getting things ready...' }: AppLoadingProps) {
   const orbitRotation = React.useRef(new Animated.Value(0)).current;
@@ -19,23 +19,24 @@ export function AppLoading({ message = 'Getting things ready...' }: AppLoadingPr
     const orbitLoop = Animated.loop(
       Animated.timing(orbitRotation, {
         toValue: 1,
-        duration: 2600,
+        duration: 2800,
         easing: Easing.linear,
         useNativeDriver: true,
       }),
+      { resetBeforeIteration: true },
     );
 
     const glowLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(glowPulse, {
           toValue: 1,
-          duration: 1200,
+          duration: 1400,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
         Animated.timing(glowPulse, {
           toValue: 0,
-          duration: 1200,
+          duration: 1400,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
@@ -56,6 +57,11 @@ export function AppLoading({ message = 'Getting things ready...' }: AppLoadingPr
     outputRange: ['0deg', '360deg'],
   });
 
+  const planeCounterRotate = orbitRotation.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['35deg', '-325deg'],
+  });
+
   const glowScale = glowPulse.interpolate({
     inputRange: [0, 1],
     outputRange: [1, 1.1],
@@ -63,26 +69,38 @@ export function AppLoading({ message = 'Getting things ready...' }: AppLoadingPr
 
   const glowOpacity = glowPulse.interpolate({
     inputRange: [0, 1],
-    outputRange: [0.18, 0.3],
+    outputRange: [0.18, 0.34],
   });
 
   return (
     <View style={styles.container}>
       <View style={styles.animationStage}>
-        <Animated.View style={[styles.glow, { transform: [{ scale: glowScale }], opacity: glowOpacity }]} />
+        <Animated.View style={[styles.outerGlow, { transform: [{ scale: glowScale }], opacity: glowOpacity }]} />
+        <View style={styles.innerGlow} />
 
-        <View style={styles.globe}>
-          <View style={styles.meridian} />
-          <View style={styles.equator} />
-          <View style={[styles.latitude, styles.latitudeTop]} />
-          <View style={[styles.latitude, styles.latitudeBottom]} />
-          <View style={[styles.meridian, styles.meridianTilt]} />
+        <View style={styles.globeShadow}>
+          <View style={styles.globe}>
+            <View style={styles.oceanHighlight} />
+
+            <View style={[styles.landMass, styles.landNorthAmerica]} />
+            <View style={[styles.landMass, styles.landSouthAmerica]} />
+            <View style={[styles.landMass, styles.landEuropeAfrica]} />
+            <View style={[styles.landMass, styles.landAsia]} />
+            <View style={[styles.landMass, styles.landAustralia]} />
+
+            <View style={styles.equator} />
+            <View style={[styles.latitudeRing, styles.latitudeNorth]} />
+            <View style={[styles.latitudeRing, styles.latitudeSouth]} />
+            <View style={[styles.longitudeRing, styles.longitudeCenter]} />
+            <View style={[styles.longitudeRing, styles.longitudeLeft]} />
+            <View style={[styles.longitudeRing, styles.longitudeRight]} />
+          </View>
         </View>
 
         <Animated.View style={[styles.orbit, { transform: [{ rotate: orbitRotate }] }]}>
-          <View style={styles.planeWrap}>
-            <Ionicons name="airplane" size={PLANE_SIZE} color="#0284C7" />
-          </View>
+          <Animated.View style={[styles.planeBadge, { transform: [{ rotate: planeCounterRotate }] }]}>
+            <Ionicons name="airplane" size={PLANE_SIZE} color="#008D9B" />
+          </Animated.View>
         </Animated.View>
       </View>
 
@@ -96,7 +114,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F7FCFF',
+    backgroundColor: '#F4FBFC',
     paddingHorizontal: 24,
   },
   animationStage: {
@@ -106,83 +124,165 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
-  glow: {
+  outerGlow: {
     position: 'absolute',
-    width: GLOBE_SIZE + 24,
-    height: GLOBE_SIZE + 24,
+    width: GLOBE_SIZE + 34,
+    height: GLOBE_SIZE + 34,
     borderRadius: 999,
     backgroundColor: '#67E8F9',
+  },
+  innerGlow: {
+    position: 'absolute',
+    width: GLOBE_SIZE + 18,
+    height: GLOBE_SIZE + 18,
+    borderRadius: 999,
+    backgroundColor: 'rgba(0, 141, 155, 0.10)',
+  },
+  globeShadow: {
+    width: GLOBE_SIZE,
+    height: GLOBE_SIZE,
+    borderRadius: GLOBE_SIZE / 2,
+    backgroundColor: '#008D9B',
+    shadowColor: '#006D78',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+    elevation: 8,
   },
   globe: {
     width: GLOBE_SIZE,
     height: GLOBE_SIZE,
-    borderRadius: 999,
-    backgroundColor: '#0EA5E9',
+    borderRadius: GLOBE_SIZE / 2,
+    backgroundColor: '#0EA5C6',
     borderWidth: 2,
-    borderColor: '#BAE6FD',
+    borderColor: '#BDEEF2',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  meridian: {
+  oceanHighlight: {
     position: 'absolute',
-    width: 2,
-    height: '82%',
-    borderRadius: 999,
-    backgroundColor: 'rgba(224, 242, 254, 0.8)',
+    top: 8,
+    left: 14,
+    width: 62,
+    height: 52,
+    borderRadius: 31,
+    backgroundColor: 'rgba(125, 211, 252, 0.38)',
+    transform: [{ rotate: '-18deg' }],
   },
-  meridianTilt: {
-    transform: [{ rotate: '55deg' }],
-    opacity: 0.55,
+  landMass: {
+    position: 'absolute',
+    backgroundColor: 'rgba(204, 251, 241, 0.86)',
+    borderRadius: 999,
+  },
+  landNorthAmerica: {
+    top: 29,
+    left: 20,
+    width: 27,
+    height: 19,
+    transform: [{ rotate: '-24deg' }],
+  },
+  landSouthAmerica: {
+    top: 55,
+    left: 39,
+    width: 17,
+    height: 31,
+    transform: [{ rotate: '-19deg' }],
+  },
+  landEuropeAfrica: {
+    top: 35,
+    left: 59,
+    width: 20,
+    height: 41,
+    transform: [{ rotate: '10deg' }],
+  },
+  landAsia: {
+    top: 30,
+    right: 12,
+    width: 32,
+    height: 24,
+    transform: [{ rotate: '16deg' }],
+  },
+  landAustralia: {
+    right: 21,
+    bottom: 28,
+    width: 19,
+    height: 11,
+    transform: [{ rotate: '-7deg' }],
   },
   equator: {
     position: 'absolute',
-    width: '85%',
+    width: '92%',
     height: 2,
     borderRadius: 999,
-    backgroundColor: 'rgba(224, 242, 254, 0.85)',
+    backgroundColor: 'rgba(240, 253, 250, 0.72)',
   },
-  latitude: {
+  latitudeRing: {
     position: 'absolute',
-    width: '74%',
-    height: 16,
+    width: '86%',
+    height: 26,
     borderRadius: 999,
     borderWidth: 1.5,
-    borderColor: 'rgba(224, 242, 254, 0.55)',
+    borderColor: 'rgba(240, 253, 250, 0.54)',
   },
-  latitudeTop: {
+  latitudeNorth: {
     top: 24,
   },
-  latitudeBottom: {
+  latitudeSouth: {
     bottom: 24,
+  },
+  longitudeRing: {
+    position: 'absolute',
+    width: 36,
+    height: '93%',
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: 'rgba(240, 253, 250, 0.58)',
+  },
+  longitudeCenter: {
+    width: 2,
+    borderWidth: 0,
+    backgroundColor: 'rgba(240, 253, 250, 0.62)',
+  },
+  longitudeLeft: {
+    transform: [{ rotate: '-12deg' }],
+  },
+  longitudeRight: {
+    transform: [{ rotate: '12deg' }],
   },
   orbit: {
     position: 'absolute',
     width: ORBIT_SIZE,
     height: ORBIT_SIZE,
-    borderRadius: 999,
+    borderRadius: ORBIT_SIZE / 2,
     borderWidth: 1,
-    borderColor: 'rgba(56, 189, 248, 0.22)',
+    borderColor: 'rgba(0, 141, 155, 0.18)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  planeWrap: {
+  planeBadge: {
     position: 'absolute',
-    top: ORBIT_SIZE / 2 - PLANE_SIZE / 2,
-    left: ORBIT_SIZE / 2 + ORBIT_RADIUS - PLANE_SIZE - 6,
+    top: -PLANE_BADGE_SIZE / 2,
+    left: ORBIT_SIZE / 2 - PLANE_BADGE_SIZE / 2,
+    width: PLANE_BADGE_SIZE,
+    height: PLANE_BADGE_SIZE,
+    borderRadius: PLANE_BADGE_SIZE / 2,
     backgroundColor: '#FFFFFF',
-    borderRadius: 999,
-    padding: 4,
-    shadowColor: '#0C4A6E',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.16,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#BDEEF2',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#006D78',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 4,
   },
   message: {
-    marginTop: 16,
+    marginTop: 18,
     fontSize: 14,
-    fontWeight: '600',
+    lineHeight: 20,
+    fontWeight: '700',
     color: '#0F766E',
     textAlign: 'center',
   },

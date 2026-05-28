@@ -10,16 +10,16 @@ const CARD_THEME = {
   colors: {
     primary: '#008D9B',
     background: '#FFFFFF',
-    textPrimary: '#000000',
-    textSecondary: '#A19D9D',
-    cardBorder: '#CFCFCF',
+    textPrimary: '#111827',
+    textSecondary: '#64748B',
+    cardBorder: '#E2E8F0',
     cardShadow: '#000000',
     ratingIconBackground: '#FFF4CC',
     plusBackground: '#D7EDF0',
   },
 } as const;
 
-const { spacing, borderRadius, colors } = CARD_THEME;
+const { spacing, colors } = CARD_THEME;
 
 type PlaceCardProps = {
   place: Place;
@@ -100,13 +100,16 @@ export function PlaceCard({
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: borderRadius,
+    borderRadius: 24,
     backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.cardBorder,
     overflow: 'hidden',
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.08)',
-    elevation: 2,
+    shadowColor: colors.cardShadow,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 3,
   },
   imageWrapper: {
     position: 'relative',
@@ -133,7 +136,7 @@ const styles = StyleSheet.create({
   imagePlaceholderSubtext: {
     color: '#0F766E',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     textAlign: 'center',
   },
   ratingPill: {
@@ -178,7 +181,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 16,
     lineHeight: 20,
-    fontWeight: '600',
+    fontWeight: '800',
   },
   cardRegion: {
     color: colors.textSecondary,

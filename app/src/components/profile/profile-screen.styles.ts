@@ -21,8 +21,8 @@ export const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 34,
-    fontWeight: "700",
-    color: "#111111",
+    fontWeight: "800",
+    color: "#111827",
   },
   headerIconButton: {
     padding: 4,
@@ -71,11 +71,11 @@ export const styles = StyleSheet.create({
   name: {
     fontSize: 28,
     fontWeight: "700",
-    color: "#111111",
+    color: "#111827",
   },
   username: {
     fontSize: 15,
-    color: "#8A8A8A",
+    color: "#64748B",
     marginTop: 4,
   },
   statsRow: {
@@ -91,12 +91,12 @@ export const styles = StyleSheet.create({
   statValue: {
     fontSize: 30,
     fontWeight: "700",
-    color: "#111111",
+    color: "#111827",
   },
   statLabel: {
     marginTop: 2,
     fontSize: 14,
-    color: "#8A8A8A",
+    color: "#64748B",
   },
   statDivider: {
     width: 1,
@@ -123,14 +123,19 @@ export const styles = StyleSheet.create({
   actionCard: {
     minHeight: 92,
     borderWidth: 1.5,
-    borderColor: "#A9E2E8",
-    borderRadius: 22,
+    borderColor: "#D7EEF0",
+    borderRadius: 24,
     backgroundColor: "#FFFFFF",
     paddingHorizontal: 18,
     paddingVertical: 18,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    shadowColor: "#008D9B",
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 2,
   },
   actionLeft: {
     flexDirection: "row",
@@ -146,14 +151,14 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
   },
   actionTitle: {
-    fontSize: 22,
-    fontWeight: "600",
-    color: "#111111",
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#111827",
   },
   actionSubtitle: {
     marginTop: 4,
     fontSize: 14,
-    color: "#8A8A8A",
+    color: "#64748B",
   },
   settingsSection: {
     marginTop: 26,

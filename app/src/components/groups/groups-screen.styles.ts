@@ -73,12 +73,17 @@ export const groupsStyles = StyleSheet.create({
 
   // Active group card
   activeCard: {
-    borderRadius: rs(18),
+    borderRadius: rs(22),
     borderWidth: 1.5,
     borderColor: COLORS.activeCardBorder,
     backgroundColor: COLORS.activeCardBackground,
     padding: rs(16),
     marginBottom: rs(16),
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 3,
   },
   activeCardTopRow: {
     flexDirection: 'row',
@@ -163,13 +168,18 @@ export const groupsStyles = StyleSheet.create({
   otherCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: rs(16),
+    borderRadius: rs(18),
     borderWidth: 1,
     borderColor: COLORS.cardBorder,
     backgroundColor: COLORS.cardBackground,
     paddingVertical: rs(14),
     paddingHorizontal: rs(16),
     marginBottom: rs(10),
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
   otherCardIcon: {
     width: rs(42),
