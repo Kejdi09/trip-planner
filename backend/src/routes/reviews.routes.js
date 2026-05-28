@@ -132,16 +132,32 @@ async function generatePlaceOverview(place) {
   const systemPrompt = 'You are a concise travel copywriter. Return exactly one complete sentence.';
   const userPrompt = `Write exactly one complete, factual travel overview sentence for ${city}, ${country}. Keep it between 22 and 30 words. No markdown. No emojis. No hashtags. No unfinished clauses. The sentence must end with punctuation.`;
 
-  const response = await fetch(deepseekApiUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${deepseekApiKey}` },
-    body: JSON.stringify({
-      model: deepseekModel,
-      messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-      temperature: 0.2,
-      max_tokens: 100,
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutMs = 9000;
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  let response;
+  try {
+    response = await fetch(deepseekApiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${deepseekApiKey}` },
+      body: JSON.stringify({
+        model: deepseekModel,
+        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+        temperature: 0.2,
+        max_tokens: 100,
+      }),
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      const timeoutError = new Error('DeepSeek request timed out');
+      timeoutError.code = 'DEEPSEEK_TIMEOUT';
+      throw timeoutError;
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
   if (!response.ok) return null;
   const payload = await response.json().catch(() => null);
   const rawContent = String(payload?.choices?.[0]?.message?.content || '').trim();
@@ -332,6 +348,10 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
         console.log('[place-description] generation success', { placeId, city: updated.city, country: updated.country });
         return res.json(updated);
       } catch (aiError) {
+        if (aiError?.code === 'DEEPSEEK_TIMEOUT') {
+          console.log('[place-description] generation timed out', { placeId, city: data.city, country: data.country });
+          return res.json({ ...data, description: null });
+        }
         console.error('[place-description] generation failed', { placeId, city: data.city, country: data.country, error: aiError?.message || String(aiError) });
         return res.json({ ...data, description: null });
       }
