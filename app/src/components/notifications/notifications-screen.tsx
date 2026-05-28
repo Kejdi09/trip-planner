@@ -50,14 +50,21 @@ const parseContent = (content: string | null, title?: string | null, body?: stri
   };
 };
 
+function parseSupabaseTime(value: string) {
+  if (!value) return null;
+  const hasTimezone = /[zZ]|[+-]\d{2}:\d{2}$/.test(value);
+  const date = new Date(hasTimezone ? value : `${value}Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 const formatTime = (value: string) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
+  const date = parseSupabaseTime(value);
+  if (!date) return '';
   const diffMs = Date.now() - date.getTime();
   const minute = 60 * 1000;
   const hour = 60 * minute;
   const day = 24 * hour;
-  if (diffMs < minute) return 'Just now';
+  if (Math.abs(diffMs) < minute || diffMs < 0) return 'Just now';
   if (diffMs < hour) return `${Math.max(1, Math.floor(diffMs / minute))}m ago`;
   if (diffMs < day) return `${Math.max(1, Math.floor(diffMs / hour))}h ago`;
   if (diffMs < 7 * day) return `${Math.max(1, Math.floor(diffMs / day))}d ago`;

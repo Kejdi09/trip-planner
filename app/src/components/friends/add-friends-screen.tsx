@@ -127,7 +127,9 @@ type SearchResultCardProps = {
 
 function SearchResultCard({ user, onAdd, isSending }: SearchResultCardProps) {
   return (
-    <Pressable style={styles.resultCard} onPress={() => router.push('/profile')}>
+    <Pressable
+      style={styles.resultCard}
+      onPress={() => router.push({ pathname: '/user-profile/[userId]', params: { userId: user.id } })}>
       <Avatar uri={user.avatarUrl} name={user.fullName} />
 
       <View style={styles.userInfo}>
