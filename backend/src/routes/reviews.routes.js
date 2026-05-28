@@ -1,6 +1,7 @@
 const express = require('express');
 const { fetchPexelsImageForPlace, hasPexelsApiKey } = require('../lib/place-images');
-const { deepseekApiKey, deepseekApiUrl, deepseekModel } = require('../config');
+const { deepseekApiKey } = require('../config');
+const { callDeepSeekChat } = require('../services/deepseek');
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -124,48 +125,25 @@ async function enrichPlacesWithImages(supabaseAdmin, rows, maxFetches = 5) {
 }
 
 async function generatePlaceOverview(place) {
-  if (!deepseekApiKey) return null;
   const city = String(place.city || place.name || '').trim();
   const country = String(place.country || '').trim();
   if (!city || !country) return null;
 
   const systemPrompt = 'You are a concise travel copywriter. Return exactly one complete sentence.';
-  const userPrompt = `Write exactly one complete, factual travel overview sentence for ${city}, ${country}. Keep it between 22 and 30 words. No markdown. No emojis. No hashtags. No unfinished clauses. The sentence must end with punctuation.`;
+  const userPrompt = `Write exactly one complete, factual travel overview sentence for ${city}, ${country}. Keep it between 18 and 28 words. No markdown. No emojis. No hashtags. Do not end with unfinished phrases. End with punctuation.`;
 
-  const controller = new AbortController();
-  const timeoutMs = 9000;
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  let response;
-  try {
-    response = await fetch(deepseekApiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${deepseekApiKey}` },
-      body: JSON.stringify({
-        model: deepseekModel,
-        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-        temperature: 0.2,
-        max_tokens: 100,
-      }),
-      signal: controller.signal,
-    });
-  } catch (error) {
-    if (error?.name === 'AbortError') {
-      const timeoutError = new Error('DeepSeek request timed out');
-      timeoutError.code = 'DEEPSEEK_TIMEOUT';
-      throw timeoutError;
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-  if (!response.ok) return null;
-  const payload = await response.json().catch(() => null);
-  const rawContent = String(payload?.choices?.[0]?.message?.content || '').trim();
-  if (!rawContent) return null;
-  const unquoted = rawContent.replace(/^["']+|["']+$/g, '').trim();
-  const singleLine = unquoted.replace(/\s+/g, ' ');
-  return singleLine;
+  const content = await callDeepSeekChat({
+    purpose: 'place-overview',
+    messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+    temperature: 0.2,
+    maxTokens: 100,
+    timeoutMs: 10000,
+  });
+
+  const unquoted = String(content || '').replace(/^\s*["']+|["']+\s*$/g, '').trim();
+  return unquoted.replace(/\s+/g, ' ');
 }
+
 
 module.exports = function reviewsRoutes(supabaseAdmin) {
   const router = express.Router();
