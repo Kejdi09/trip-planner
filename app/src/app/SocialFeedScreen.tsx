@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
+import { AppLoading } from '@/components/common/AppLoading';
 import {
-  ActivityIndicator,
   Image,
   RefreshControl,
   SafeAreaView,
@@ -64,7 +64,6 @@ function formatTimeAgo(value: string) {
 
 function actionText(item: FeedItem) {
   if (item.type === 'review') return 'reviewed';
-  if (item.type === 'wishlist') return 'saved';
   if (item.type === 'planned') return 'is planning a trip to';
   return 'joined a trip to';
 }
@@ -260,7 +259,7 @@ const SocialFeedScreen: React.FC = () => {
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator
+        showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refresh} tintColor={C.primary} />}
       >
         <View style={styles.header}>
@@ -286,8 +285,7 @@ const SocialFeedScreen: React.FC = () => {
 
           {isLoading ? (
             <View style={styles.statusCard}>
-              <ActivityIndicator color={C.primary} />
-              <Text style={styles.statusText}>Loading friend activity...</Text>
+              <AppLoading message="Loading friend activity..." />
             </View>
           ) : errorMessage ? (
             <View style={styles.statusCard}>

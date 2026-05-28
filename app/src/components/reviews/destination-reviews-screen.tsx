@@ -1,6 +1,7 @@
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
+import { AppLoading } from '@/components/common/AppLoading';
 import { Dimensions, FlatList, Image, Modal, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -342,7 +343,7 @@ export function DestinationReviewsScreen() {
               {errorMessage ? (
                 <StatusMessage message={errorMessage} style={styles.errorText} />
               ) : isLoading ? (
-                <StatusMessage message="Loading reviews..." style={styles.statusText} />
+                <AppLoading message="Loading reviews..." />
               ) : reviewItems.length === 0 ? (
                 <StatusMessage message="No reviews yet." style={styles.statusText} />
               ) : hasDestination ? (

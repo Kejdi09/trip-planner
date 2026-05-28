@@ -1,11 +1,11 @@
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
+import { AppLoading } from '@/components/common/AppLoading';
 import { ActivityIndicator, Image, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RatingStars } from '@/components/reviews/rating-stars';
-import { AppBottomNav } from '@/components/ui/app-bottom-nav';
 import { FadeIn } from '@/components/ui/fade-in';
 import { StatusMessage } from '@/components/ui/status-message';
 import type { PlaceRecord } from '../../../lib/reviews-api';
@@ -228,7 +228,7 @@ export function MyReviewsScreen() {
           {errorMessage ? (
             <StatusMessage message={errorMessage} style={styles.errorText} />
           ) : isLoading ? (
-            <StatusMessage message="Loading your reviews..." style={styles.statusText} />
+            <AppLoading message="Loading your reviews..." />
           ) : sortedReviews.length === 0 ? (
             <StatusMessage message="No reviews yet." style={styles.statusText} />
           ) : (
@@ -327,8 +327,6 @@ export function MyReviewsScreen() {
             </Pressable>
           </Pressable>
         </Modal>
-
-        <AppBottomNav activeTab="Profile" />
       </View>
     </SafeAreaView>
   );

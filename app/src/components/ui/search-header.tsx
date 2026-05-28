@@ -8,9 +8,9 @@ const HEADER_THEME = {
   colors: {
     primary: '#008D9B',
     background: '#FFFFFF',
-    textPrimary: '#000000',
-    textSecondary: '#A19D9D',
-    searchBackground: '#E3E8EC',
+    textPrimary: '#111827',
+    textSecondary: '#64748B',
+    searchBackground: '#F1F5F9',
     searchIcon: '#4E5A64',
   },
 } as const;
@@ -79,9 +79,9 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.textPrimary,
-    fontSize: 42,
-    lineHeight: 46,
-    fontWeight: '700',
+    fontSize: 36,
+    lineHeight: 40,
+    fontWeight: '800',
     marginBottom: spacing * 2,
   },
   searchRow: {
@@ -97,7 +97,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.searchBackground,
     borderRadius: borderRadius,
     paddingHorizontal: spacing * 2,
-    height: spacing * 5,
+    height: spacing * 5.5,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   searchInput: {
     flex: 1,
@@ -107,8 +109,8 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   filterButton: {
-    height: spacing * 6,
-    width: spacing * 6,
+    height: spacing * 5.5,
+    width: spacing * 5.5,
     borderRadius: spacing * 3,
     backgroundColor: colors.primary,
     alignItems: 'center',

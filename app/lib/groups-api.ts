@@ -177,6 +177,19 @@ export async function deleteItineraryItem(groupId: string, itemId: string, userI
   });
 }
 
+export async function leaveGroupApi(groupId: string, userId?: string) {
+  const resolvedUserId = await resolveActiveUserId(userId);
+  const params = new URLSearchParams({ actorId: resolvedUserId });
+  return fetch(`${base()}/api/groups/${groupId}/members/${resolvedUserId}?${params.toString()}`, {
+    method: 'DELETE',
+    headers: { 'content-type': 'application/json', 'x-app-env': APP_ENV },
+  }).then(async (response) => {
+    if (response.status === 204) return;
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error ?? 'Unable to leave group.');
+  });
+}
+
 export async function deleteGroupApi(groupId: string, userId?: string) {
   const resolvedUserId = await resolveActiveUserId(userId);
   return request<{ success: true }>(`/api/groups/${groupId}`, {

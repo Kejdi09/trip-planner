@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Dimensions,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -26,7 +27,7 @@ const TYPE_SCALE = Math.min(Math.max(SCREEN_WIDTH / 390, 0.9), 1.08);
 const rs = (v: number) => Math.round(v * TYPE_SCALE);
 
 const C = {
-  background: '#FFFFFF',
+  background: '#F8FCFD',
   primary: '#008D9B',
   primaryLight: '#D7EDF0',
   text: '#111318',
@@ -34,9 +35,9 @@ const C = {
   border: '#EBEBEB',
   myBubble: '#008D9B',
   myBubbleText: '#FFFFFF',
-  theirBubble: '#F0F2F5',
+  theirBubble: '#FFFFFF',
   theirBubbleText: '#111318',
-  inputBackground: '#F5F6F8',
+  inputBackground: '#F7FAFB',
   timestampText: '#B0B5BE',
   dateLabelText: '#8F949F',
   headerBorder: '#F0F2F5',
@@ -45,10 +46,52 @@ const C = {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: C.background },
   screen: { flex: 1, backgroundColor: C.background },
+  messageArea: {
+    flex: 1,
+    overflow: 'hidden',
+  },
+  chatBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#F8FCFD',
+  },
+  backdropBlobLarge: {
+    position: 'absolute',
+    width: rs(320),
+    height: rs(320),
+    borderRadius: rs(160),
+    backgroundColor: 'rgba(0, 141, 155, 0.08)',
+    top: rs(42),
+    left: rs(-130),
+  },
+  backdropBlobMedium: {
+    position: 'absolute',
+    width: rs(260),
+    height: rs(260),
+    borderRadius: rs(130),
+    backgroundColor: 'rgba(45, 212, 191, 0.08)',
+    bottom: rs(34),
+    right: rs(-98),
+  },
+  backdropBlobSmall: {
+    position: 'absolute',
+    width: rs(150),
+    height: rs(150),
+    borderRadius: rs(75),
+    backgroundColor: 'rgba(14, 165, 233, 0.05)',
+    top: rs(230),
+    right: rs(28),
+  },
+  backdropDot: {
+    position: 'absolute',
+    width: rs(6),
+    height: rs(6),
+    borderRadius: rs(3),
+    backgroundColor: 'rgba(0, 141, 155, 0.14)',
+  },
 
   // Header
   header: {
-    backgroundColor: C.background,
+    backgroundColor: 'rgba(255, 255, 255, 0.96)',
     borderBottomWidth: 1,
     borderBottomColor: C.headerBorder,
     paddingTop: rs(12),
@@ -101,7 +144,7 @@ const styles = StyleSheet.create({
   },
 
   // Messages list
-  messageList: { flex: 1 },
+  messageList: { flex: 1, backgroundColor: 'transparent' },
   messageListContent: {
     paddingHorizontal: rs(16),
     paddingVertical: rs(12),
@@ -140,6 +183,8 @@ const styles = StyleSheet.create({
   bubbleTheirs: {
     backgroundColor: C.theirBubble,
     borderBottomLeftRadius: rs(4),
+    borderWidth: 1,
+    borderColor: 'rgba(226, 232, 240, 0.86)',
   },
   bubbleText: { fontSize: rs(15), lineHeight: rs(20), fontWeight: '500' },
   bubbleTextMine: { color: C.myBubbleText },
@@ -152,12 +197,19 @@ const styles = StyleSheet.create({
   inputBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: rs(16),
+    marginHorizontal: rs(14),
+    paddingHorizontal: rs(12),
     paddingVertical: rs(10),
-    borderTopWidth: 1,
-    borderTopColor: C.border,
-    backgroundColor: C.background,
+    borderRadius: rs(28),
+    borderWidth: 1,
+    borderColor: 'rgba(203, 239, 242, 0.95)',
+    backgroundColor: 'rgba(255, 255, 255, 0.96)',
     gap: rs(10),
+    shadowColor: '#008D9B',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 8,
   },
   inputWrapper: {
     flex: 1,
@@ -167,6 +219,8 @@ const styles = StyleSheet.create({
     borderRadius: rs(22),
     paddingHorizontal: rs(14),
     minHeight: rs(42),
+    borderWidth: 1,
+    borderColor: 'rgba(226, 232, 240, 0.72)',
   },
   input: {
     flex: 1,
@@ -176,12 +230,17 @@ const styles = StyleSheet.create({
     maxHeight: rs(100),
   },
   sendButton: {
-    width: rs(40),
-    height: rs(40),
-    borderRadius: rs(20),
+    width: rs(42),
+    height: rs(42),
+    borderRadius: rs(21),
     backgroundColor: C.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: C.primary,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    elevation: 3,
   },
   sendButtonDisabled: { backgroundColor: '#D7EDF0' },
 });
@@ -214,7 +273,21 @@ export function GroupChatScreen() {
   const [sending, setSending] = React.useState(false);
   const [currentUserId, setCurrentUserId] = React.useState(getActiveUserId());
   const insets = useSafeAreaInsets();
+  const navBottom = Math.max(10, insets.bottom + 6);
+  const navHeight = 66;
+  const [keyboardVisible, setKeyboardVisible] = React.useState(false);
+  const inputBottomSpacing = keyboardVisible ? Math.max(8, insets.bottom) : navBottom + navHeight + 12;
   const listRef = React.useRef<FlatList>(null);
+
+
+  React.useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   React.useEffect(() => {
     (async () => {
@@ -337,8 +410,8 @@ export function GroupChatScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <KeyboardAvoidingView
         style={styles.screen}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={0}>
+        behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}>
 
         {/* Header */}
         <View style={styles.header}>
@@ -376,19 +449,25 @@ export function GroupChatScreen() {
         {loading ? (
           <ActivityIndicator color={C.primary} style={{ flex: 1 }} />
         ) : (
-          <>
-          <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
-            <View style={{ position: 'absolute', width: 240, height: 240, borderRadius: 120, backgroundColor: 'rgba(0,141,155,0.10)', top: 60, left: -80 }} />
-            <View style={{ position: 'absolute', width: 300, height: 300, borderRadius: 150, backgroundColor: 'rgba(0,141,155,0.08)', bottom: 20, right: -120 }} />
-          </View>
-          <FlatList
-            ref={listRef}
-            style={styles.messageList}
-            contentContainerStyle={styles.messageListContent}
-            data={messages}
-            keyExtractor={(item) => item.id}
-            onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
-            renderItem={({ item }) => {
+          <View style={styles.messageArea}>
+            <View pointerEvents="none" style={styles.chatBackdrop}>
+              <View style={styles.backdropBlobLarge} />
+              <View style={styles.backdropBlobMedium} />
+              <View style={styles.backdropBlobSmall} />
+              <View style={[styles.backdropDot, { top: rs(114), right: rs(44) }]} />
+              <View style={[styles.backdropDot, { top: rs(190), left: rs(58), opacity: 0.55 }]} />
+              <View style={[styles.backdropDot, { bottom: rs(120), left: rs(34), opacity: 0.45 }]} />
+            </View>
+            <FlatList
+              ref={listRef}
+              style={styles.messageList}
+              contentContainerStyle={[styles.messageListContent, { paddingBottom: 24 }]}
+              data={messages}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyExtractor={(item) => item.id}
+              onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+              renderItem={({ item }) => {
               const isMe = item.senderId === currentUserId;
               const sender = group?.members.find((m) => m.id === item.senderId);
               return (
@@ -410,12 +489,12 @@ export function GroupChatScreen() {
                 </>
               );
             }}
-          />
-          </>
+            />
+          </View>
         )}
 
         {/* Input bar */}
-        <View style={[styles.inputBar, { paddingBottom: Math.max(10, insets.bottom + 78) }]}>
+        <View style={[styles.inputBar, { marginBottom: inputBottomSpacing }]}>
           <View style={styles.inputWrapper}>
             <TextInput
               value={inputText}

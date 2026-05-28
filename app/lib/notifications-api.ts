@@ -67,7 +67,7 @@ export async function fetchNotifications(limit = 50): Promise<AppNotification[]>
 
   if (!response.ok) throw new Error(await parseError(response, 'Unable to load notifications.'));
   const payload = (await response.json()) as NotificationPayload;
-  return payload.notifications ?? [];
+  return (payload.notifications ?? []).filter((notification) => notification.type !== 'wishlist' && notification.related_entity_type !== 'wishlist');
 }
 
 export async function fetchUnreadNotificationCount(): Promise<number> {
@@ -77,7 +77,8 @@ export async function fetchUnreadNotificationCount(): Promise<number> {
       .from('notifications')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
-      .eq('is_read', false);
+      .eq('is_read', false)
+      .neq('type', 'wishlist');
 
     if (error) return 0;
     return count ?? 0;

@@ -232,17 +232,10 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
 
       if (friendIds.length === 0) return res.json({ items: [] });
 
-      const [reviewsRes, wishlistsRes, plannedGroupsRes, membershipsRes] = await Promise.all([
+      const [reviewsRes, plannedGroupsRes, membershipsRes] = await Promise.all([
         supabaseAdmin
           .from('reviews')
           .select('id, user_id, place_id, rating, review, created_at')
-          .in('user_id', friendIds)
-          .not('place_id', 'is', null)
-          .order('created_at', { ascending: false })
-          .limit(sourceLimit),
-        supabaseAdmin
-          .from('wishlists')
-          .select('id, user_id, place_id, created_at')
           .in('user_id', friendIds)
           .not('place_id', 'is', null)
           .order('created_at', { ascending: false })
@@ -261,7 +254,7 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
           .limit(sourceLimit),
       ]);
 
-      const sourceError = reviewsRes.error || wishlistsRes.error || plannedGroupsRes.error || membershipsRes.error;
+      const sourceError = reviewsRes.error || plannedGroupsRes.error || membershipsRes.error;
       if (sourceError) {
         const wrapped = new Error(sourceError.message || 'Failed to load feed activity.');
         wrapped.status = 502;
@@ -269,7 +262,6 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
       }
 
       const reviews = reviewsRes.data || [];
-      const wishlists = wishlistsRes.data || [];
       const plannedGroups = plannedGroupsRes.data || [];
       const memberships = membershipsRes.data || [];
       const memberGroupIds = Array.from(new Set(memberships.map((membership) => membership.group_id).filter(Boolean)));
@@ -312,14 +304,12 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
 
       const actorIds = Array.from(new Set([
         ...reviews.map((review) => review.user_id),
-        ...wishlists.map((wishlist) => wishlist.user_id),
         ...resolvedPlannedGroups.map((group) => group.created_by),
         ...joinedMemberships.map((membership) => membership.user_id),
       ].filter(Boolean)));
 
       const placeIds = Array.from(new Set([
         ...reviews.map((review) => review.place_id),
-        ...wishlists.map((wishlist) => wishlist.place_id),
         ...resolvedPlannedGroups.map((group) => group.destination_place_id),
         ...joinedMemberships.map((membership) => joinedGroupById.get(membership.group_id)?.destination_place_id),
       ].filter(Boolean)));
@@ -398,16 +388,6 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
         createdAt: review.created_at,
       }));
 
-      const wishlistItems = wishlists.map((wishlist) => ({
-        id: `wishlist:${wishlist.id}`,
-        type: 'wishlist',
-        actor: normalizeActor(wishlist.user_id),
-        place: normalizePlace(wishlist.place_id),
-        rating: null,
-        text: null,
-        createdAt: wishlist.created_at,
-      }));
-
       const plannedItems = resolvedPlannedGroups.filter((group) => group.destination_place_id).map((group) => ({
         id: `planned:${group.id}`,
         type: 'planned',
@@ -431,7 +411,7 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
         };
       });
 
-      const items = [...reviewItems, ...wishlistItems, ...plannedItems, ...joinedItems]
+      const items = [...reviewItems, ...plannedItems, ...joinedItems]
         .filter((item) => item.createdAt && item.place?.id)
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(offset, offset + limit);

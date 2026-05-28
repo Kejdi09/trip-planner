@@ -153,7 +153,7 @@ export function NotificationsScreen() {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
         {items.length === 0 ? (
           <View style={styles.emptyCard}>

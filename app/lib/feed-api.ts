@@ -1,6 +1,6 @@
 import { API_BASE_URL, APP_ENV } from './app-config';
 
-export type FeedActivityType = 'review' | 'wishlist' | 'planned' | 'joined';
+export type FeedActivityType = 'review' | 'planned' | 'joined';
 
 export type FeedActor = {
   id: string;

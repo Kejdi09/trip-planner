@@ -9,6 +9,8 @@ type PlaceRow = {
   description: string | null;
   city: string | null;
   country: string | null;
+  image_url: string | null;
+  imageUrl?: string | null;
   created_at: string | null;
 };
 
@@ -220,7 +222,7 @@ export async function fetchWishlistPlaces(userId: string): Promise<DiscoverPlace
       country: place.country?.trim() || null,
       visited: formatVisitedLabel(uniqueUsers.size),
       rating: averageRating(placeReviews),
-      image: imageByPlaceId.get(place.id) ?? DEFAULT_PLACE_IMAGE,
+      image: place.image_url?.trim() || place.imageUrl?.trim() || imageByPlaceId.get(place.id) || DEFAULT_PLACE_IMAGE,
     };
   });
 }
