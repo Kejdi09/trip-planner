@@ -43,3 +43,6 @@ Thumbs.db
 
 # Local project notes
 DEVOPS_STATUS.md
+
+# Local GeoNames source files
+data/

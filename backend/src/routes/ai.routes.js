@@ -1,5 +1,6 @@
 const express = require('express');
 const { ensureGroupDestinationPlace } = require('../services/destinations');
+const { callDeepSeekChat } = require('../services/deepseek');
 
 function daysInclusive(startDate, endDate) {
   if (!startDate || !endDate) return null;
@@ -82,9 +83,6 @@ module.exports = function aiRoutes(supabaseAdmin) {
 
   router.post('/generate-itinerary', async (req, res, next) => {
     try {
-      const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
-      const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
-      if (!DEEPSEEK_API_KEY) return res.status(500).json({ error: { code: 'MISSING_DEEPSEEK_KEY', message: 'Missing DEEPSEEK_API_KEY' } });
 
       const groupId = String(req.body?.groupId || '').trim();
       if (!groupId) return res.status(400).json({ error: { code: 'MISSING_GROUP_ID', message: 'groupId is required' } });
@@ -106,13 +104,45 @@ module.exports = function aiRoutes(supabaseAdmin) {
       const systemPrompt = `You are a travel itinerary planner.\nReturn only valid JSON.\nNo markdown.\nNo explanation.\nNo comments.`;
       const userPrompt = `Create a realistic travel itinerary as JSON.\n\nTrip data:\n${JSON.stringify(tripContext, null, 2)}\n\nRules:\n- Create exactly ${totalDays} days.\n- Each day must have exactly 2 places.\n- Use real, popular places in ${city}${country ? `, ${country}` : ''}.\n- Avoid repeating places.\n- Keep descriptions short.\n- Use morning and afternoon time blocks.\n- Budget ${tripContext.budget.minBudget != null && tripContext.budget.maxBudget != null ? `range is EUR ${tripContext.budget.minBudget}-${tripContext.budget.maxBudget}` : 'is unspecified'}.\n- Return JSON in this exact structure:\n\n{\n  "destination": "City, Country",\n  "summary": "short summary",\n  "days": [\n    {\n      "day": 1,\n      "title": "short day title",\n      "places": [\n        {\n          "name": "place name",\n          "timeBlock": "morning",\n          "startTime": "09:00",\n          "endTime": "11:00",\n          "description": "short description"\n        },\n        {\n          "name": "place name",\n          "timeBlock": "afternoon",\n          "startTime": "14:00",\n          "endTime": "16:00",\n          "description": "short description"\n        }\n      ]\n    }\n  ]\n}`;
 
-      const deepseekResponse = await fetch('https://api.deepseek.com/chat/completions', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${DEEPSEEK_API_KEY}` }, body: JSON.stringify({ model: DEEPSEEK_MODEL, messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }], response_format: { type: 'json_object' }, temperature: 0.4, max_tokens: 4000 }) });
-      if (!deepseekResponse.ok) return res.status(500).json({ error: { code: 'DEEPSEEK_FAILED', message: 'DeepSeek request failed' } });
-      const data = await deepseekResponse.json();
-      const content = data.choices?.[0]?.message?.content;
-      if (!content) return res.status(500).json({ error: { code: 'DEEPSEEK_EMPTY', message: 'DeepSeek returned no content' } });
-      const itinerary = JSON.parse(content);
-      if (!Array.isArray(itinerary.days)) return res.status(500).json({ error: { code: 'DEEPSEEK_INVALID_SHAPE', message: 'DeepSeek returned invalid itinerary shape' } });
+      let content;
+      try {
+        content = await callDeepSeekChat({
+          purpose: 'generate-itinerary',
+          messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
+          responseFormat: { type: 'json_object' },
+          temperature: 0.4,
+          maxTokens: 4000,
+          timeoutMs: 15000,
+        });
+      } catch (error) {
+        if (error?.code === 'MISSING_DEEPSEEK_KEY') {
+          return res.status(500).json({ error: { code: 'MISSING_DEEPSEEK_KEY', message: 'Missing DEEPSEEK_API_KEY' } });
+        }
+        if (error?.code === 'DEEPSEEK_TIMEOUT') {
+          return res.status(504).json({ error: { code: 'DEEPSEEK_TIMEOUT', message: 'DeepSeek request timed out' } });
+        }
+        if (error?.code === 'DEEPSEEK_EMPTY') {
+          return res.status(502).json({ error: { code: 'DEEPSEEK_EMPTY', message: 'DeepSeek returned empty content' } });
+        }
+        return res.status(502).json({ error: { code: 'DEEPSEEK_FAILED', message: error?.message || 'DeepSeek request failed' } });
+      }
+
+      if (!content) {
+        return res.status(500).json({ error: { code: 'DEEPSEEK_EMPTY', message: 'DeepSeek returned no content' } });
+      }
+
+      let itinerary;
+      try {
+        itinerary = JSON.parse(content);
+      } catch (error) {
+        console.error('[ai/generate-itinerary] invalid json from deepseek', { content });
+        return res.status(500).json({ error: { code: 'DEEPSEEK_INVALID_JSON', message: 'DeepSeek returned invalid JSON' } });
+      }
+
+      if (!Array.isArray(itinerary?.days)) {
+        return res.status(500).json({ error: { code: 'DEEPSEEK_INVALID_SHAPE', message: 'DeepSeek returned invalid itinerary shape' } });
+      }
+
       return res.json(itinerary);
     } catch (error) { return next(error); }
   });

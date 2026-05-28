@@ -6,6 +6,7 @@ import {
   Alert,
   Dimensions,
   Image,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,7 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '../../../lib/supabase';
 import { AppLoading } from '@/components/common/AppLoading';
 
-type Friend = { id: string; fullName: string; username: string; avatarUrl: string | null; tripCount: number };
+type Friend = { id: string; friendshipId: string; fullName: string; username: string; avatarUrl: string | null; tripCount: number };
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TYPE_SCALE = Math.min(Math.max(SCREEN_WIDTH / 390, 0.9), 1.08);
@@ -189,6 +190,7 @@ export function MyFriendsScreen() {
   const [loading, setLoading] = React.useState(true);
   const [searchQuery, setSearchQuery] = React.useState('');
   const [removingIds, setRemovingIds] = React.useState<Set<string>>(new Set());
+  const [removeError, setRemoveError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     (async () => {
@@ -203,7 +205,12 @@ export function MyFriendsScreen() {
           .eq('status', 'accepted')
           .or(`requester_id.eq.${me},receiver_id.eq.${me}`);
 
-        const friendIds = (rows ?? []).map((r) => (r.requester_id === me ? r.receiver_id : r.requester_id));
+        const friendshipByFriendId = new Map<string, string>();
+        (rows ?? []).forEach((row) => {
+          const friendId = row.requester_id === me ? row.receiver_id : row.requester_id;
+          friendshipByFriendId.set(friendId, row.id);
+        });
+        const friendIds = Array.from(friendshipByFriendId.keys());
         if (friendIds.length === 0) {
           setFriends([]);
           return;
@@ -214,13 +221,21 @@ export function MyFriendsScreen() {
           .select('id, full_name, username, avatar_url')
           .in('id', friendIds);
 
-        setFriends((profiles ?? []).map((p) => ({
-          id: p.id,
-          fullName: p.full_name ?? p.username ?? 'User',
-          username: p.username ?? 'user',
-          avatarUrl: p.avatar_url ?? null,
-          tripCount: 0,
-        })));
+        setFriends((profiles ?? []).flatMap((p) => {
+          const friendshipId = friendshipByFriendId.get(p.id);
+          if (!friendshipId) {
+            console.warn('[friends] missing friendship row id for profile', { profileId: p.id });
+            return [];
+          }
+          return [{
+            id: p.id,
+            friendshipId,
+            fullName: p.full_name ?? p.username ?? 'User',
+            username: p.username ?? 'user',
+            avatarUrl: p.avatar_url ?? null,
+            tripCount: 0,
+          }];
+        }));
       } finally {
         setLoading(false);
       }
@@ -238,38 +253,64 @@ export function MyFriendsScreen() {
   // Top 3 by tripCount
   const topFriends = [...friends].sort((a, b) => b.tripCount - a.tripCount).slice(0, 3);
 
+  const removeFriend = async (friend: Friend) => {
+    if (removingIds.has(friend.id)) return;
+    setRemoveError(null);
+    setRemovingIds((prev) => new Set(prev).add(friend.id));
+    const { data: authData } = await supabase.auth.getUser();
+    const currentUserId = authData.user?.id ?? null;
+    console.log('[friends] removing friend', {
+      currentUserId,
+      friendId: friend.id,
+      friendshipId: friend.friendshipId,
+    });
+
+    const { data, error } = await supabase
+      .from('friendships')
+      .delete()
+      .eq('id', friend.friendshipId)
+      .select('id');
+    console.log('[friends] delete result', { data, error });
+
+    if (error) {
+      console.error('Failed to delete friendship row', {
+        friendId: friend.id,
+        friendshipId: friend.friendshipId,
+        error,
+      });
+      setRemoveError('Could not remove friend. Please try again.');
+      Alert.alert('Could not remove friend', 'Please try again.');
+    } else if (!data || data.length === 0) {
+      console.error('Delete matched zero friendship rows', {
+        friendId: friend.id,
+        friendshipId: friend.friendshipId,
+      });
+      const { data: existingRows, error: existingError } = await supabase
+        .from('friendships')
+        .select('id, requester_id, receiver_id, status')
+        .eq('id', friend.friendshipId);
+      console.log('[friends] row after failed delete', { existingRows, existingError });
+      setRemoveError('Could not remove friend. No friendship row was deleted.');
+      Alert.alert('Could not remove friend', 'Could not remove friend. No friendship row was deleted.');
+    } else {
+      setFriends((prev) => prev.filter((f) => f.id !== friend.id));
+    }
+    setRemovingIds((prev) => { const n = new Set(prev); n.delete(friend.id); return n; });
+  };
+
   const handleRemove = (friend: Friend) => {
+    if (Platform.OS === 'web') {
+      const confirmed = globalThis.confirm?.(`Remove ${friend.fullName} as a friend?`) ?? false;
+      if (confirmed) void removeFriend(friend);
+      return;
+    }
+
     Alert.alert(
       'Remove Friend',
       `Remove ${friend.fullName} as a friend?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            console.log('remove friend confirmed', friend.id);
-            setRemovingIds((prev) => new Set(prev).add(friend.id));
-            const { data: auth } = await supabase.auth.getUser();
-            const me = auth.user?.id;
-            if (!me) {
-              Alert.alert('Could not remove friend', 'Please log in again.');
-              setRemovingIds((prev) => { const n = new Set(prev); n.delete(friend.id); return n; });
-              return;
-            }
-            const { error } = await supabase
-              .from('friendships')
-              .delete()
-              .or(`and(requester_id.eq.${me},receiver_id.eq.${friend.id}),and(requester_id.eq.${friend.id},receiver_id.eq.${me})`);
-            if (error) {
-              Alert.alert('Could not remove friend', 'Please try again.');
-            } else {
-              setFriends((prev) => prev.filter((f) => f.id !== friend.id));
-              console.log('friend removed successfully');
-            }
-            setRemovingIds((prev) => { const n = new Set(prev); n.delete(friend.id); return n; });
-          },
-        },
+        { text: 'Remove', style: 'destructive', onPress: () => { void removeFriend(friend); } },
       ],
     );
   };
@@ -331,6 +372,7 @@ export function MyFriendsScreen() {
 
             {/* All friends */}
             <Text style={styles.sectionLabel}>ALL</Text>
+            {removeError ? <Text style={{ color: '#BE123C', marginBottom: rs(10), fontWeight: '600' }}>{removeError}</Text> : null}
 
             {filtered.length === 0 ? (
               <View style={styles.emptyState}>
@@ -353,10 +395,11 @@ export function MyFriendsScreen() {
                     <ActivityIndicator size="small" color={C.primary} />
                   ) : (
                     <Pressable
-                      style={[styles.removeButton, { zIndex: 10, elevation: 10 }]}
-                      onPress={(event) => { console.log('remove friend pressed', friend.id); event.stopPropagation?.(); handleRemove(friend); }}
+                      style={styles.removeButton}
+                      onPress={(event) => { event.stopPropagation?.(); handleRemove(friend); }}
                       accessibilityRole="button"
                       accessibilityLabel={`Remove ${friend.fullName}`}
+                      disabled={removingIds.has(friend.id)}
                       hitSlop={10}>
                       <Feather name="x" size={16} color={C.removeIcon} />
                     </Pressable>
