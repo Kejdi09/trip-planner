@@ -128,7 +128,6 @@ export const styles = StyleSheet.create({
     borderRadius: rs(14),
     paddingHorizontal: rs(14),
     paddingVertical: rs(16),
-    minHeight: rs(72),
   },
   descriptionText: {
     fontSize: rs(14),

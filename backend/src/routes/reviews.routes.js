@@ -46,8 +46,10 @@ function isValidPlaceDescription(text, place) {
   if (!/[.!?]$/.test(normalized)) return false;
   if (/[*#`_]/.test(normalized)) return false;
   const words = normalized.split(/\s+/).filter(Boolean);
-  if (words.length < 8 || words.length > 35) return false;
+  if (words.length < 25 || words.length > 90) return false;
   const lowered = normalized.toLowerCase();
+  const sentenceParts = normalized.match(/[^.!?]+[.!?]+/g) || [];
+  if (sentenceParts.length < 2 || sentenceParts.length > 4) return false;
   const badEndings = [
     'offering visitors', 'offering', 'featuring', 'including', 'with', 'known for', 'home to',
     'and', 'or', 'to', 'for',
@@ -56,7 +58,7 @@ function isValidPlaceDescription(text, place) {
   const city = String(place.city || place.name || '').trim().toLowerCase();
   const country = String(place.country || '').trim().toLowerCase();
   if (city && !lowered.includes(city)) return false;
-  if (country && !lowered.includes(country)) return false;
+  if (country && words.length < 40 && !lowered.includes(country)) return false;
   return true;
 }
 
@@ -129,22 +131,24 @@ async function generatePlaceOverview(place) {
   const country = String(place.country || '').trim();
   if (!city || !country) return null;
 
-  const systemPrompt = 'You write concise travel overview sentences. Return only the final sentence.';
-  const primaryUserPrompt = `Write exactly one complete factual travel overview sentence for ${city}, ${country}. 18-28 words. No markdown, no emojis, no hashtags. End with punctuation.`;
-  const fallbackUserPrompt = `Write one complete travel overview sentence about ${city}, ${country}. 18-28 words. End with punctuation.`;
+  const systemPrompt = 'You write concise, factual travel overviews for a travel app. Return only the overview text.';
+  const primaryUserPrompt = `Write a short 3-sentence travel overview for ${city}, ${country}. Mention ${city} and ${country} naturally. Keep it factual, inviting, and general. Maximum 70 words total. No markdown, no emojis, no hashtags.`;
+  const fallbackUserPrompt = `Write 3 short factual sentences about ${city}, ${country} for a travel app. Return only the overview.`;
 
   try {
     const content = await callDeepSeekChat({
       purpose: 'place-overview',
       messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: primaryUserPrompt }],
       temperature: 0.3,
-      maxTokens: 100,
-      timeoutMs: 10000,
+      maxTokens: 600,
+      timeoutMs: 15000,
     });
     const unquoted = String(content || '').replace(/^\s*["']+|["']+\s*$/g, '').trim();
     return unquoted.replace(/\s+/g, ' ');
   } catch (error) {
     if (error?.code !== 'DEEPSEEK_EMPTY') throw error;
+    const shouldRetry = error?.details?.finishReason === 'length' || error?.details?.finishReason == null;
+    if (!shouldRetry) throw error;
     console.warn('[place-description] empty content on primary prompt, retrying with simpler prompt', {
       placeId: place.id,
       city,
@@ -157,8 +161,8 @@ async function generatePlaceOverview(place) {
     purpose: 'place-overview-retry',
     messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: fallbackUserPrompt }],
     temperature: 0.3,
-    maxTokens: 100,
-    timeoutMs: 10000,
+    maxTokens: 800,
+    timeoutMs: 15000,
   });
 
   const retryUnquoted = String(retryContent || '').replace(/^\s*["']+|["']+\s*$/g, '').trim();
