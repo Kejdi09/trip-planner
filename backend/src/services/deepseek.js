@@ -63,9 +63,32 @@ async function callDeepSeekChat({
       throw createError('DEEPSEEK_FAILED', 'DeepSeek returned invalid JSON response');
     }
 
-    const content = String(parsed?.choices?.[0]?.message?.content || '').trim();
+    const firstChoice = parsed?.choices?.[0] || null;
+    const message = firstChoice?.message || {};
+
+    const contentRaw = message?.content;
+    const content = Array.isArray(contentRaw)
+      ? contentRaw.map((part) => String(part?.text || part?.content || '')).join(' ').trim()
+      : String(contentRaw || '').trim();
+
     if (!content) {
-      throw createError('DEEPSEEK_EMPTY', 'DeepSeek returned empty content');
+      const reasoningRaw = message?.reasoning_content;
+      const reasoning = Array.isArray(reasoningRaw)
+        ? reasoningRaw.map((part) => String(part?.text || part?.content || '')).join(' ').trim()
+        : String(reasoningRaw || '').trim();
+
+      const emptyDiagnostics = {
+        purpose,
+        status: response.status,
+        model: parsed?.model || payload.model || null,
+        finishReason: firstChoice?.finish_reason || null,
+        choicesLength: Array.isArray(parsed?.choices) ? parsed.choices.length : 0,
+        messageKeys: Object.keys(message || {}),
+        contentLength: content.length,
+        reasoningContentLength: reasoning.length,
+      };
+      console.warn('[deepseek] empty content diagnostics', emptyDiagnostics);
+      throw createError('DEEPSEEK_EMPTY', 'DeepSeek returned empty content', emptyDiagnostics);
     }
 
     return content;

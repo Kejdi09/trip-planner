@@ -129,19 +129,40 @@ async function generatePlaceOverview(place) {
   const country = String(place.country || '').trim();
   if (!city || !country) return null;
 
-  const systemPrompt = 'You are a concise travel copywriter. Return exactly one complete sentence.';
-  const userPrompt = `Write exactly one complete, factual travel overview sentence for ${city}, ${country}. Keep it between 18 and 28 words. No markdown. No emojis. No hashtags. Do not end with unfinished phrases. End with punctuation.`;
+  const systemPrompt = 'You write concise travel overview sentences. Return only the final sentence.';
+  const primaryUserPrompt = `Write exactly one complete factual travel overview sentence for ${city}, ${country}. 18-28 words. No markdown, no emojis, no hashtags. End with punctuation.`;
+  const fallbackUserPrompt = `Write one complete travel overview sentence about ${city}, ${country}. 18-28 words. End with punctuation.`;
 
-  const content = await callDeepSeekChat({
-    purpose: 'place-overview',
-    messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-    temperature: 0.2,
+  try {
+    const content = await callDeepSeekChat({
+      purpose: 'place-overview',
+      messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: primaryUserPrompt }],
+      temperature: 0.3,
+      maxTokens: 100,
+      timeoutMs: 10000,
+    });
+    const unquoted = String(content || '').replace(/^\s*["']+|["']+\s*$/g, '').trim();
+    return unquoted.replace(/\s+/g, ' ');
+  } catch (error) {
+    if (error?.code !== 'DEEPSEEK_EMPTY') throw error;
+    console.warn('[place-description] empty content on primary prompt, retrying with simpler prompt', {
+      placeId: place.id,
+      city,
+      country,
+      diagnostics: error?.details || null,
+    });
+  }
+
+  const retryContent = await callDeepSeekChat({
+    purpose: 'place-overview-retry',
+    messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: fallbackUserPrompt }],
+    temperature: 0.3,
     maxTokens: 100,
     timeoutMs: 10000,
   });
 
-  const unquoted = String(content || '').replace(/^\s*["']+|["']+\s*$/g, '').trim();
-  return unquoted.replace(/\s+/g, ' ');
+  const retryUnquoted = String(retryContent || '').replace(/^\s*["']+|["']+\s*$/g, '').trim();
+  return retryUnquoted.replace(/\s+/g, ' ');
 }
 
 
