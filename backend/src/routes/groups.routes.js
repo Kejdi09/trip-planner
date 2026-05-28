@@ -96,6 +96,10 @@ module.exports = function groupsRoutes(supabaseAdmin) {
     return Math.floor(parsed);
   }
 
+  function normalizeItineraryTitle(value) {
+    return String(value || '').trim().toLowerCase();
+  }
+
 
   async function requireCreator(groupId, userId) {
     const group = await requireGroup(groupId);
@@ -643,6 +647,23 @@ module.exports = function groupsRoutes(supabaseAdmin) {
       }
       if (group.end_date && compareDateOnly(date, group.end_date) > 0) {
         return res.status(400).json({ error: 'Itinerary date cannot be after group end date.' });
+      }
+
+      const { data: existingItems, error: existingItemsError } = await supabaseAdmin
+        .from('itinerary_items')
+        .select('id, title, date, time, sort_order, created_by, created_at')
+        .eq('group_id', groupId);
+
+      if (existingItemsError) {
+        const wrapped = new Error(existingItemsError.message || 'Failed to check itinerary duplicates.');
+        wrapped.status = 502;
+        throw wrapped;
+      }
+
+      const normalizedTitle = normalizeItineraryTitle(title);
+      const duplicate = (existingItems || []).find((item) => normalizeItineraryTitle(item.title) === normalizedTitle);
+      if (duplicate) {
+        return res.status(409).json({ error: 'This place is already in the itinerary.', code: 'DUPLICATE_ITINERARY_ITEM', item: duplicate });
       }
 
       if (sortOrder === null) {

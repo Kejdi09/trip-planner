@@ -81,6 +81,7 @@ module.exports = function notificationsRoutes(supabaseAdmin) {
         .from('notifications')
         .select('id, user_id, type, content, title, body, related_entity_type, related_entity_id, is_read, created_at')
         .eq('user_id', userId)
+        .neq('type', 'wishlist')
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -104,6 +105,9 @@ module.exports = function notificationsRoutes(supabaseAdmin) {
 
       assertUuid(userId, 'userId');
       if (!type) return res.status(400).json({ error: 'type is required.' });
+      if (type === 'wishlist' || relatedEntityType === 'wishlist') {
+        return res.status(204).send();
+      }
       if (!title) return res.status(400).json({ error: 'title is required.' });
       if (relatedEntityId) assertUuid(String(relatedEntityId), 'relatedEntityId');
 

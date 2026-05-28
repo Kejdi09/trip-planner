@@ -10,6 +10,17 @@ export const BOTTOM_NAV_THEME = {
 } as const;
 
 export const bottomNavStyles = StyleSheet.create({
+  bottomNavScrim: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    borderTopWidth: 1,
+    borderTopColor: '#EEF2F3',
+    zIndex: 20,
+    elevation: 7,
+  },
   bottomNav: {
     position: 'absolute',
     left: 12,
@@ -17,7 +28,7 @@ export const bottomNavStyles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: BOTTOM_NAV_THEME.colors.background,
+    backgroundColor: 'rgba(255, 255, 255, 0.99)',
     borderWidth: 1,
     borderColor: BOTTOM_NAV_THEME.colors.navBorder,
     borderRadius: 20,
@@ -28,7 +39,7 @@ export const bottomNavStyles = StyleSheet.create({
     elevation: 8,
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.16,
     shadowRadius: 12,
   },
   bottomItem: {

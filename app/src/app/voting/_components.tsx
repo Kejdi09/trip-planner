@@ -55,9 +55,7 @@ export const Header: React.FC<HeaderProps> = ({ title, onBack, timeLeft }) => (
         </View>
       )}
     </View>
-    <TouchableOpacity style={headerStyles.chatBtn} accessibilityLabel="Open chat">
-      <Text style={headerStyles.chatIcon}>💬</Text>
-    </TouchableOpacity>
+    <View style={headerStyles.headerSpacer} />
   </View>
 );
 
@@ -77,8 +75,7 @@ const headerStyles = StyleSheet.create({
   timerRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   timerIcon: { fontSize: 11, marginRight: 3 },
   timerText: { fontSize: 12, color: COLORS.timerText, fontWeight: '600' },
-  chatBtn: { padding: 4, marginTop: 2 },
-  chatIcon: { fontSize: 20 },
+  headerSpacer: { width: 28 },
 });
 
 // ─── Tab Bar ──────────────────────────────────────────────────────────────────

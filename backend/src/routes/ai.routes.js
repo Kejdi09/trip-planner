@@ -97,9 +97,13 @@ function buildItineraryPrompts({ city, country, totalDays, interests, compactCon
   return { systemPrompt, userPrompt };
 }
 
-function normalizeGeneratedItinerary(itinerary, totalDays) {
+function normalizePlaceName(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function normalizeGeneratedItinerary(itinerary, totalDays, existingNames = []) {
   if (!Array.isArray(itinerary?.days)) return itinerary;
-  const seenPlaces = new Set();
+  const seenPlaces = new Set(existingNames.map(normalizePlaceName).filter(Boolean));
   const normalizedDays = [];
   for (let index = 0; index < itinerary.days.length; index += 1) {
     const rawDay = itinerary.days[index] || {};
@@ -109,7 +113,7 @@ function normalizeGeneratedItinerary(itinerary, totalDays) {
     for (const rawPlace of rawPlaces) {
       const name = String(rawPlace?.name || rawPlace?.place || rawPlace?.title || '').trim();
       if (!name) continue;
-      const key = name.toLowerCase();
+      const key = normalizePlaceName(name);
       if (seenPlaces.has(key)) continue;
       seenPlaces.add(key);
       places.push({
@@ -127,7 +131,7 @@ function normalizeGeneratedItinerary(itinerary, totalDays) {
       places,
     });
   }
-  return { ...itinerary, days: normalizedDays.filter((day) => day.day >= 1 && day.day <= totalDays) };
+  return { ...itinerary, days: normalizedDays.filter((day) => day.day >= 1 && day.day <= totalDays && day.places.length > 0) };
 }
 
 module.exports = function aiRoutes(supabaseAdmin) {
@@ -273,9 +277,9 @@ module.exports = function aiRoutes(supabaseAdmin) {
         return res.status(500).json({ error: { code: 'DEEPSEEK_INVALID_SHAPE', message: 'DeepSeek returned invalid itinerary shape' } });
       }
 
-      const normalizedItinerary = normalizeGeneratedItinerary(itinerary, totalDays);
+      const normalizedItinerary = normalizeGeneratedItinerary(itinerary, totalDays, compactContext.existingPlaceNames);
       if (!Array.isArray(normalizedItinerary.days) || normalizedItinerary.days.length === 0) {
-        return res.status(500).json({ error: { code: 'DEEPSEEK_INVALID_SHAPE', message: 'DeepSeek returned no usable itinerary days' } });
+        return res.status(409).json({ error: { code: 'NO_NEW_ITINERARY_PLACES', message: 'All AI suggestions are already in this itinerary.' } });
       }
 
       return res.json(normalizedItinerary);

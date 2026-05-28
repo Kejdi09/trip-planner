@@ -15,8 +15,9 @@ import {
   PanResponder,
   useWindowDimensions,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { AppLoading } from "@/components/common/AppLoading";
 import { createItineraryItem, deleteItineraryItem, fetchItinerary, getActiveUserId, updateItineraryItem } from "../../../lib/groups-api";
 import { API_BASE_URL, APP_ENV } from "../../../lib/app-config";
 import { addDaysToDateOnly, dateOnlyDiff, parseDateOnly } from "../../../lib/date-utils";
@@ -93,9 +94,14 @@ function clampDay(day: number, totalDays: number) {
   return Math.min(Math.max(1, Math.floor(day)), Math.max(1, totalDays));
 }
 
+function normalizePlaceName(value: string) {
+  return String(value || "").trim().toLowerCase();
+}
+
 export default function TripDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ groupId?: string }>();
+  const insets = useSafeAreaInsets();
   const groupId = params.groupId ? String(params.groupId) : null;
 
   useWindowDimensions();
@@ -119,7 +125,7 @@ export default function TripDetailScreen() {
 
   const goToNextDay = useCallback(() => {
     setSelectedDay((current) => Math.min(trip.totalDays, current + 1));
-  }, []);
+  }, [trip.totalDays]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -438,7 +444,11 @@ export default function TripDetailScreen() {
         return;
       }
 
-      const existingNames = new Set(places.map((place) => place.name.trim().toLowerCase()));
+      const latestItems = groupId ? (await fetchItinerary(groupId, currentUserId)).items : [];
+      const existingNames = new Set([
+        ...places.map((place) => normalizePlaceName(place.name)),
+        ...latestItems.map((item) => normalizePlaceName(item.title)),
+      ].filter(Boolean));
       const uniquePlaces = aiPlaces.filter((place) => {
         const key = place.name.trim().toLowerCase();
         if (!key || existingNames.has(key)) return false;
@@ -447,7 +457,7 @@ export default function TripDetailScreen() {
       });
 
       if (uniquePlaces.length === 0) {
-        Alert.alert("No new places", "The AI suggestions were duplicates of places already in this itinerary.");
+        Alert.alert("Already up to date", "All AI suggestions are already in this itinerary, so nothing new was added.");
         return;
       }
 
@@ -484,7 +494,7 @@ export default function TripDetailScreen() {
     }
   };
 
-  if (contextLoading) { return <SafeAreaView style={styles.safeArea}><View style={styles.screen}><Text style={{ padding: 24 }}>Loading trip context...</Text></View></SafeAreaView>; }
+  if (contextLoading) { return <SafeAreaView style={styles.safeArea}><View style={styles.screen}><AppLoading message="Loading trip context..." /></View></SafeAreaView>; }
 
   if (contextError) { return <SafeAreaView style={styles.safeArea}><View style={styles.screen}><Text style={{ padding: 24, color: "#BE123C" }}>{contextError}</Text></View></SafeAreaView>; }
 
@@ -645,9 +655,7 @@ export default function TripDetailScreen() {
             </Text>
           </View>
 
-          <Pressable style={styles.chatButton}>
-            <Feather name="message-circle" size={20} color="#008D9B" />
-          </Pressable>
+          <View style={styles.headerSpacer} />
         </View>
 
 
@@ -664,7 +672,7 @@ export default function TripDetailScreen() {
 
         <ScrollView
           style={styles.content}
-          contentContainerStyle={styles.contentInner}
+          contentContainerStyle={[styles.contentInner, { paddingBottom: insets.bottom + 224 }]}
           showsVerticalScrollIndicator={false}
           {...panResponder.panHandlers}
         >
@@ -697,7 +705,7 @@ export default function TripDetailScreen() {
           </View>
         </ScrollView>
 
-        <View style={styles.aiSuggestion}>
+        <View style={[styles.aiSuggestion, { bottom: insets.bottom + 92 }]}>
           <View style={styles.aiHeader}>
             <Feather name="star" size={25} color="#111827" />
             <View>
@@ -892,13 +900,9 @@ const styles = StyleSheet.create({
     color: "#7C8790",
     fontWeight: "600",
   },
-  chatButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#E7FAFC",
-    alignItems: "center",
-    justifyContent: "center",
+  headerSpacer: {
+    width: 30,
+    height: 30,
   },
   brandRow: {
     paddingHorizontal: 28,
@@ -1043,7 +1047,6 @@ const styles = StyleSheet.create({
   },
   contentInner: {
     paddingHorizontal: 22,
-    paddingBottom: 190,
   },
   timelineRow: {
     flexDirection: "row",
@@ -1213,15 +1216,20 @@ const styles = StyleSheet.create({
   },
   aiSuggestion: {
     position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 72,
+    left: 18,
+    right: 18,
     backgroundColor: "#F3FAFB",
-    borderTopWidth: 1,
-    borderTopColor: "#DAE8EB",
-    paddingHorizontal: 22,
-    paddingTop: 12,
-    paddingBottom: 12,
+    borderWidth: 1,
+    borderColor: "#DAE8EB",
+    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 18,
+    shadowColor: "#000000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 8,
   },
   aiHeader: {
     flexDirection: "row",
