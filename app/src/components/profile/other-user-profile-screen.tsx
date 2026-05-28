@@ -1,7 +1,7 @@
 import { Feather, Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppLoading } from '@/components/common/AppLoading';
@@ -10,7 +10,7 @@ import { supabase } from '../../../lib/supabase';
 import { C, rs } from '../history/theme';
 import { styles as travelStyles } from '../history/my-travels-screen.styles';
 
-type ProfileRow = { id: string; username: string | null; full_name: string | null; created_at: string | null };
+type ProfileRow = { id: string; username: string | null; full_name: string | null; avatar_url: string | null; created_at: string | null };
 type Summary = { countries: number; cities: number; placesRated: number; groupTrips: number; visitedCountries: string[] };
 
 function initials(name: string) {
@@ -38,7 +38,7 @@ export function OtherUserProfileScreen() {
         setLoading(true);
         setError(null);
         const [p, req, rec, trips] = await Promise.all([
-          supabase.from('profiles').select('id, username, full_name, created_at').eq('id', userId).maybeSingle(),
+          supabase.from('profiles').select('id, username, full_name, avatar_url, created_at').eq('id', userId).maybeSingle(),
           supabase.from('friendships').select('id', { count: 'exact', head: true }).eq('requester_id', userId).eq('status', 'accepted'),
           supabase.from('friendships').select('id', { count: 'exact', head: true }).eq('receiver_id', userId).eq('status', 'accepted'),
           supabase.from('group_members').select('group_id', { count: 'exact', head: true }).eq('user_id', userId),
@@ -72,7 +72,11 @@ export function OtherUserProfileScreen() {
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 140 }}>
         <Pressable onPress={() => router.back()} style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' }}><Feather name="arrow-left" size={18} color="#0F172A" /></Pressable>
         <View style={{ marginTop: 14, backgroundColor: '#fff', borderRadius: 20, borderWidth: 1, borderColor: '#D7EEF0', padding: 16 }}>
-          <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#D7EEF0', alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: '#0F766E', fontSize: 22, fontWeight: '800' }}>{initials(name)}</Text></View>
+          {profile.avatar_url ? (
+            <Image source={{ uri: profile.avatar_url }} style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#D7EEF0' }} />
+          ) : (
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#D7EEF0', alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: '#0F766E', fontSize: 22, fontWeight: '800' }}>{initials(name)}</Text></View>
+          )}
           <Text style={{ fontSize: 22, fontWeight: '800', color: '#0F172A', marginTop: 10 }}>{name}</Text>
           <Text style={{ color: '#64748B' }}>{profile.username ? `@${profile.username}` : ''}</Text>
           <Text style={{ color: '#94A3B8', marginTop: 4 }}>{profile.created_at ? `Joined ${new Date(profile.created_at).toLocaleDateString()}` : ''}</Text>
