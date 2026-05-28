@@ -102,6 +102,11 @@ export default function TripDetailScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ groupId?: string }>();
   const insets = useSafeAreaInsets();
+  const navBottom = Math.max(10, insets.bottom + 6);
+  const navHeight = 66;
+  const aiSuggestionBottom = navBottom + navHeight + 12;
+  const aiSuggestionEstimatedHeight = 154;
+  const itineraryBottomPadding = aiSuggestionBottom + aiSuggestionEstimatedHeight + 32;
   const groupId = params.groupId ? String(params.groupId) : null;
 
   useWindowDimensions();
@@ -672,7 +677,7 @@ export default function TripDetailScreen() {
 
         <ScrollView
           style={styles.content}
-          contentContainerStyle={[styles.contentInner, { paddingBottom: insets.bottom + 224 }]}
+          contentContainerStyle={[styles.contentInner, { paddingBottom: itineraryBottomPadding }]}
           showsVerticalScrollIndicator={false}
           {...panResponder.panHandlers}
         >
@@ -705,7 +710,7 @@ export default function TripDetailScreen() {
           </View>
         </ScrollView>
 
-        <View style={[styles.aiSuggestion, { bottom: insets.bottom + 92 }]}>
+        <View style={[styles.aiSuggestion, { bottom: aiSuggestionBottom }]}>
           <View style={styles.aiHeader}>
             <Feather name="star" size={25} color="#111827" />
             <View>

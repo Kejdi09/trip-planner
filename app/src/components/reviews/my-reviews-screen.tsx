@@ -6,7 +6,6 @@ import { ActivityIndicator, Image, Modal, Pressable, ScrollView, Text, View } fr
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RatingStars } from '@/components/reviews/rating-stars';
-import { AppBottomNav } from '@/components/ui/app-bottom-nav';
 import { FadeIn } from '@/components/ui/fade-in';
 import { StatusMessage } from '@/components/ui/status-message';
 import type { PlaceRecord } from '../../../lib/reviews-api';
@@ -328,8 +327,6 @@ export function MyReviewsScreen() {
             </Pressable>
           </Pressable>
         </Modal>
-
-        <AppBottomNav activeTab="Profile" />
       </View>
     </SafeAreaView>
   );

@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Dimensions,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -214,7 +215,21 @@ export function GroupChatScreen() {
   const [sending, setSending] = React.useState(false);
   const [currentUserId, setCurrentUserId] = React.useState(getActiveUserId());
   const insets = useSafeAreaInsets();
+  const navBottom = Math.max(10, insets.bottom + 6);
+  const navHeight = 66;
+  const [keyboardVisible, setKeyboardVisible] = React.useState(false);
+  const inputBottomSpacing = keyboardVisible ? Math.max(8, insets.bottom) : navBottom + navHeight + 12;
   const listRef = React.useRef<FlatList>(null);
+
+
+  React.useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   React.useEffect(() => {
     (async () => {
@@ -337,8 +352,8 @@ export function GroupChatScreen() {
     <SafeAreaView style={styles.safeArea} edges={['top']}>
       <KeyboardAvoidingView
         style={styles.screen}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={0}>
+        behavior={Platform.OS === 'ios' ? 'padding' : Platform.OS === 'android' ? 'height' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}>
 
         {/* Header */}
         <View style={styles.header}>
@@ -384,8 +399,10 @@ export function GroupChatScreen() {
           <FlatList
             ref={listRef}
             style={styles.messageList}
-            contentContainerStyle={styles.messageListContent}
+            contentContainerStyle={[styles.messageListContent, { paddingBottom: 16 }]}
             data={messages}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
             keyExtractor={(item) => item.id}
             onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
             renderItem={({ item }) => {
@@ -415,7 +432,7 @@ export function GroupChatScreen() {
         )}
 
         {/* Input bar */}
-        <View style={[styles.inputBar, { paddingBottom: Math.max(10, insets.bottom + 78) }]}>
+        <View style={[styles.inputBar, { marginBottom: inputBottomSpacing }]}>
           <View style={styles.inputWrapper}>
             <TextInput
               value={inputText}

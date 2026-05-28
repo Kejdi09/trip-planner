@@ -33,9 +33,7 @@ export function AppBottomNav({ activeTab = 'Discover', onPressTab }: AppBottomNa
   const navBottom = Math.max(10, insets.bottom + 6);
 
   return (
-    <>
-      <View pointerEvents="none" style={[bottomNavStyles.bottomNavScrim, { height: navBottom + 78 }]} />
-      <View style={[bottomNavStyles.bottomNav, { bottom: navBottom }]}>
+    <View style={[bottomNavStyles.bottomNav, { bottom: navBottom }]}>
       <BottomNavItem
         label="Feed"
         active={activeTab === 'Feed'}
@@ -66,7 +64,6 @@ export function AppBottomNav({ activeTab = 'Discover', onPressTab }: AppBottomNa
         onPress={() => handleTabPress('Profile')}
         icon={<MaterialCommunityIcons name="account-outline" size={24} color={activeTab === 'Profile' ? colors.primary : colors.navIconInactive} />}
       />
-      </View>
-    </>
+    </View>
   );
 }

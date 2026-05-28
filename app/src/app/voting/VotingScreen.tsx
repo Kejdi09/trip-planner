@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../../../lib/supabase';
 import { VotingTab } from './_types';
 import DateVotingScreen from './DateVotingScreen';
@@ -11,6 +12,9 @@ import { formatDateOnly, isAfterDateOnly, isBeforeDateOnly, startOfTodayDateOnly
 const VotingScreen: React.FC = () => {
   const params = useLocalSearchParams<{ groupId?: string; userId?: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const navBottom = Math.max(10, insets.bottom + 6);
+  const finishButtonBottom = navBottom + 78;
   const groupId = String(params.groupId || '');
   const [userId, setUserId] = useState(String(params.userId || ''));
   const [activeTab, setActiveTab] = useState<VotingTab>('Dates');
@@ -58,7 +62,7 @@ const VotingScreen: React.FC = () => {
 
   return <View style={{ flex:1 }}>
     {activeTab === 'Budget' ? <BudgetVotingScreen {...sharedProps} budgetOptions={budgetOptions} onVote={(id)=>void handleVote('budget', id)} onCreateBudgetOption={(mn,mx)=>void handleCreateBudgetOption(mn,mx)} totalBudgetMin={totalBudgetMin} totalBudgetMax={totalBudgetMax} onDeleteOption={(id)=>void (deleteBudgetOption(groupId,id,userId).then(loadState))} /> : <DateVotingScreen {...sharedProps} dateOptions={dateOptions} onVote={(id)=>void handleVote('date', id)} onCreateDateOption={(s,e)=>void handleCreateDateOption(s,e)} onDeleteOption={(id)=>void (deleteDateOption(groupId,id,userId).then(loadState))} />}
-    <View style={{ position:'absolute', left:16, right:16, bottom:92 }}><Pressable disabled={Boolean(votingFinished)} onPress={()=>void handleFinalize()} style={{ backgroundColor:'#008D9B', borderRadius:14, paddingVertical:14, alignItems:'center', opacity:votingFinished?0.55:1 }}><Text style={{ color:'#fff', fontWeight:'800', fontSize:16 }}>{votingFinished ? 'Voting Finished' : 'Finish Voting'}</Text></Pressable></View>
+    <View style={{ position:'absolute', left:16, right:16, bottom:finishButtonBottom }}><Pressable disabled={Boolean(votingFinished)} onPress={()=>void handleFinalize()} style={{ backgroundColor:'#008D9B', borderRadius:14, paddingVertical:14, alignItems:'center', opacity:votingFinished?0.55:1 }}><Text style={{ color:'#fff', fontWeight:'800', fontSize:16 }}>{votingFinished ? 'Voting Finished' : 'Finish Voting'}</Text></Pressable></View>
   </View>;
 };
 
