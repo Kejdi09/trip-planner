@@ -1,4 +1,5 @@
 const express = require('express');
+const { fetchPexelsImageForPlace, hasPexelsApiKey } = require('../lib/place-images');
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -34,6 +35,54 @@ function normalizePlaceRow(place) {
     population: place.population ?? null,
     source: place.external_source || null,
   };
+}
+
+async function enrichPlacesWithImages(supabaseAdmin, rows, maxFetches = 5) {
+  if (!hasPexelsApiKey || rows.length === 0) return rows;
+  const result = [...rows];
+  let fetches = 0;
+
+  for (let index = 0; index < result.length; index += 1) {
+    const place = result[index];
+    if (place.image_url) continue;
+    if (place.image_fetched_at) continue;
+    if (fetches >= maxFetches) break;
+
+    try {
+      const imageData = await fetchPexelsImageForPlace(place);
+      fetches += 1;
+      if (!imageData?.image_url) continue;
+
+      const { data: updated, error } = await supabaseAdmin
+        .from('places')
+        .update({
+          image_url: imageData.image_url,
+          image_source: imageData.image_source,
+          image_author: imageData.image_author,
+          image_author_url: imageData.image_author_url,
+          image_fetched_at: new Date().toISOString(),
+        })
+        .eq('id', place.id)
+        .select('id, image_url, image_source, image_author, image_author_url, image_fetched_at')
+        .maybeSingle();
+
+      if (error) continue;
+      if (updated?.image_url) {
+        result[index] = {
+          ...place,
+          image_url: updated.image_url,
+          image_source: updated.image_source,
+          image_author: updated.image_author,
+          image_author_url: updated.image_author_url,
+          image_fetched_at: updated.image_fetched_at,
+        };
+      }
+    } catch {
+      // Continue without failing endpoint.
+    }
+  }
+
+  return result;
 }
 
 module.exports = function reviewsRoutes(supabaseAdmin) {
@@ -94,7 +143,7 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
       if (!q) {
         const { data, error } = await supabaseAdmin
           .from('places')
-          .select('id, name, description, city, country, country_code, latitude, longitude, population, image_url, external_source')
+          .select('id, name, description, city, country, country_code, latitude, longitude, population, image_url, image_source, image_author, image_author_url, image_fetched_at, external_source')
           .eq('external_source', 'geonames')
           .order('population', { ascending: false, nullsFirst: false })
           .range(offset, offset + limit - 1);
@@ -104,7 +153,8 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
           return res.status(500).json({ error: 'Failed to search places.' });
         }
 
-        return res.json({ places: (data || []).map(normalizePlaceRow) });
+        const hydrated = await enrichPlacesWithImages(supabaseAdmin, data || []);
+        return res.json({ places: hydrated.map(normalizePlaceRow) });
       }
 
       const qLower = q.toLowerCase();
@@ -112,7 +162,7 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
 
       const { data, error } = await supabaseAdmin
         .from('places')
-        .select('id, name, description, city, country, country_code, latitude, longitude, population, image_url, external_source, search_text')
+        .select('id, name, description, city, country, country_code, latitude, longitude, population, image_url, image_source, image_author, image_author_url, image_fetched_at, external_source, search_text')
         .eq('external_source', 'geonames')
         .or(
           `name.ilike.%${escaped}%,city.ilike.%${escaped}%,country.ilike.%${escaped}%,country_code.ilike.%${escaped}%,search_text.ilike.%${escaped}%`,
@@ -143,8 +193,9 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
         })
         .sort((a, b) => b.score - a.score || Number(b.row.population || 0) - Number(a.row.population || 0));
 
-      const page = ranked.slice(offset, offset + limit).map((item) => normalizePlaceRow(item.row));
-      return res.json({ places: page });
+      const pageRows = ranked.slice(offset, offset + limit).map((item) => item.row);
+      const hydrated = await enrichPlacesWithImages(supabaseAdmin, pageRows);
+      return res.json({ places: hydrated.map(normalizePlaceRow) });
     } catch (error) {
       console.error('[places/search] unexpected error', error);
       return res.status(500).json({ error: 'Failed to search places.' });

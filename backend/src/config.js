@@ -44,4 +44,5 @@ module.exports = {
   appEnv,
   supabaseUrl: selectedConfig.supabaseUrl,
   supabaseServiceKey: selectedConfig.supabaseServiceKey,
+  pexelsApiKey: process.env.PEXELS_API_KEY ?? null,
 };
