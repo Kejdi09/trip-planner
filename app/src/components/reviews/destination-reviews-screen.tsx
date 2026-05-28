@@ -274,8 +274,9 @@ export function DestinationReviewsScreen() {
         </FadeIn>
 
         <ScrollView
+          style={styles.reviewsScroll}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}>
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 140 }]}>
           {isEmpty ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyTitle}>No destinations yet</Text>

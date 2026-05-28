@@ -45,13 +45,10 @@ export function AppBottomNav({ activeTab = 'Discover', onPressTab }: AppBottomNa
       {Platform.OS === 'web' ? (
         <View pointerEvents="none" style={[bottomNavStyles.bottomNavGradient, { height: gradientHeight }, webGradientStyle]} />
       ) : (
-        <>
-          <View pointerEvents="none" style={[bottomNavStyles.bottomNavFadeBand, { bottom: navBottom + 104, height: 30, backgroundColor: 'rgba(255,255,255,0.04)' }]} />
-          <View pointerEvents="none" style={[bottomNavStyles.bottomNavFadeBand, { bottom: navBottom + 78, height: 36, backgroundColor: 'rgba(255,255,255,0.09)' }]} />
-          <View pointerEvents="none" style={[bottomNavStyles.bottomNavFadeBand, { bottom: navBottom + 50, height: 46, backgroundColor: 'rgba(255,255,255,0.16)' }]} />
-          <View pointerEvents="none" style={[bottomNavStyles.bottomNavFadeBand, { bottom: navBottom + 20, height: 58, backgroundColor: 'rgba(255,255,255,0.28)' }]} />
-          <View pointerEvents="none" style={[bottomNavStyles.bottomNavFadeBand, { bottom: 0, height: navBottom + 58, backgroundColor: 'rgba(255,255,255,0.48)' }]} />
-        </>
+        <View
+          pointerEvents="none"
+          style={[bottomNavStyles.bottomNavNativeBackdrop, { height: navBottom + 58 }]}
+        />
       )}
       <View style={[bottomNavStyles.bottomNav, { bottom: navBottom }]}>
       <BottomNavItem

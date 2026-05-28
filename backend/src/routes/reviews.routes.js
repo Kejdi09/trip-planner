@@ -62,7 +62,47 @@ function normalizePlaceRow(place) {
     longitude: place.longitude ?? null,
     population: place.population ?? null,
     source: place.external_source || null,
+    rating: Number.isFinite(Number(place.rating)) ? Number(place.rating) : 0,
+    reviewCount: Number.isFinite(Number(place.reviewCount)) ? Number(place.reviewCount) : 0,
   };
+}
+
+async function addReviewStatsToPlaces(supabaseAdmin, places) {
+  const rows = Array.isArray(places) ? places : [];
+  const placeIds = Array.from(new Set(rows.map((place) => place.id).filter(Boolean)));
+
+  if (placeIds.length === 0) {
+    return rows.map((place) => ({ ...place, rating: 0, reviewCount: 0 }));
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('reviews')
+    .select('place_id, rating')
+    .in('place_id', placeIds);
+
+  if (error) {
+    console.error('[places/search] review stats query failed', error);
+    return rows.map((place) => ({ ...place, rating: 0, reviewCount: 0 }));
+  }
+
+  const statsByPlaceId = new Map();
+  (data || []).forEach((review) => {
+    const placeId = review.place_id;
+    const rating = Number(review.rating);
+    if (!placeId || !Number.isFinite(rating)) return;
+
+    const current = statsByPlaceId.get(placeId) || { total: 0, count: 0 };
+    current.total += rating;
+    current.count += 1;
+    statsByPlaceId.set(placeId, current);
+  });
+
+  return rows.map((place) => {
+    const stats = statsByPlaceId.get(place.id);
+    const reviewCount = stats?.count || 0;
+    const rating = reviewCount > 0 ? Number((stats.total / reviewCount).toFixed(1)) : 0;
+    return { ...place, rating, reviewCount };
+  });
 }
 
 function isValidPlaceDescription(text, place) {
@@ -477,7 +517,8 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
         }
 
         const hydrated = await enrichPlacesWithImages(supabaseAdmin, data || []);
-        return res.json({ places: hydrated.map(normalizePlaceRow) });
+        const withReviewStats = await addReviewStatsToPlaces(supabaseAdmin, hydrated);
+        return res.json({ places: withReviewStats.map(normalizePlaceRow) });
       }
 
       const qLower = q.toLowerCase();
@@ -534,7 +575,8 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
 
       const pageRows = ranked.slice(offset, offset + limit).map((item) => item.row);
       const hydrated = await enrichPlacesWithImages(supabaseAdmin, pageRows);
-      return res.json({ places: hydrated.map(normalizePlaceRow) });
+      const withReviewStats = await addReviewStatsToPlaces(supabaseAdmin, hydrated);
+      return res.json({ places: withReviewStats.map(normalizePlaceRow) });
     } catch (error) {
       console.error('[places/search] unexpected error', error);
       return res.status(500).json({ error: 'Failed to search places.' });

@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { AppLoading } from '@/components/common/AppLoading';
 import { addGroupMember, fetchGroupMembers, fetchMyGroups, getActiveUserId } from '../../../lib/groups-api';
 import { supabase } from '../../../lib/supabase';
 
@@ -207,18 +208,37 @@ export function InviteToGroupScreen() {
   const [sendingIds, setSendingIds] = React.useState<Set<string>>(new Set());
   const [friends, setFriends] = React.useState<Friend[]>([]);
   const [activeUserId, setActiveUserId] = React.useState(getActiveUserId());
+  const [groupLoading, setGroupLoading] = React.useState(true);
+  const [friendsLoading, setFriendsLoading] = React.useState(true);
+  const [loadError, setLoadError] = React.useState<string | null>(null);
 
   // Load group to know who's already a member
   React.useEffect(() => {
-    if (groupId) {
-      void (async () => {
+    let mounted = true;
+
+    const loadGroup = async () => {
+      setGroupLoading(true);
+      setLoadError(null);
+
+      if (!groupId) {
+        setGroup(null);
+        setLoadError('Missing group information.');
+        setGroupLoading(false);
+        return;
+      }
+
+      try {
         const [{ groups }, { members }] = await Promise.all([
           fetchMyGroups(),
           fetchGroupMembers(groupId),
         ]);
+
+        if (!mounted) return;
+
         const row = groups.find((g) => g.id === groupId) ?? null;
         if (!row) {
           setGroup(null);
+          setLoadError('Unable to find this group.');
           return;
         }
 
@@ -234,26 +254,82 @@ export function InviteToGroupScreen() {
           budgetRange: null,
           destination: null,
         });
-      })();
-    }
+      } catch (error) {
+        if (!mounted) return;
+        const message = error instanceof Error ? error.message : 'Unable to load this group.';
+        setLoadError(message);
+      } finally {
+        if (mounted) setGroupLoading(false);
+      }
+    };
+
+    void loadGroup();
+
+    return () => {
+      mounted = false;
+    };
   }, [groupId]);
 
   React.useEffect(() => {
-    (async () => {
-      const { data: auth } = await supabase.auth.getUser();
-      const me = auth.user?.id ?? getActiveUserId();
-      setActiveUserId(me);
-      if (!me) return;
-      const { data: rows } = await supabase
-        .from('friendships')
-        .select('requester_id, receiver_id')
-        .eq('status', 'accepted')
-        .or(`requester_id.eq.${me},receiver_id.eq.${me}`);
-      const ids = (rows ?? []).map((r) => (r.requester_id === me ? r.receiver_id : r.requester_id));
-      if (ids.length === 0) { setFriends([]); return; }
-      const { data: profiles } = await supabase.from('profiles').select('id, full_name, username, avatar_url').in('id', ids);
-      setFriends((profiles ?? []).map((p) => ({ id: p.id, fullName: p.full_name ?? p.username ?? 'Friend', username: p.username ?? 'friend', avatarUrl: p.avatar_url ?? null, tripCount: 0 })));
-    })();
+    let mounted = true;
+
+    const loadFriends = async () => {
+      setFriendsLoading(true);
+      try {
+        const { data: auth } = await supabase.auth.getUser();
+        const me = auth.user?.id ?? getActiveUserId();
+        if (!mounted) return;
+
+        setActiveUserId(me);
+        if (!me) {
+          setFriends([]);
+          return;
+        }
+
+        const { data: rows, error: friendshipsError } = await supabase
+          .from('friendships')
+          .select('requester_id, receiver_id')
+          .eq('status', 'accepted')
+          .or(`requester_id.eq.${me},receiver_id.eq.${me}`);
+
+        if (friendshipsError) throw friendshipsError;
+
+        const ids = (rows ?? []).map((r) => (r.requester_id === me ? r.receiver_id : r.requester_id));
+        if (ids.length === 0) {
+          setFriends([]);
+          return;
+        }
+
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, username, avatar_url')
+          .in('id', ids);
+
+        if (profilesError) throw profilesError;
+        if (!mounted) return;
+
+        setFriends((profiles ?? []).map((profile) => ({
+          id: profile.id,
+          fullName: profile.full_name ?? profile.username ?? 'Friend',
+          username: profile.username ?? 'friend',
+          avatarUrl: profile.avatar_url ?? null,
+          tripCount: 0,
+        })));
+      } catch (error) {
+        if (!mounted) return;
+        const message = error instanceof Error ? error.message : 'Unable to load friends.';
+        setLoadError(message);
+        setFriends([]);
+      } finally {
+        if (mounted) setFriendsLoading(false);
+      }
+    };
+
+    void loadFriends();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const alreadyMemberIds = React.useMemo(
@@ -263,8 +339,10 @@ export function InviteToGroupScreen() {
 
   const eligibleFriends = React.useMemo(
     () => friends.filter((f) => !alreadyMemberIds.has(f.id) && f.id !== activeUserId),
-    [alreadyMemberIds],
+    [activeUserId, alreadyMemberIds, friends],
   );
+
+  const initialLoading = groupLoading || friendsLoading;
 
   const filteredFriends = React.useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -298,6 +376,15 @@ export function InviteToGroupScreen() {
           <Text style={styles.title}>Add to Group</Text>
         </View>
 
+        {initialLoading ? (
+          <AppLoading message="Loading friends..." />
+        ) : loadError ? (
+          <View style={styles.emptyState}>
+            <Feather name="alert-circle" size={28} color={C.mutedText} />
+            <Text style={styles.emptyStateText}>{loadError}</Text>
+          </View>
+        ) : (
+          <>
         {/* Search */}
         <View style={styles.searchBar}>
           <TextInput
@@ -374,6 +461,8 @@ export function InviteToGroupScreen() {
             })
           )}
         </ScrollView>
+          </>
+        )}
 
       </View>
     </SafeAreaView>
