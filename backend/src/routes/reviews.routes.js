@@ -229,6 +229,7 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
 
       const limit = parseLimit(req.query.limit, 20, 50);
       const offset = parseOffset(req.query.offset, 0);
+      const sourceLimit = offset + limit;
 
       const { data: friendships, error: friendshipError } = await supabaseAdmin
         .from('friendships')
@@ -248,26 +249,87 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
 
       if (friendIds.length === 0) return res.json({ items: [] });
 
-      const { data: reviews, error: reviewError } = await supabaseAdmin
-        .from('reviews')
-        .select('id, user_id, place_id, rating, review, created_at')
-        .in('user_id', friendIds)
-        .not('place_id', 'is', null)
-        .order('created_at', { ascending: false })
-        .range(offset, offset + limit - 1);
+      const [reviewsRes, wishlistsRes, plannedGroupsRes, membershipsRes] = await Promise.all([
+        supabaseAdmin
+          .from('reviews')
+          .select('id, user_id, place_id, rating, review, created_at')
+          .in('user_id', friendIds)
+          .not('place_id', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(sourceLimit),
+        supabaseAdmin
+          .from('wishlists')
+          .select('id, user_id, place_id, created_at')
+          .in('user_id', friendIds)
+          .not('place_id', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(sourceLimit),
+        supabaseAdmin
+          .from('groups')
+          .select('id, name, created_by, destination_place_id, status, created_at')
+          .in('created_by', friendIds)
+          .not('destination_place_id', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(sourceLimit),
+        supabaseAdmin
+          .from('group_members')
+          .select('id, user_id, group_id, joined_at')
+          .in('user_id', friendIds)
+          .order('joined_at', { ascending: false })
+          .limit(sourceLimit),
+      ]);
 
-      if (reviewError) {
-        const wrapped = new Error(reviewError.message || 'Failed to load feed reviews.');
+      const sourceError = reviewsRes.error || wishlistsRes.error || plannedGroupsRes.error || membershipsRes.error;
+      if (sourceError) {
+        const wrapped = new Error(sourceError.message || 'Failed to load feed activity.');
         wrapped.status = 502;
         throw wrapped;
       }
 
-      const rows = reviews || [];
-      if (rows.length === 0) return res.json({ items: [] });
+      const reviews = reviewsRes.data || [];
+      const wishlists = wishlistsRes.data || [];
+      const plannedGroups = plannedGroupsRes.data || [];
+      const memberships = membershipsRes.data || [];
+      const memberGroupIds = Array.from(new Set(memberships.map((membership) => membership.group_id).filter(Boolean)));
 
-      const actorIds = Array.from(new Set(rows.map((review) => review.user_id).filter(Boolean)));
-      const placeIds = Array.from(new Set(rows.map((review) => review.place_id).filter(Boolean)));
-      const reviewIds = rows.map((review) => review.id);
+      let joinedGroups = [];
+      if (memberGroupIds.length > 0) {
+        const { data: groupsForMemberships, error: joinedGroupsError } = await supabaseAdmin
+          .from('groups')
+          .select('id, name, destination_place_id, created_by, status, created_at')
+          .in('id', memberGroupIds)
+          .not('destination_place_id', 'is', null);
+        if (joinedGroupsError) {
+          const wrapped = new Error(joinedGroupsError.message || 'Failed to load joined trip metadata.');
+          wrapped.status = 502;
+          throw wrapped;
+        }
+        joinedGroups = groupsForMemberships || [];
+      }
+
+      const joinedGroupById = new Map(joinedGroups.map((group) => [group.id, group]));
+      const joinedMemberships = memberships.filter((membership) => {
+        const group = joinedGroupById.get(membership.group_id);
+        if (!group?.destination_place_id) return false;
+        if (group.created_by === membership.user_id) return false;
+        return Boolean(membership.joined_at || group.created_at);
+      });
+
+      const actorIds = Array.from(new Set([
+        ...reviews.map((review) => review.user_id),
+        ...wishlists.map((wishlist) => wishlist.user_id),
+        ...plannedGroups.map((group) => group.created_by),
+        ...joinedMemberships.map((membership) => membership.user_id),
+      ].filter(Boolean)));
+
+      const placeIds = Array.from(new Set([
+        ...reviews.map((review) => review.place_id),
+        ...wishlists.map((wishlist) => wishlist.place_id),
+        ...plannedGroups.map((group) => group.destination_place_id),
+        ...joinedMemberships.map((membership) => joinedGroupById.get(membership.group_id)?.destination_place_id),
+      ].filter(Boolean)));
+
+      const reviewIds = reviews.map((review) => review.id);
 
       const [profilesRes, placesRes, photosRes] = await Promise.all([
         actorIds.length
@@ -300,39 +362,85 @@ module.exports = function reviewsRoutes(supabaseAdmin) {
         }
       });
 
-      return res.json({
-        items: rows.map((review) => {
-          const actor = profileById.get(review.user_id) || null;
-          const place = placeById.get(review.place_id) || null;
-          const reviewPhoto = firstPhotoByReviewId.get(review.id) || null;
+      const normalizeActor = (actorId) => {
+        const actor = profileById.get(actorId) || null;
+        return {
+          id: actorId,
+          fullName: actor?.full_name || null,
+          username: actor?.username || null,
+          avatarUrl: actor?.avatar_url || null,
+        };
+      };
+
+      const normalizePlace = (placeId, reviewPhoto = null) => {
+        const place = placeById.get(placeId) || null;
+        if (!place) {
           return {
-            id: `review:${review.id}`,
-            type: 'review',
-            actor: {
-              id: review.user_id,
-              fullName: actor?.full_name || null,
-              username: actor?.username || null,
-              avatarUrl: actor?.avatar_url || null,
-            },
-            place: place ? {
-              id: place.id,
-              title: place.name || place.city || 'Unknown place',
-              city: place.city || null,
-              country: place.country || null,
-              imageUrl: place.image_url || reviewPhoto || null,
-            } : {
-              id: review.place_id,
-              title: 'Unknown place',
-              city: null,
-              country: null,
-              imageUrl: reviewPhoto,
-            },
-            rating: review.rating ?? null,
-            text: review.review || null,
-            createdAt: review.created_at,
+            id: placeId,
+            title: 'Unknown place',
+            city: null,
+            country: null,
+            imageUrl: reviewPhoto,
           };
-        }),
+        }
+        return {
+          id: place.id,
+          title: place.name || place.city || 'Unknown place',
+          city: place.city || null,
+          country: place.country || null,
+          imageUrl: place.image_url || reviewPhoto || null,
+        };
+      };
+
+      const reviewItems = reviews.map((review) => ({
+        id: `review:${review.id}`,
+        type: 'review',
+        actor: normalizeActor(review.user_id),
+        place: normalizePlace(review.place_id, firstPhotoByReviewId.get(review.id) || null),
+        rating: review.rating ?? null,
+        text: review.review || null,
+        createdAt: review.created_at,
+      }));
+
+      const wishlistItems = wishlists.map((wishlist) => ({
+        id: `wishlist:${wishlist.id}`,
+        type: 'wishlist',
+        actor: normalizeActor(wishlist.user_id),
+        place: normalizePlace(wishlist.place_id),
+        rating: null,
+        text: null,
+        createdAt: wishlist.created_at,
+      }));
+
+      const plannedItems = plannedGroups.map((group) => ({
+        id: `planned:${group.id}`,
+        type: 'planned',
+        actor: normalizeActor(group.created_by),
+        place: normalizePlace(group.destination_place_id),
+        rating: null,
+        text: group.name || null,
+        createdAt: group.created_at,
+      }));
+
+      const joinedItems = joinedMemberships.map((membership) => {
+        const group = joinedGroupById.get(membership.group_id);
+        return {
+          id: `joined:${membership.id}`,
+          type: 'joined',
+          actor: normalizeActor(membership.user_id),
+          place: normalizePlace(group.destination_place_id),
+          rating: null,
+          text: group.name || null,
+          createdAt: membership.joined_at || group.created_at,
+        };
       });
+
+      const items = [...reviewItems, ...wishlistItems, ...plannedItems, ...joinedItems]
+        .filter((item) => item.createdAt && item.place?.id)
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(offset, offset + limit);
+
+      return res.json({ items });
     } catch (error) {
       return next(error);
     }

@@ -64,8 +64,9 @@ function formatTimeAgo(value: string) {
 
 function actionText(item: FeedItem) {
   if (item.type === 'review') return 'reviewed';
+  if (item.type === 'wishlist') return 'saved';
   if (item.type === 'planned') return 'is planning a trip to';
-  return 'saved';
+  return 'joined a trip to';
 }
 
 const ActivityCard: React.FC<{ item: FeedItem; onPress: () => void }> = ({ item, onPress }) => {
@@ -111,7 +112,11 @@ const ActivityCard: React.FC<{ item: FeedItem; onPress: () => void }> = ({ item,
           ) : null}
         </View>
         {region ? <Text style={aStyles.region}>{region}</Text> : null}
-        {item.text ? <Text style={aStyles.reviewText} numberOfLines={2}>{item.text}</Text> : null}
+        {item.text ? (
+          <Text style={item.type === 'review' ? aStyles.reviewText : aStyles.groupText} numberOfLines={2}>
+            {item.type === 'review' ? item.text : `Trip: ${item.text}`}
+          </Text>
+        ) : null}
       </View>
     </TouchableOpacity>
   );
@@ -173,6 +178,7 @@ const aStyles = StyleSheet.create({
   ratingText: { fontSize: 12, fontWeight: '700', color: C.textPrimary },
   region: { marginTop: 2, fontSize: 12, color: C.textSecondary },
   reviewText: { marginTop: 8, fontSize: 13, lineHeight: 18, color: C.textSecondary },
+  groupText: { marginTop: 8, fontSize: 12, lineHeight: 17, fontWeight: '600', color: C.textSecondary },
 });
 
 const SocialFeedScreen: React.FC = () => {
